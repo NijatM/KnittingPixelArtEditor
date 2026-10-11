@@ -38,10 +38,11 @@ Third batch (2026-10-11) — Day 4 and Day 6 done (Day 5 stamps still open):
 - **Autosave** (`src/store.ts`): IndexedDB, last project only; reload restores photo, detection, settings, edits and bake exactly; "forget this project" in Export.
 - Regression scripts for all of it in `research/private_tests/` (editor, exports + `check_exports.py`, autosave, phone).
 
+Fourth batch (2026-10-11) — Day 5 done: **stamps** (`src/pipeline/stamps.ts`, replaces the fixed drawing in features.ts). 5 eye, 4 brow, 6 mouth, 4 nose, 4 glasses variants; "auto" per photo + grid size; Stamps panel steppers (auto → variants → off, off = the 05 Features switch), tap-to-cycle in the view with dashed hit boxes, "all auto"; saved with the project. Auto picked the open-mouth stamp for both Mariana photos (open smiles), which fixes the flat-line mouth; the Nijat photos render bit-identically to before. Harness: `research/private_tests/stampsheet.ts` renders every variant per face.
+
 Next:
-1. Day 5: procedural stamps (eyes / brows / mouth / nose / glasses variants, auto-placed from the face points, tap to swap).
-2. Day 7: hair modes (solid / tone / texture), tuning on TestPortraits.
-3. Tuning list: strong side light (Nijat_V3 in A/C/D), big curly hair (Mariana) → hair modes on Day 7; moustache blobs in E; optional: fp16 weights to halve the 15 MB model download.
+1. Day 7: hair modes (solid / tone / texture), tuning on TestPortraits.
+2. Tuning list: strong side light (Nijat_V3 in A/C/D), big curly hair (Mariana) → hair modes on Day 7; moustache blobs in E; optional: fp16 weights to halve the 15 MB model download.
 
 ## Planning session — 2026-10-09
 

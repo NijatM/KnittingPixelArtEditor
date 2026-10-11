@@ -118,6 +118,7 @@ body.help .explain { display: block; }
 .stepper { display: inline-flex; align-items: center; gap: 2px; }
 .stepper button { padding: 1px 7px; }
 .stepper span { min-width: 3.2em; text-align: center; font-variant-numeric: tabular-nums; }
+[data-stamp] .stepper span { min-width: 12em; }
 .txt { background: var(--bg2); border: 1px solid var(--line2); padding: 3px 6px; border-radius: 0; min-width: 0; width: 100%; outline: none; }
 .txt:focus { border-color: var(--hi); }
 .sw { display: inline-block; width: 22px; height: 22px; border: 1px solid var(--line2); vertical-align: middle; position: relative; overflow: hidden; }

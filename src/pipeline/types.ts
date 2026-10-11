@@ -1,3 +1,5 @@
+import type { Stamps } from './stamps';
+
 /** MediaPipe selfie_multiclass categories. */
 export const SEG = { BG: 0, HAIR: 1, BODY: 2, FACE: 3, CLOTHES: 4, OTHER: 5 } as const;
 
@@ -45,6 +47,7 @@ export interface Look {
   cleanup: number;
   lineWeight: number; // style E: 1 = tuned, higher = more cells become line
   features: Features;
+  stamps: Stamps;     // feature stamp per kind, 0 = auto
   background: 'white' | 'black' | 'pattern' | 'photo';
   bgDensity: number; // pattern / photo background: share of ink, 0..1
 }

@@ -10,6 +10,7 @@ import { AUTO_FRAME, computeCrop, type FrameParams } from './frame';
 import { decodeImage, wireImport } from './importer';
 import { GLASSES_MIN_SHARE, glassesShare } from './pipeline/glasses';
 import { OVAL, pts } from './pipeline/landmarks';
+import { AUTO_STAMPS, STAMPS, STAMP_KINDS, autoVariant, hitBoxes, type Face, type StampKind } from './pipeline/stamps';
 import { SEG, type Crop, type Features, type Look, type RenderResult, type StyleId, type StyleResult } from './pipeline/types';
 import { $, $$, Bar, check, seg, setCheck, setSeg } from './ui/controls';
 import type { FromWorker, ToWorker } from './worker';
@@ -56,7 +57,7 @@ const S = {
   H: 80,
   lock: true,
   cellAspect: 1,
-  look: { skin: 0.5, hair: 0.5, clothes: 0.5, cleanup: 2, lineWeight: 1, background: 'white', bgDensity: 0.25, features: { ...DEFAULT_FEATURES } } as Look,
+  look: { skin: 0.5, hair: 0.5, clothes: 0.5, cleanup: 2, lineWeight: 1, background: 'white', bgDensity: 0.25, features: { ...DEFAULT_FEATURES }, stamps: { ...AUTO_STAMPS } } as Look,
   style: 'B' as StyleId,
   pal: [...DEFAULT_PAL],
   step: 'photo' as Step,
@@ -88,6 +89,28 @@ function shown(): { cells: Uint8Array; W: number; H: number } | null {
   const any = S.res.get(S.style);
   return any ? { cells: any.cells, W: any.W, H: any.H } : null;
 }
+/** Face points in grid coordinates for the current frame (stamps' auto choice, hit boxes). */
+function gridFace(): Face | null {
+  const c = crop(), lm = S.photo?.lm;
+  if (!c || !lm) return null;
+  const g = new Float32Array(lm.length), sx = S.W / c.w, sy = S.H / c.h;
+  for (let i = 0; i < lm.length; i += 2) { g[i] = (lm[i] - c.x) * sx; g[i + 1] = (lm[i + 1] - c.y) * sy; }
+  return { lm: g, W: S.W, H: S.H };
+}
+const FEATURE_OF: Record<StampKind, keyof Features> = { eyes: 'eyes', brows: 'brows', mouth: 'mouth', nose: 'nostrils', glasses: 'glasses' };
+
+/** Step a stamp: auto → 1 … n → off → auto. Off is the feature switch in 05 Features. */
+function cycleStamp(kind: StampKind, dir: number) {
+  const n = STAMPS[kind].length, f = S.look.features, key = FEATURE_OF[kind];
+  const pos = !f[key] ? n + 1 : S.look.stamps[kind]; // 0 auto, 1..n, n + 1 off
+  const next = (pos + dir + n + 2) % (n + 2);
+  f[key] = next !== n + 1;
+  if (next !== n + 1) S.look.stamps[kind] = next;
+  const face = gridFace(), name = next === n + 1 ? 'off' : next === 0 ? `auto · ${face ? STAMPS[kind][autoVariant(kind, face) - 1].name : 'traced'}` : STAMPS[kind][next - 1].name;
+  log(`> ${kind} · ${name}`);
+  syncControls(); lookChanged();
+}
+
 /** Mirror axis: the face centre (between the outer eye corners), snapped to half a cell; the grid centre otherwise. */
 function updateAxis() {
   const c = crop(), lm = S.photo?.lm;
@@ -277,6 +300,17 @@ function drawEditor() {
   const ctx = cv.getContext('2d')!;
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(off, 0, 0, W * cw, H * ch);
+  const face = S.step === 'stamps' ? gridFace() : null;
+  if (face) { // tappable features
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--ok').trim();
+    ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
+    const boxes = hitBoxes(face);
+    for (const k of ['eyes', 'brows', 'mouth', 'nose'] as StampKind[]) {
+      const b = boxes[k];
+      ctx.strokeRect(Math.round(b.x0 * cw) + 0.5, Math.round(b.y0 * ch) + 0.5, Math.round((b.x1 - b.x0) * cw), Math.round((b.y1 - b.y0) * ch));
+    }
+    ctx.setLineDash([]);
+  }
   if (S.grid && ch >= 5) {
     ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--line2').trim();
     for (let x = 0; x <= W; x++) { ctx.globalAlpha = x % 10 ? 0.35 : 0.9; ctx.fillRect(x * cw, 0, 1, H * ch); }
@@ -420,6 +454,16 @@ function refresh() {
   bind('features', Object.entries(f).every(([k, v]) => (k === 'glasses' ? v === found : v)) ? 'auto' : 'custom');
   bind('background', S.look.background);
   bind('fmt', S.fmt === 'bmp' ? `bmp ${S.depth}-bit` : S.fmt);
+  const face = gridFace();
+  let picked = 0;
+  for (const kind of STAMP_KINDS) {
+    const n = STAMPS[kind].length, v = S.look.stamps[kind], on = S.look.features[FEATURE_OF[kind]];
+    if (on && v) picked++;
+    $(`[data-stamp=${kind}] .stepper span`).textContent = !on ? 'off'
+      : v ? `${v}/${n} · ${STAMPS[kind][v - 1].name}`
+      : `auto · ${face ? STAMPS[kind][autoVariant(kind, face) - 1].name : '—'}${S.style === 'E' && (kind === 'mouth' || kind === 'nose') ? ' (E: model)' : ''}`;
+  }
+  bind('stamps', picked ? `${picked} picked` : 'auto');
   $('#glasses-note').textContent = g < 0 ? '' : found ? '· found' : '· none found';
   $$('#nav .lrow').forEach(r => r.classList.toggle('faint', !S.photo && r.dataset.step !== 'photo'));
 
@@ -591,6 +635,13 @@ $('#livecheck').onclick = () => {
   editorChanged();
 };
 $('#clearedits').onclick = () => { S.ed.clear(); editorChanged(); };
+$$<HTMLButtonElement>('[data-cycle]').forEach(b => (b.onclick = () => cycleStamp(b.closest<HTMLElement>('[data-stamp]')!.dataset.stamp as StampKind, +b.dataset.cycle!)));
+$('#stamps-auto').onclick = () => {
+  S.look.stamps = { ...AUTO_STAMPS };
+  for (const k of STAMP_KINDS) if (k !== 'glasses') S.look.features[FEATURE_OF[k]] = true;
+  S.look.features.glasses = (S.photo?.glasses ?? -1) >= GLASSES_MIN_SHARE;
+  log('> all stamps on auto'); syncControls(); lookChanged();
+};
 $$<HTMLButtonElement>('[data-brush]').forEach(b => (b.onclick = () => { S.ed.brush = Math.max(1, Math.min(6, S.ed.brush + +b.dataset.brush!)); refresh(); }));
 {
   const cv = $('#cv') as HTMLCanvasElement;
@@ -599,6 +650,15 @@ $$<HTMLButtonElement>('[data-brush]').forEach(b => (b.onclick = () => { S.ed.bru
     return [Math.floor((e.clientX - r.left) / r.width * S.ed.W), Math.floor((e.clientY - r.top) / r.height * S.ed.H)];
   };
   cv.addEventListener('pointerdown', e => {
+    if (S.step === 'stamps') { // tap a feature to cycle its stamp
+      const face = gridFace(), [x, y] = cellAt(e);
+      if (!face) return;
+      const boxes = hitBoxes(face), cx = x + 0.5, cy = y + 0.5;
+      const inside = (k: StampKind) => { const b = boxes[k]; return cx >= b.x0 && cx <= b.x1 && cy >= b.y0 && cy <= b.y1; };
+      const kind = (['brows', 'nose', 'mouth', 'eyes'] as StampKind[]).find(inside) ?? (inside('glasses') ? 'glasses' : null);
+      if (kind) cycleStamp(kind, 1);
+      return;
+    }
     const r = editable() ?? (S.ed.baked ? { cells: S.ed.baked } : null);
     if (!r || e.button !== 0) return;
     cv.setPointerCapture(e.pointerId);

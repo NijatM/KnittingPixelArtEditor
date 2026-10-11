@@ -35,7 +35,7 @@
     <div class="spaced dim navsec">EDIT</div>
     <div class="list">
       <div class="lrow" data-step="draw" tabindex="0"><span class="lnum">07</span><span class="left">draw</span><span class="right" data-bind="edits">—</span></div>
-      <div class="lrow" data-step="stamps" tabindex="0"><span class="lnum">08</span><span class="left">stamps</span><span class="right">—</span></div>
+      <div class="lrow" data-step="stamps" tabindex="0"><span class="lnum">08</span><span class="left">stamps</span><span class="right" data-bind="stamps">auto</span></div>
       <div class="lrow" data-step="colours" tabindex="0"><span class="lnum">09</span><span class="left">colours</span><span class="right"><span class="mini" data-sw="0"></span><span class="mini" data-sw="1"></span></span></div>
     </div>
     <div class="spaced dim navsec">MAKE</div>
@@ -180,7 +180,7 @@
         <button class="check" style="display:block" data-feature="eyes"><span class="box">[ ]</span> redraw eyes</button>
         <button class="check" style="display:block" data-feature="brows"><span class="box">[ ]</span> brows</button>
         <button class="check" style="display:block" data-feature="mouth"><span class="box">[ ]</span> mouth</button>
-        <button class="check" style="display:block" data-feature="nostrils"><span class="box">[ ]</span> nostrils</button>
+        <button class="check" style="display:block" data-feature="nostrils"><span class="box">[ ]</span> nose</button>
         <button class="check" style="display:block" data-feature="jaw"><span class="box">[ ]</span> jaw line <span class="dim">· line portrait</span></button>
         <button class="check" style="display:block" data-feature="silhouette"><span class="box">[ ]</span> silhouette</button>
         <button class="check" style="display:block" data-feature="glasses"><span class="box">[ ]</span> glasses frames <span class="dim" id="glasses-note"></span></button>
@@ -220,8 +220,14 @@
       <div class="kicker">08 · EDIT</div>
       <div class="title">Stamps</div>
       <div class="dash"></div>
-      <div class="note">Eyes, brows, mouths and noses placed from the face points.</div>
-      <div class="empty small">not built yet</div>
+      <div class="note">Designed features, placed from the face points. Tap a feature in the view to cycle it.</div>
+      <div class="row" data-stamp="eyes"><label>eyes</label><div class="val"><div class="stepper"><button data-cycle="-1" aria-label="previous eyes">‹</button><span></span><button data-cycle="1" aria-label="next eyes">›</button></div></div></div>
+      <div class="row" data-stamp="brows"><label>brows</label><div class="val"><div class="stepper"><button data-cycle="-1" aria-label="previous brows">‹</button><span></span><button data-cycle="1" aria-label="next brows">›</button></div></div></div>
+      <div class="row" data-stamp="mouth"><label>mouth</label><div class="val"><div class="stepper"><button data-cycle="-1" aria-label="previous mouth">‹</button><span></span><button data-cycle="1" aria-label="next mouth">›</button></div></div></div>
+      <div class="row" data-stamp="nose"><label>nose</label><div class="val"><div class="stepper"><button data-cycle="-1" aria-label="previous nose">‹</button><span></span><button data-cycle="1" aria-label="next nose">›</button></div></div></div>
+      <div class="row" data-stamp="glasses"><label>glasses</label><div class="val"><div class="stepper"><button data-cycle="-1" aria-label="previous glasses">‹</button><span></span><button data-cycle="1" aria-label="next glasses">›</button></div></div></div>
+      <div class="inline"><button class="btn" id="stamps-auto">all auto</button></div>
+      <div class="explain small">"auto" picks per photo and grid size: dot eyes and a dot nose on small grids, an open mouth when the photo smiles with teeth, frames when glasses are found. Designed noses and mouths replace the photo's own shading there. In ML lines (E) the mouth and nose stay the model's unless you pick one. Stepping to "off" turns the feature off (same as 05 Features).</div>
     </section>
 
     <section class="panel" data-panel="colours">

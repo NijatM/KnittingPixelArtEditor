@@ -137,8 +137,8 @@ function styleE(p: Prepared, r: Regions, look: Look, lines: LineMap) {
   let ink = clean(Uint8Array.from(cov, c => +(c > t)), W, H, look.cleanup);
   cut(ink, p.ps, r.hair, densityToQ(look.hair, 88));
   cut(ink, p.ps, r.clothes, densityToQ(look.clothes, 55));
-  // The model draws mouth, nose and jaw itself; only eyes, brows and glasses come from the face points.
-  const fm = featureMasks(p, { ...look.features, mouth: false, nostrils: false, jaw: false });
+  // The model draws mouth, nose and jaw itself; eyes, brows and glasses (and any stamp picked by hand) are stamped.
+  const fm = featureMasks(p, look, { modelFace: true });
   ink = clean(ink, W, H, look.cleanup, fm.sock);
   return finish(ink, fm, r, look, W);
 }
@@ -147,7 +147,7 @@ const RENDER = { A: styleA, B: styleB, C: styleC, D: styleD };
 
 /** Renders the given styles; E needs the line map from ml.ts. */
 export function renderStyles(p: Prepared, styles: StyleId[], look: Look, lines?: LineMap): StyleResult[] {
-  const fm = featureMasks(p, look.features), r = regions(p, fm);
+  const fm = featureMasks(p, look), r = regions(p, fm);
   return styles.map(style => {
     const t0 = performance.now(), cells = new Uint8Array(p.W * p.H);
     const ink = style === 'E' ? styleE(p, r, look, lines!) : RENDER[style](p, r, fm, look);
