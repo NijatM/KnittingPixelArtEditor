@@ -6,7 +6,7 @@ import { SEG, type Crop, type Prepared, type Source } from './types';
 export const workScale = (W: number) => Math.max(4, Math.min(10, Math.floor(1000 / W)));
 
 /** Area-weight table for one axis: output cell i covers [o + i*s, o + (i+1)*s) of source pixels 0..n-1. */
-function axisWeights(o: number, s: number, outN: number, n: number) {
+export function axisWeights(o: number, s: number, outN: number, n: number) {
   const start = new Int32Array(outN), len = new Int32Array(outN), inside = new Float32Array(outN), w: number[] = [];
   const offs = new Int32Array(outN);
   for (let i = 0; i < outN; i++) {
@@ -24,8 +24,27 @@ function axisWeights(o: number, s: number, outN: number, n: number) {
   return { start, len, offs, inside, w: Float32Array.from(w) };
 }
 
+/** Area-resize a single-channel image (any factor). */
+export function areaResize(src: Float32Array, sw: number, sh: number, dw: number, dh: number): Float32Array {
+  const X = axisWeights(0, sw / dw, dw, sw), Y = axisWeights(0, sh / dh, dh, sh);
+  const tmp = new Float32Array(sh * dw), out = new Float32Array(dw * dh);
+  for (let y = 0; y < sh; y++)
+    for (let i = 0; i < dw; i++) {
+      let s = 0;
+      for (let k = 0; k < X.len[i]; k++) s += src[y * sw + X.start[i] + k] * X.w[X.offs[i] + k];
+      tmp[y * dw + i] = s / (sw / dw);
+    }
+  for (let j = 0; j < dh; j++)
+    for (let i = 0; i < dw; i++) {
+      let s = 0;
+      for (let k = 0; k < Y.len[j]; k++) s += tmp[(Y.start[j] + k) * dw + i] * Y.w[Y.offs[j] + k];
+      out[j * dw + i] = s / (sh / dh);
+    }
+  return out;
+}
+
 /** Area-resample the crop of the RGBA source to ww×wh RGB; cells mostly outside the photo are flagged. */
-function resampleCrop(src: Source, c: Crop, ww: number, wh: number) {
+export function resampleCrop(src: Source, c: Crop, ww: number, wh: number) {
   const X = axisWeights(c.x, c.w / ww, ww, src.w), Y = axisWeights(c.y, c.h / wh, wh, src.h);
   const rgb = new Float32Array(ww * wh * 3), outside = new Uint8Array(ww * wh);
   // Horizontal pass on every source row the crop touches.
@@ -60,7 +79,7 @@ function resampleCrop(src: Source, c: Crop, ww: number, wh: number) {
 }
 
 /** Nearest sample of the source segmentation at each work pixel centre; outside the photo = background. */
-function sampleSeg(src: Source, c: Crop, ww: number, wh: number, outside: Uint8Array) {
+export function sampleSeg(src: Source, c: Crop, ww: number, wh: number, outside: Uint8Array) {
   const out = new Uint8Array(ww * wh);
   if (!src.seg) { for (let i = 0; i < out.length; i++) out[i] = outside[i] ? SEG.BG : SEG.FACE; return out; }
   const sx = c.w / ww, sy = c.h / wh;
@@ -155,21 +174,25 @@ export function prepare(src: Source, crop: Crop, W: number, H: number): Prepared
   for (let i = 0; i < gray.length; i++)
     gray[i] = Math.round(0.299 * rgb[i * 3] + 0.587 * rgb[i * 3 + 1] + 0.114 * rgb[i * 3 + 2]);
   const pg = clahe(bilateral(gray, ww, wh), ww, wh);
-  for (let i = 0; i < pg.length; i++) if (seg[i] === SEG.BG) pg[i] = 255;
 
-  // Grid resolution: tone = block mean, region = block majority.
-  const ps = new Float32Array(W * H), segs = new Uint8Array(W * H), acc = new Uint8Array(W * H), votes = new Int32Array(6);
+  // Grid resolution: tone = block mean (background whitened, and kept), region = block majority.
+  const ps = new Float32Array(W * H), bgps = new Float32Array(W * H), segs = new Uint8Array(W * H), acc = new Uint8Array(W * H);
+  const votes = new Int32Array(6);
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
-      let s = 0; votes.fill(0);
+      let s = 0, sb = 0; votes.fill(0);
       for (let j = 0; j < f; j++)
-        for (let i = 0; i < f; i++) { const o = (y * f + j) * ww + x * f + i; s += pg[o]; votes[seg[o]]++; }
+        for (let i = 0; i < f; i++) {
+          const o = (y * f + j) * ww + x * f + i;
+          s += seg[o] === SEG.BG ? 255 : pg[o]; sb += pg[o]; votes[seg[o]]++;
+        }
       ps[y * W + x] = s / (f * f);
+      bgps[y * W + x] = sb / (f * f);
       let best = 0; for (let k = 1; k < 6; k++) if (votes[k] > votes[best]) best = k;
       segs[y * W + x] = best;
       acc[y * W + x] = +(votes[SEG.OTHER] >= 0.25 * f * f);
     }
 
   const lm = src.lm ? scaleLm(src.lm, crop, W / crop.w, H / crop.h) : null;
-  return { W, H, ps, segs, acc, lm, ms: performance.now() - t0 };
+  return { W, H, ps, bgps, segs, acc, lm, ms: performance.now() - t0 };
 }

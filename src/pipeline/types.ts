@@ -17,14 +17,15 @@ export interface Crop { x: number; y: number; w: number; h: number }
 export interface Prepared {
   W: number;
   H: number;
-  ps: Float32Array;   // prepared tone 0..255 per cell
+  ps: Float32Array;   // prepared tone 0..255 per cell, background whitened
+  bgps: Float32Array; // same tone with the background kept (for the "photo" background)
   segs: Uint8Array;   // SEG category per cell
   acc: Uint8Array;    // 1 where ≥ 25 % of the cell is "others / accessories" (glasses frames, …)
   lm: Float32Array | null; // face points in grid coordinates
   ms: number;
 }
 
-export type StyleId = 'A' | 'B' | 'C' | 'D';
+export type StyleId = 'A' | 'B' | 'C' | 'D' | 'E';
 
 export interface Features {
   eyes: boolean;
@@ -42,8 +43,10 @@ export interface Look {
   hair: number;
   clothes: number;
   cleanup: number;
+  lineWeight: number; // style E: 1 = tuned, higher = more cells become line
   features: Features;
-  background: 'white' | 'black';
+  background: 'white' | 'black' | 'pattern' | 'photo';
+  bgDensity: number; // pattern / photo background: share of ink, 0..1
 }
 
 export interface RenderRequest {

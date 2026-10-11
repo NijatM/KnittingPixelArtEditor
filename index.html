@@ -34,13 +34,13 @@
     </div>
     <div class="spaced dim navsec">EDIT</div>
     <div class="list">
-      <div class="lrow" data-step="draw" tabindex="0"><span class="lnum">07</span><span class="left">draw</span><span class="right">—</span></div>
+      <div class="lrow" data-step="draw" tabindex="0"><span class="lnum">07</span><span class="left">draw</span><span class="right" data-bind="edits">—</span></div>
       <div class="lrow" data-step="stamps" tabindex="0"><span class="lnum">08</span><span class="left">stamps</span><span class="right">—</span></div>
       <div class="lrow" data-step="colours" tabindex="0"><span class="lnum">09</span><span class="left">colours</span><span class="right"><span class="mini" data-sw="0"></span><span class="mini" data-sw="1"></span></span></div>
     </div>
     <div class="spaced dim navsec">MAKE</div>
     <div class="list">
-      <div class="lrow" data-step="export" tabindex="0"><span class="lnum">10</span><span class="left">export</span><span class="right">png</span></div>
+      <div class="lrow" data-step="export" tabindex="0"><span class="lnum">10</span><span class="left">export</span><span class="right" data-bind="fmt">png</span></div>
     </div>
 
     <div class="navfoot small faint">
@@ -77,9 +77,9 @@
       <div class="tbline">
         <div class="seg" id="viewseg"><button data-view="styles">styles</button><button data-view="pixels">pixels</button></div>
         <span class="sep hide-narrow"></span>
-        <div class="seg tools" title="drawing arrives with the editor"><button disabled class="on">pencil</button><button disabled>erase</button><button disabled>fill</button><button disabled>line</button></div>
-        <div class="seg" title="drawing arrives with the editor"><button disabled class="on">ink</button><button disabled>paper</button></div>
-        <button class="check" disabled title="drawing arrives with the editor"><span class="box">[ ]</span> mirror</button>
+        <div class="seg tools"><button data-tool="pencil" title="pencil (B)">pencil</button><button data-tool="erase" title="erase back to the style (E)">erase</button><button data-tool="fill" title="fill (G)">fill</button><button data-tool="line" title="line (L)">line</button></div>
+        <div class="seg"><button data-ink="0" title="draw with ink (X swaps)">ink</button><button data-ink="1" title="draw with paper (X swaps)">paper</button></div>
+        <button class="check mirrorcheck" title="mirror around the face centre (M)"><span class="box">[ ]</span> mirror</button>
         <button class="check" id="gridcheck"><span class="box">[ ]</span> grid</button>
         <div class="stepper hide-narrow"><button data-zoom="-1" aria-label="zoom out">‹</button><span id="zoomval">fit</span><button data-zoom="1" aria-label="zoom in">›</button></div>
       </div>
@@ -87,10 +87,10 @@
 
     <div id="statusbar">
       <div class="stline">
-        <button class="btn" disabled title="editing arrives with the editor">‹ undo</button>
-        <button class="btn" disabled title="editing arrives with the editor">redo ›</button>
-        <button class="check on" disabled><span class="box">[x]</span> live</button>
-        <button class="btn primary" disabled title="editing arrives with the editor">bake</button>
+        <button class="btn" id="undo" title="undo (⌘Z)">‹ undo</button>
+        <button class="btn" id="redo" title="redo (⇧⌘Z)">redo ›</button>
+        <button class="check on" id="livecheck" title="the base follows the style and sliders"><span class="box">[x]</span> live</button>
+        <button class="btn primary" data-act="bake" title="flatten style + edits into plain pixels">bake</button>
       </div>
       <div class="stline small"><span class="fg" id="status"></span></div>
       <div class="stline small"><span class="dim" id="log" aria-live="polite">&gt; ready · drop, paste or choose a portrait</span><span class="faint" id="clock"></span></div>
@@ -152,8 +152,9 @@
       <div class="note">Every style is rendered from your photo. Pick one to start from; your edits will stay on their own layer.</div>
       <div class="list" id="stylelist"></div>
       <div class="subhead">PARAMETERS<i></i></div>
+      <div class="row"><label>line weight</label><div class="bar" id="bar-lineweight"></div><span class="barval"></span></div>
       <div class="row"><label>cleanup</label><div class="bar" id="bar-cleanup"></div><span class="barval"></span></div>
-      <div class="explain small">Cleanup removes lone cells that disagree with almost all of their neighbours. Drawn features are protected.</div>
+      <div class="explain small">Line weight thickens or thins the model's lines (style E). Cleanup removes lone cells that disagree with almost all of their neighbours; drawn features are protected. Style E downloads a 15 MB line model once, then runs on this device.</div>
     </section>
 
     <section class="panel" data-panel="regions">
@@ -193,17 +194,26 @@
       <div class="kicker">06 · START</div>
       <div class="title">Background</div>
       <div class="dash"></div>
-      <div class="seg" id="bgseg"><button data-bg="white">white</button><button data-bg="black">black</button><button disabled title="coming soon">pattern</button><button disabled title="coming soon">photo</button></div>
+      <div class="seg" id="bgseg"><button data-bg="white">white</button><button data-bg="black">black</button><button data-bg="pattern">pattern</button><button data-bg="photo">photo</button></div>
+      <div class="row" id="bgdensity-row" style="margin-top:8px"><label>density</label><div class="bar" id="bar-bg"></div><span class="barval"></span></div>
       <div class="inline"><button class="check" data-feature="silhouette"><span class="box">[ ]</span> outline the person</button></div>
-      <div class="explain small">The outline is drawn on a white background only.</div>
+      <div class="explain small">Pattern fills the background with evenly spaced dots; photo keeps the real background, drawn in the same style. Density sets how much of it is ink. The outline is an ink line against white and a one-cell paper gap against everything else.</div>
     </section>
 
     <section class="panel" data-panel="draw">
       <div class="kicker">07 · EDIT</div>
       <div class="title">Draw</div>
       <div class="dash"></div>
-      <div class="note">Edits will sit on their own layer above the style, so changing a slider keeps them.</div>
-      <div class="empty small">not built yet · pencil, eraser, fill, line, mirror, undo and bake come next</div>
+      <div class="note">Edits sit on their own layer above the style. Change any slider or style and they stay.</div>
+      <div class="row"><label>tool</label><div class="seg tools"><button data-tool="pencil">pencil</button><button data-tool="erase">erase</button><button data-tool="fill">fill</button><button data-tool="line">line</button></div></div>
+      <div class="row"><label>colour</label><div class="seg"><button data-ink="0">ink</button><button data-ink="1">paper</button></div></div>
+      <div class="row"><label>brush</label><div class="val"><div class="stepper"><button data-brush="-1" aria-label="smaller brush">‹</button><span data-bind="brush">1</span><button data-brush="1" aria-label="bigger brush">›</button></div></div></div>
+      <div class="row"><label>mirror</label><div class="val"><button class="check mirrorcheck"><span class="box">[ ]</span></button> <span class="dim" data-bind="axis"></span></div></div>
+      <div class="subhead">EDITS<i></i></div>
+      <div class="row"><label>forced</label><span class="val" data-bind="editsdetail">none yet</span></div>
+      <div class="row"><label>base</label><span class="val dim" data-bind="basestate"></span></div>
+      <div class="inline"><button class="btn" id="clearedits">clear edits</button><button class="btn primary" data-act="bake">bake</button></div>
+      <div class="explain small">Erase returns a cell to "auto" (whatever the style says). Bake flattens style + edits into plain pixels and freezes them; tick "live" to follow the style again (undo brings the bake back). Keys: B pencil · E erase · G fill · L line · X swap colour · M mirror · ⌘Z / ⇧⌘Z undo / redo · + / − / 0 zoom · ⌘ + scroll zoom.</div>
     </section>
 
     <section class="panel" data-panel="stamps">
@@ -230,10 +240,14 @@
       <div class="dash"></div>
       <div class="note">One pixel per stitch.</div>
       <div class="subhead">FILE<i></i></div>
-      <div class="row"><label>format</label><div class="seg"><button class="on">PNG</button><button disabled title="coming soon">BMP</button><button disabled title="coming soon">SVG</button></div></div>
+      <div class="row"><label>format</label><div class="seg" id="fmtseg"><button data-fmt="png">PNG</button><button data-fmt="bmp">BMP</button><button data-fmt="svg">SVG</button></div></div>
+      <div class="row" id="bmprow"><label>bit depth</label><div class="seg" id="depthseg"><button data-depth="1">1</button><button data-depth="4">4</button><button data-depth="8">8</button><button data-depth="24">24</button></div></div>
       <div class="row"><label>name</label><input class="txt" id="exportname" aria-label="file name"></div>
       <div class="inline"><button class="btn primary" id="exportbtn">export png</button></div>
-      <div class="explain small">PNG keeps your two colours exactly. BMP (bit depth of your choice) and SVG come with the export step.</div>
+      <div class="subhead">SESSION<i></i></div>
+      <div class="note small" data-bind="saved">Saved in this browser. Only the last project is kept.</div>
+      <div class="inline"><button class="btn" id="forget">forget this project</button></div>
+      <div class="explain small">PNG and BMP: one pixel per stitch in exactly your two colours. BMP bit depth is your choice: 1, 4 or 8-bit store the colours as a palette, 24-bit stores plain RGB; depths too small for the palette are disabled. SVG merges each row's runs into paths, with cells drawn at the cell aspect. The project (photo, settings, edits) stays in this browser until you forget it or load another photo.</div>
     </section>
 
   </aside>

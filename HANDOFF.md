@@ -9,8 +9,8 @@ Suggested first prompt next time:
 
 Built (Vite 8 + TypeScript 7, `npm run dev` / `build` / `preview`; Node 26 installed with Homebrew):
 
-- Git repo initialised on `main` — **nothing committed or pushed yet**. `.gitignore` keeps `TestPortraits/`, `research/private_*`, `public/mediapipe/` (copied WASM) out.
-- GitHub Actions Pages workflow, Vite `base: '/KnittingPixelArtEditor/'`. Repo Pages source must be set to "GitHub Actions" once.
+- Repo `github.com/NijatM/KnittingPixelArtEditor` (public), first commit pushed 2026-10-11; Pages deploy succeeded → **https://nijatm.github.io/KnittingPixelArtEditor/**. `.gitignore` keeps `TestPortraits/`, `research/private_*`, `public/mediapipe/` (copied WASM) out.
+- GitHub Actions Pages workflow, Vite `base: '/KnittingPixelArtEditor/'`. Pages source is "GitHub Actions" (already set).
 - App shell from the mockup CSS, IBM Plex Mono self-hosted, dark/light theme (remembered), `?` help, phone layout.
 - Import: file picker, drag & drop anywhere, paste; EXIF orientation; ≤ 1600 px.
 - MediaPipe face landmarks + multiclass segmentation, self-hosted, **CPU delegate** (GPU took ~14 s on the first photo).
@@ -25,11 +25,23 @@ Changed from the plan after testing on `TestPortraits/` (SPEC updated):
 
 Verified headless (Playwright + Chromium in the scratchpad, production build): all 5 team photos render all 4 styles; glasses found on Nijat_V1 (8 %) and Nijat_V3 (31 %) only; sizes 32/128, ratios, sliders, PNG export (exactly 2 colours, 64×80), light theme, phone layout, a photo without a face; dev server; no page errors. ~1.3 s from photo to gallery on the first photo, ~0.7 s after. Test scripts kept (git-ignored) in `research/private_tests/`.
 
+Second batch (2026-10-11, after the first deploy):
+- Glasses are now **drawn from the eye landmarks** (rounded lens per eye + bridge, lens interior cleared, frame cells touching a brow dropped). The segmenter only finds the dark top bar of clear frames, so it is used for detection only. Fixes the "sunglasses" bars the user saw at 51 wide.
+- Empty / frame view: the styles|pixels toggle no longer lights "pixels".
+- **Backgrounds** pattern and photo (+ density) — Day 2 done.
+- **Style E** (Day 3): `opensketch_style` → ONNX via `scripts/convert-informative-drawings.py`, second worker, WebGPU or CPU, line weight slider, progress + error state in the E tile. E is the cleanest style for harsh side light (Nijat_V3); it still turns moustaches into blobs (known).
+- Offline tuning loop: `?debug` URL keeps detection data on `window.__kpaeDebug`; `research/private_tests/dump.mjs` saves it, `harness.ts` (bundled with rolldown) renders any style / setting / mask overlay in Node without a browser.
+
+Third batch (2026-10-11) — Day 4 and Day 6 done (Day 5 stamps still open):
+- **Editor** (`src/editor.ts`): pencil / erase / fill / line, brush 1–6, ink/paper, mirror around the face centre, undo/redo (200 steps), clear, live / Bake, edits kept across slider + style changes and rescaled on grid changes, zoom (stepper, + / − / 0, ⌘+scroll) with scrolling, keyboard shortcuts, touch drawing on phones; gallery thumbnails show your edits on every style.
+- **Export** (`src/export.ts`): PNG, BMP with bit depth 1 / 4 / 8 / 24 (depths too small for the palette disabled), SVG (row runs merged into one path per colour, cell aspect respected). Verified pixel-identical to the PNG.
+- **Autosave** (`src/store.ts`): IndexedDB, last project only; reload restores photo, detection, settings, edits and bake exactly; "forget this project" in Export.
+- Regression scripts for all of it in `research/private_tests/` (editor, exports + `check_exports.py`, autosave, phone).
+
 Next:
-1. Day 2 leftovers: background **pattern** and **photo** options.
-2. Day 3: Informative Drawings `opensketch_style` → ONNX (+ MIT notice next to it), style E, gallery renders lazily.
-3. Day 4: editor (edits layer, pencil / erase / fill / line, undo/redo, mirror, Bake).
-4. Tuning list from the test photos: strong side light (Nijat_V3 cheek shadow in A/C/D), big curly hair (Mariana) — hair modes on Day 7.
+1. Day 5: procedural stamps (eyes / brows / mouth / nose / glasses variants, auto-placed from the face points, tap to swap).
+2. Day 7: hair modes (solid / tone / texture), tuning on TestPortraits.
+3. Tuning list: strong side light (Nijat_V3 in A/C/D), big curly hair (Mariana) → hair modes on Day 7; moustache blobs in E; optional: fp16 weights to halve the 15 MB model download.
 
 ## Planning session — 2026-10-09
 

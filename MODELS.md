@@ -11,8 +11,8 @@ Every model file shipped in `public/models/`, where it comes from, and its licen
 | License | **MIT**, Copyright (c) 2022 Caroline Chan — same text in the source repo and in ControlNet's `annotator/lineart/LICENSE` |
 | Training drawings | OpenSketch dataset (Gryaditskaya et al. 2019), distributed under **CC0** |
 | SHA-256 (.pth) | `30a534781061f34e83bb9406b4335da4ff2616c95d22a585c1245aa8363e74e0` |
-| Shipped as | ONNX converted from the .pth (conversion is a modification, which MIT allows) |
-| Obligation | Keep the MIT copyright + permission notice next to the ONNX file (e.g. `public/models/informative-drawings/LICENSE`) |
+| Shipped as | `public/models/informative-drawings/opensketch_style.onnx` (17.2 MB, opset 17, dynamic H×W), made by `scripts/convert-informative-drawings.py` (checks the .pth hash; ONNX vs PyTorch max difference ≤ 1.3e-5). SHA-256 `9eade9d338453059b9a1effd881f677b769c540953cab62fe712fd6bbdfb48eb` |
+| Obligation | MIT copyright + permission notice kept next to it: `public/models/informative-drawings/LICENSE` (copied from the source repo) |
 
 Provenance check (2026-10-10): ControlNet's "lineart" annotators on `huggingface.co/lllyasviel/Annotators` (tagged only "License: other") are byte-identical re-uploads of the author's checkpoints — `sk_model2.pth` ("coarse", used in the experiments) = `opensketch_style`, `sk_model.pth` ("realistic") = `anime_style` (`c686ced2…0d90f0c6`). We take the file from the author's release, so the mirror's unclear tag doesn't apply.
 
@@ -34,4 +34,5 @@ Runtime: `@mediapipe/tasks-vision` (npm, Apache 2.0); its WASM files are copied 
 | What | License |
 |---|---|
 | IBM Plex Mono via `@fontsource/ibm-plex-mono` (bundled, self-hosted) | SIL Open Font License 1.1 |
+| ONNX Runtime Web (`onnxruntime-web`, runs style E; its WebGPU and CPU `.wasm` builds are bundled by Vite) | MIT |
 | Vite (build) · TypeScript (build) | MIT · Apache 2.0 |

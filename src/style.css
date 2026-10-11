@@ -168,6 +168,8 @@ body.help .explain { display: block; }
 
 /* ---------------------------------------------------------------- app additions (beyond the mockup) */
 [hidden] { display: none !important; }
+#editor { overflow: auto; align-items: flex-start; justify-content: flex-start; padding-left: 24px; padding-right: 24px; }
+#editor #cv { margin: auto; flex: none; }
 #fcv { display: block; cursor: grab; touch-action: none; }
 #fcv.dragging { cursor: grabbing; }
 #empty { padding: 96px 28px 120px; }

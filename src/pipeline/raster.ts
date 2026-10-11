@@ -74,6 +74,21 @@ export function boundary(inside: Mask, outside: Mask, W: number, H: number): Mas
   return out;
 }
 
+/** 3×3 dilation (cells within one step, diagonals included). */
+export function dilate(m: Mask, W: number, H: number): Mask {
+  const out = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (!m[y * W + x]) continue;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx, yy = y + dy;
+          if (xx >= 0 && yy >= 0 && xx < W && yy < H) out[yy * W + xx] = 1;
+        }
+    }
+  return out;
+}
+
 /** Orphan cleanup: flip cells that disagree with >= 7 of their 8 neighbours (edges replicated). */
 export function clean(ink: Mask, W: number, H: number, passes: number, protect?: Mask): Mask {
   let cur = ink.slice();
