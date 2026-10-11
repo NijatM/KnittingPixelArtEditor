@@ -1,0 +1,6 @@
+TestPortraits/
+research/private_*/
+.DS_Store
+node_modules/
+dist/
+public/mediapipe/

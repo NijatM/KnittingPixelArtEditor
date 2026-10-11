@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>KnittingPixelArtEditor</title>
+  <meta name="description" content="Photo portraits into knittable pixel art. Nijat Mahamaliyev, Tailored Materiality Research.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230b0b0b'/%3E%3Crect x='3' y='3' width='4' height='4' fill='%23f4f4f4'/%3E%3Crect x='9' y='3' width='4' height='4' fill='none' stroke='%23f4f4f4'/%3E%3Crect x='3' y='9' width='4' height='4' fill='none' stroke='%23f4f4f4'/%3E%3Crect x='9' y='9' width='4' height='4' fill='%23f4f4f4'/%3E%3C/svg%3E">
+  <script>try { const t = localStorage.getItem('kpae.theme'); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
+</head>
+<body>
+<div id="app">
+
+  <!-- ============================================================ nav -->
+  <nav id="nav" aria-label="steps">
+    <div class="navhead">
+      <div class="name">Nijat Mahamaliyev</div>
+      <div class="what">Photo portraits into knittable pixel art.</div>
+      <div class="lab">Tailored Materiality Research</div>
+    </div>
+
+    <div class="spaced dim navsec">SOURCE</div>
+    <div class="list">
+      <div class="lrow" data-step="photo" tabindex="0"><span class="lnum">00</span><span class="left">photo</span><span class="right" data-bind="photo">—</span></div>
+      <div class="lrow" data-step="frame" tabindex="0"><span class="lnum">01</span><span class="left">frame</span><span class="right" data-bind="frame"></span></div>
+      <div class="lrow" data-step="grid" tabindex="0"><span class="lnum">02</span><span class="left">grid</span><span class="right" data-bind="gridsize"></span></div>
+    </div>
+    <div class="spaced dim navsec">START</div>
+    <div class="list">
+      <div class="lrow" data-step="style" tabindex="0"><span class="lnum">03</span><span class="left">style</span><span class="right" data-bind="stylename"></span></div>
+      <div class="lrow" data-step="regions" tabindex="0"><span class="lnum">04</span><span class="left">regions</span><span class="right" data-bind="regions"></span></div>
+      <div class="lrow" data-step="features" tabindex="0"><span class="lnum">05</span><span class="left">features</span><span class="right" data-bind="features"></span></div>
+      <div class="lrow" data-step="background" tabindex="0"><span class="lnum">06</span><span class="left">background</span><span class="right" data-bind="background"></span></div>
+    </div>
+    <div class="spaced dim navsec">EDIT</div>
+    <div class="list">
+      <div class="lrow" data-step="draw" tabindex="0"><span class="lnum">07</span><span class="left">draw</span><span class="right">—</span></div>
+      <div class="lrow" data-step="stamps" tabindex="0"><span class="lnum">08</span><span class="left">stamps</span><span class="right">—</span></div>
+      <div class="lrow" data-step="colours" tabindex="0"><span class="lnum">09</span><span class="left">colours</span><span class="right"><span class="mini" data-sw="0"></span><span class="mini" data-sw="1"></span></span></div>
+    </div>
+    <div class="spaced dim navsec">MAKE</div>
+    <div class="list">
+      <div class="lrow" data-step="export" tabindex="0"><span class="lnum">10</span><span class="left">export</span><span class="right">png</span></div>
+    </div>
+
+    <div class="navfoot small faint">
+      <a href="https://nijatmahamaliyev.com">nijatmahamaliyev.com</a>
+    </div>
+  </nav>
+
+  <!-- ============================================================ stage -->
+  <main id="stage" data-view="empty">
+    <div id="view">
+      <div id="empty">
+        <div class="drop">
+          <div class="big">drop a portrait here</div>
+          <div>paste · <button class="btn" data-choose>choose file</button></div>
+          <div class="small faint" style="margin-top:14px">one person · it never leaves this device</div>
+        </div>
+      </div>
+      <div id="editor"><canvas id="cv" aria-label="pixel portrait"></canvas></div>
+      <div id="framer"><canvas id="fcv" aria-label="photo with frame — drag to move, scroll to resize"></canvas></div>
+      <div id="gallery">
+        <div class="glabel spaced dim">STYLES · RENDERED FROM YOUR PHOTO AT <span data-bind="gridsize"></span></div>
+        <div class="ggrid" id="ggrid"></div>
+      </div>
+    </div>
+
+    <div id="toolbar">
+      <div class="tbline">
+        <span class="prompt"><b>root@nijat:~$</b> ./KnittingPixelArtEditor<span class="cursor"></span></span>
+        <div class="tbright">
+          <button class="btn" id="helpbtn" title="explain controls" aria-pressed="false">?</button>
+          <div class="seg" id="theme"><button data-theme-set="light">light</button><button data-theme-set="dark">dark</button></div>
+        </div>
+      </div>
+      <div class="tbline">
+        <div class="seg" id="viewseg"><button data-view="styles">styles</button><button data-view="pixels">pixels</button></div>
+        <span class="sep hide-narrow"></span>
+        <div class="seg tools" title="drawing arrives with the editor"><button disabled class="on">pencil</button><button disabled>erase</button><button disabled>fill</button><button disabled>line</button></div>
+        <div class="seg" title="drawing arrives with the editor"><button disabled class="on">ink</button><button disabled>paper</button></div>
+        <button class="check" disabled title="drawing arrives with the editor"><span class="box">[ ]</span> mirror</button>
+        <button class="check" id="gridcheck"><span class="box">[ ]</span> grid</button>
+        <div class="stepper hide-narrow"><button data-zoom="-1" aria-label="zoom out">‹</button><span id="zoomval">fit</span><button data-zoom="1" aria-label="zoom in">›</button></div>
+      </div>
+    </div>
+
+    <div id="statusbar">
+      <div class="stline">
+        <button class="btn" disabled title="editing arrives with the editor">‹ undo</button>
+        <button class="btn" disabled title="editing arrives with the editor">redo ›</button>
+        <button class="check on" disabled><span class="box">[x]</span> live</button>
+        <button class="btn primary" disabled title="editing arrives with the editor">bake</button>
+      </div>
+      <div class="stline small"><span class="fg" id="status"></span></div>
+      <div class="stline small"><span class="dim" id="log" aria-live="polite">&gt; ready · drop, paste or choose a portrait</span><span class="faint" id="clock"></span></div>
+    </div>
+  </main>
+
+  <!-- ============================================================ inspector -->
+  <aside id="inspector">
+    <input type="file" accept="image/*" id="file" class="vh" tabindex="-1">
+
+    <section class="panel" data-panel="photo">
+      <div class="kicker">00 · SOURCE</div>
+      <div class="title">Photo</div>
+      <div class="dash"></div>
+      <div class="note">One portrait, one person. It never leaves this device.</div>
+      <div class="drop"><canvas id="thumb" hidden></canvas><div>drop · paste · <button class="btn" data-choose>choose file</button></div></div>
+      <div class="subhead">DETECTED<i></i></div>
+      <div class="row"><label>face</label><span class="val" id="det-face">—</span></div>
+      <div class="row"><label>regions</label><span class="val" id="det-regions">—</span></div>
+      <div class="row"><label>glasses</label><span class="val" id="det-glasses">—</span></div>
+      <div class="okline small" id="det-time"></div>
+      <div class="explain small">Face points and hair / skin / clothes regions come from MediaPipe, running in your browser. Nothing is uploaded.</div>
+    </section>
+
+    <section class="panel" data-panel="frame">
+      <div class="kicker">01 · SOURCE</div>
+      <div class="title">Frame</div>
+      <div class="dash"></div>
+      <div class="note">Auto-framed from the face. Drag in the view to move it, scroll to resize.</div>
+      <div class="subhead">RATIO<i></i></div>
+      <div class="seg" id="ratioseg"><button data-ratio="1:1">1:1</button><button data-ratio="4:5">4:5</button><button data-ratio="3:4">3:4</button><button data-ratio="2:3">2:3</button><button data-ratio="free">free</button></div>
+      <div class="subhead">CROP<i></i></div>
+      <div class="row"><label>framing</label><div class="bar" id="bar-framing"></div><span class="barval"></span></div>
+      <div class="row"><label>vertical</label><div class="bar" id="bar-vertical"></div><span class="barval"></span></div>
+      <div class="inline"><button class="btn" id="frame-reset">reset to auto</button></div>
+      <div class="explain small">Outside the photo counts as background, so a tight photo never produces smeared edges.</div>
+    </section>
+
+    <section class="panel" data-panel="grid">
+      <div class="kicker">02 · SOURCE</div>
+      <div class="title">Grid</div>
+      <div class="dash"></div>
+      <div class="note">One cell is one stitch.</div>
+      <div class="subhead">SIZE<i></i></div>
+      <div class="seg" id="sizeseg"><button>32</button><button>48</button><button>64</button><button>96</button><button>128</button></div>
+      <div class="row" style="margin-top:8px"><label>width</label><div class="bar" id="bar-w"></div><span class="barval"></span></div>
+      <div class="row"><label>height</label><div class="bar" id="bar-h"></div><span class="barval"></span></div>
+      <button class="check" id="lockcheck"><span class="box">[ ]</span> lock to frame ratio</button>
+      <div class="subhead">CELL<i></i></div>
+      <div class="row"><label>aspect w:h</label><div class="bar" id="bar-cell"></div><span class="barval"></span></div>
+      <div class="explain small">Knit stitches are wider than tall (about 0.75). Keep 1:1 until knitting settings arrive.</div>
+      <div class="note small" data-bind="cells"></div>
+    </section>
+
+    <section class="panel" data-panel="style">
+      <div class="kicker">03 · START</div>
+      <div class="title">Style</div>
+      <div class="dash"></div>
+      <div class="note">Every style is rendered from your photo. Pick one to start from; your edits will stay on their own layer.</div>
+      <div class="list" id="stylelist"></div>
+      <div class="subhead">PARAMETERS<i></i></div>
+      <div class="row"><label>cleanup</label><div class="bar" id="bar-cleanup"></div><span class="barval"></span></div>
+      <div class="explain small">Cleanup removes lone cells that disagree with almost all of their neighbours. Drawn features are protected.</div>
+    </section>
+
+    <section class="panel" data-panel="regions">
+      <div class="kicker">04 · START</div>
+      <div class="title">Regions</div>
+      <div class="dash"></div>
+      <div class="note">Each region gets its own cut, so any face stays readable.</div>
+      <div class="subhead">SKIN<i></i></div>
+      <div class="row"><label>density</label><div class="bar" id="bar-skin"></div><span class="barval"></span></div>
+      <div class="subhead">HAIR<i></i></div>
+      <div class="row"><label>density</label><div class="bar" id="bar-hair"></div><span class="barval"></span></div>
+      <div class="subhead">CLOTHES<i></i></div>
+      <div class="row"><label>density</label><div class="bar" id="bar-clothes"></div><span class="barval"></span></div>
+      <div class="explain small">0 keeps a region open (paper), 1 fills it with ink, 0.50 is each style's own balance. Skin is normalised first, so the slider means the same on every skin tone.</div>
+    </section>
+
+    <section class="panel" data-panel="features">
+      <div class="kicker">05 · START</div>
+      <div class="title">Features</div>
+      <div class="dash"></div>
+      <div class="note">Drawn from the face points on top of the style.</div>
+      <div class="list">
+        <button class="check" style="display:block" data-feature="eyes"><span class="box">[ ]</span> redraw eyes</button>
+        <button class="check" style="display:block" data-feature="brows"><span class="box">[ ]</span> brows</button>
+        <button class="check" style="display:block" data-feature="mouth"><span class="box">[ ]</span> mouth</button>
+        <button class="check" style="display:block" data-feature="nostrils"><span class="box">[ ]</span> nostrils</button>
+        <button class="check" style="display:block" data-feature="jaw"><span class="box">[ ]</span> jaw line <span class="dim">· line portrait</span></button>
+        <button class="check" style="display:block" data-feature="silhouette"><span class="box">[ ]</span> silhouette</button>
+        <button class="check" style="display:block" data-feature="glasses"><span class="box">[ ]</span> glasses frames <span class="dim" id="glasses-note"></span></button>
+      </div>
+      <div class="subhead">GLASSES<i></i></div>
+      <div class="row"><label>status</label><span class="val dim" data-bind="glasses">—</span></div>
+      <div class="explain small">When glasses are detected, the eyes are still redrawn and the frames are drawn as a thin outline around them.</div>
+    </section>
+
+    <section class="panel" data-panel="background">
+      <div class="kicker">06 · START</div>
+      <div class="title">Background</div>
+      <div class="dash"></div>
+      <div class="seg" id="bgseg"><button data-bg="white">white</button><button data-bg="black">black</button><button disabled title="coming soon">pattern</button><button disabled title="coming soon">photo</button></div>
+      <div class="inline"><button class="check" data-feature="silhouette"><span class="box">[ ]</span> outline the person</button></div>
+      <div class="explain small">The outline is drawn on a white background only.</div>
+    </section>
+
+    <section class="panel" data-panel="draw">
+      <div class="kicker">07 · EDIT</div>
+      <div class="title">Draw</div>
+      <div class="dash"></div>
+      <div class="note">Edits will sit on their own layer above the style, so changing a slider keeps them.</div>
+      <div class="empty small">not built yet · pencil, eraser, fill, line, mirror, undo and bake come next</div>
+    </section>
+
+    <section class="panel" data-panel="stamps">
+      <div class="kicker">08 · EDIT</div>
+      <div class="title">Stamps</div>
+      <div class="dash"></div>
+      <div class="note">Eyes, brows, mouths and noses placed from the face points.</div>
+      <div class="empty small">not built yet</div>
+    </section>
+
+    <section class="panel" data-panel="colours">
+      <div class="kicker">09 · EDIT</div>
+      <div class="title">Colours</div>
+      <div class="dash"></div>
+      <div class="note">Two yarns. Exports use exactly these.</div>
+      <div class="row"><label>ink</label><div class="val swrow"><span class="sw" data-sw="0"><input type="color" data-pal="0" aria-label="ink colour"></span><input class="txt" data-hex="0" style="width:96px" aria-label="ink hex"></div></div>
+      <div class="row"><label>paper</label><div class="val swrow"><span class="sw" data-sw="1"><input type="color" data-pal="1" aria-label="paper colour"></span><input class="txt" data-hex="1" style="width:96px" aria-label="paper hex"></div></div>
+      <div class="inline"><button class="btn" id="swap">swap</button><button class="btn" id="resetpal">reset</button></div>
+    </section>
+
+    <section class="panel" data-panel="export">
+      <div class="kicker">10 · MAKE</div>
+      <div class="title">Export</div>
+      <div class="dash"></div>
+      <div class="note">One pixel per stitch.</div>
+      <div class="subhead">FILE<i></i></div>
+      <div class="row"><label>format</label><div class="seg"><button class="on">PNG</button><button disabled title="coming soon">BMP</button><button disabled title="coming soon">SVG</button></div></div>
+      <div class="row"><label>name</label><input class="txt" id="exportname" aria-label="file name"></div>
+      <div class="inline"><button class="btn primary" id="exportbtn">export png</button></div>
+      <div class="explain small">PNG keeps your two colours exactly. BMP (bit depth of your choice) and SVG come with the export step.</div>
+    </section>
+
+  </aside>
+</div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

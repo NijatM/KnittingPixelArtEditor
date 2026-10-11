@@ -1,0 +1,42 @@
+// Photo import: file picker, drag & drop, paste. Decoding through <img> applies the EXIF orientation.
+export const MAX_SIDE = 1600;
+
+export async function decodeImage(file: Blob): Promise<HTMLCanvasElement> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    const s = Math.min(1, MAX_SIDE / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(img.naturalWidth * s));
+    c.height = Math.max(1, Math.round(img.naturalHeight * s));
+    const ctx = c.getContext('2d', { willReadFrequently: true })!;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    return c;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+const imageIn = (items: Iterable<File>) => [...items].find(f => f.type.startsWith('image/')) ?? null;
+
+/** Calls onFile for images picked, dropped anywhere on the page, or pasted. */
+export function wireImport(input: HTMLInputElement, onFile: (f: File) => void, onDragState: (over: boolean) => void) {
+  input.addEventListener('change', () => { const f = imageIn(input.files ?? []); if (f) onFile(f); input.value = ''; });
+  let depth = 0;
+  const hasFiles = (e: DragEvent) => e.dataTransfer?.types.includes('Files');
+  window.addEventListener('dragenter', e => { if (hasFiles(e)) { depth++; onDragState(true); } });
+  window.addEventListener('dragleave', e => { if (hasFiles(e) && --depth <= 0) { depth = 0; onDragState(false); } });
+  window.addEventListener('dragover', e => { if (hasFiles(e)) e.preventDefault(); });
+  window.addEventListener('drop', e => {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); depth = 0; onDragState(false);
+    const f = imageIn(e.dataTransfer!.files); if (f) onFile(f);
+  });
+  window.addEventListener('paste', e => {
+    const f = imageIn([...(e.clipboardData?.items ?? [])].filter(i => i.kind === 'file').map(i => i.getAsFile()!).filter(Boolean));
+    if (f) { e.preventDefault(); onFile(f); }
+  });
+}
