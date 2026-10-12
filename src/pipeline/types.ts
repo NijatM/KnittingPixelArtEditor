@@ -25,6 +25,7 @@ export interface Prepared {
   acc: Uint8Array;    // 1 where ≥ 25 % of the cell is "others / accessories" (glasses frames, …)
   lines: Float32Array; // share of the cell on a dark strand line (hair "texture" mode)
   hairLum: number;    // median hair luminance 0..255 in the frame, -1 if there is no hair
+  facialHair: number; // share of the lower face clearly darker than the cheeks (moustache / beard ≈ 0.6+)
   lm: Float32Array | null; // face points in grid coordinates
   ms: number;
 }

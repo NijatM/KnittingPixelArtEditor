@@ -29,7 +29,7 @@ const BROWS = [
   { lo: [46, 53, 52, 65, 55], up: [70, 63, 105, 66, 107] },
   { lo: [276, 283, 282, 295, 285], up: [300, 293, 334, 296, 336] },
 ];
-const LIPS_OUTER = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185];
+export const LIPS_OUTER = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185];
 const LIPS_INNER_UP = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308];
 const LIPS_INNER_LO = [78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308];
 const NOSE = { tip: 1, base: 2, bridge: 6, l: 98, r: 327 };
@@ -232,9 +232,25 @@ export function autoVariant(kind: StampKind, f: Face): number {
 
 export const resolve = (kind: StampKind, chosen: number, f: Face) => (chosen > 0 ? Math.min(chosen, STAMPS[kind].length) : autoVariant(kind, f));
 
+/**
+ * Moustache / beard: keep mouth and nose readable inside the facial hair with 1-cell paper gaps — above and
+ * below the mouth, and a line just under the nose base (otherwise nose shadow, moustache and mouth merge).
+ */
+function separate(f: Face, mouthInk: Mask, o: Out) {
+  const { W, H } = f;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      if (!mouthInk[y * W + x]) continue;
+      for (const yy of [y - 1, y + 1]) if (yy >= 0 && yy < H && !mouthInk[yy * W + x]) o.clear[yy * W + x] = 1;
+    }
+  const l = pt(f.lm, NOSE.l), r = pt(f.lm, NOSE.r), y = pt(f.lm, NOSE.base)[1] + 0.75;
+  line(o.clear, W, H, [l[0], y], [r[0], y]);
+}
+
 /** Draw the enabled features; returns cells to clear, to ink, and the brow cells (part of ink). */
-export function drawStamps(f: Face, enabled: Record<StampKind, boolean>, chosen: Stamps): Out {
+export function drawStamps(f: Face, enabled: Record<StampKind, boolean>, chosen: Stamps, facialHair = false): Out {
   const n = f.W * f.H, o: Out = { clear: new Uint8Array(n), ink: new Uint8Array(n), brow: new Uint8Array(n) };
+  const mouthInk = new Uint8Array(n);
   // Brows first: glasses avoid them. Eye sockets are cleared before anything is inked.
   for (const kind of ['brows', 'eyes', 'glasses', 'mouth', 'nose'] as StampKind[]) {
     if (!enabled[kind]) continue;
@@ -242,8 +258,12 @@ export function drawStamps(f: Face, enabled: Record<StampKind, boolean>, chosen:
     if (kind === 'glasses' && !enabled.eyes) { // without redrawn eyes, keep the photo's eyes inside the lenses
       const t: Out = { clear: new Uint8Array(n), ink: o.ink, brow: o.brow };
       draw(f, t);
+    } else if (kind === 'mouth') {
+      draw(f, { clear: o.clear, ink: mouthInk, brow: o.brow });
+      for (let i = 0; i < n; i++) o.ink[i] |= mouthInk[i];
     } else draw(f, o);
   }
+  if (facialHair) separate(f, mouthInk, o);
   for (let i = 0; i < n; i++) o.ink[i] |= o.brow[i];
   return o;
 }

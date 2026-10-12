@@ -44,9 +44,11 @@ Fifth batch (2026-10-12) — Day 7 hair modes done: Regions panel mode auto · s
 
 Sixth batch (2026-10-12) — side light tuned: **even light** slider under SKIN (default 0.80, `src/pipeline/light.ts`). Removes only the left–right antisymmetric part of the skin tone (bands across the face midline, medians), stepped at the midline so no seam appears beside the nose. Nijat_V3's shadowed cheek no longer goes solid in A/C/D; the frontally lit photos change by only 24–41 cells at 64 wide and keep their beards.
 
+Seventh batch (2026-10-12) — moustache / beard blobs: facial-hair cue in prep (work resolution, so the same at every grid size: bearded Nijat V1/V2 ≈ 0.67, others 0.31–0.41, threshold 0.5). With facial hair: 1-cell paper gaps above/below the mouth and under the nose base (`separate()` in stamps.ts), and E stamps the mouth. Nose, moustache, mouth and beard now read as separate shapes in A–E; clean-shaven photos are unchanged by construction.
+
 Next (tuning / polish, no fixed plan left):
-1. Moustache / beard blobs in E (and A at small sizes).
-2. Optional: fp16 weights to halve the 15 MB model download; more portraits from the team to tune on.
+1. Optional: fp16 weights to halve the 15 MB model download.
+2. More portraits from the team to tune on (only 5 test photos so far; 2 bearded, 2 with glasses, 1 side-lit).
 
 ## Planning session — 2026-10-09
 

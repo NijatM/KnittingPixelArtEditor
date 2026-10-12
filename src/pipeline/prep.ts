@@ -1,5 +1,8 @@
 // Crop → work image (≈10× grid) → grey, bilateral, CLAHE → grid-resolution tone + regions.
 // Mirrors research/prototype/exp.py prep() / exp2.py run2(), with cv2 behaviour reimplemented.
+import { OVAL, bounds, pt, pts, type Pt } from './landmarks';
+import { polygon } from './raster';
+import { LIPS_OUTER } from './stamps';
 import { SEG, type Crop, type Prepared, type Source } from './types';
 
 /** Work-image scale: 10× the grid like the prototype, fewer for big grids so a frame stays < ~1000 px wide. */
@@ -198,6 +201,34 @@ function darkLines(pg: Uint8Array, w: number, h: number): Uint8Array {
   return out;
 }
 
+/**
+ * Facial hair cue, measured on the work image so it doesn't depend on the grid size: share of the lower-face
+ * skin (nose base → chin, a bit wider than the mouth, lips excluded) that is clearly darker than the cheeks.
+ * Moustaches and beards score ≈ 0.6+, clean-shaven faces ≈ 0.3.
+ */
+function facialHairShare(pg: Uint8Array, seg: Uint8Array, w: number, h: number, lm: Float32Array): number {
+  const l = pt(lm, 61), r = pt(lm, 291), base = pt(lm, 2), chin = pt(lm, 152), eyeY = (pt(lm, 33)[1] + pt(lm, 263)[1]) / 2;
+  const o = bounds(pts(lm, OVAL)), mw = r[0] - l[0];
+  const lip = pts(lm, LIPS_OUTER), lc = lip.reduce((a, q): Pt => [a[0] + q[0] / lip.length, a[1] + q[1] / lip.length], [0, 0]);
+  const lips = new Uint8Array(w * h);
+  polygon(lips, w, h, lip.map(([x, y]): Pt => [lc[0] + (x - lc[0]) * 1.25, lc[1] + (y - lc[1]) * 1.6]));
+  const cheeks: number[] = [], zone: number[] = [];
+  const y0 = Math.max(0, Math.floor((eyeY + base[1]) / 2)), y1 = Math.min(h - 1, Math.ceil(chin[1]));
+  for (let y = y0; y <= y1; y++)
+    for (let x = Math.max(0, Math.floor(o.x0)); x <= Math.min(w - 1, Math.ceil(o.x1)); x++) {
+      const i = y * w + x;
+      if ((seg[i] !== SEG.FACE && seg[i] !== SEG.BODY) || lips[i]) continue;
+      if (y < base[1]) cheeks.push(pg[i]);
+      else if (x > l[0] - 0.25 * mw && x < r[0] + 0.25 * mw) zone.push(pg[i]);
+    }
+  if (cheeks.length < 16 || zone.length < 16) return 0;
+  cheeks.sort((a, b) => a - b);
+  const ref = cheeks[cheeks.length >> 1];
+  let dark = 0;
+  for (const v of zone) dark += +(v < ref - 30);
+  return dark / zone.length;
+}
+
 export function prepare(src: Source, crop: Crop, W: number, H: number): Prepared {
   const t0 = performance.now(), f = workScale(W), ww = W * f, wh = H * f;
   const { rgb, outside } = resampleCrop(src, crop, ww, wh);
@@ -236,5 +267,6 @@ export function prepare(src: Source, crop: Crop, W: number, H: number): Prepared
     }
 
   const lm = src.lm ? scaleLm(src.lm, crop, W / crop.w, H / crop.h) : null;
-  return { W, H, ps, bgps, segs, acc, lines, hairLum, lm, ms: performance.now() - t0 };
+  const facialHair = src.lm ? facialHairShare(pg, seg, ww, wh, scaleLm(src.lm, crop, ww / crop.w, wh / crop.h)) : 0;
+  return { W, H, ps, bgps, segs, acc, lines, hairLum, facialHair, lm, ms: performance.now() - t0 };
 }
