@@ -164,13 +164,14 @@
       <div class="note">Each region gets its own cut, so any face stays readable.</div>
       <div class="subhead">SKIN<i></i></div>
       <div class="row"><label>density</label><div class="bar" id="bar-skin"></div><span class="barval"></span></div>
+      <div class="row"><label>even light</label><div class="bar" id="bar-light"></div><span class="barval"></span></div>
       <div class="subhead">HAIR<i></i></div>
       <div class="row"><label>mode</label><div class="seg" id="hairseg"><button data-hair="auto">auto</button><button data-hair="solid">solid</button><button data-hair="tone">tone</button><button data-hair="texture">texture</button></div></div>
       <div class="row"><label>density</label><div class="bar" id="bar-hair"></div><span class="barval"></span></div>
       <div class="row"><label>measured</label><span class="val dim" data-bind="hairlum">—</span></div>
       <div class="subhead">CLOTHES<i></i></div>
       <div class="row"><label>density</label><div class="bar" id="bar-clothes"></div><span class="barval"></span></div>
-      <div class="explain small">0 keeps a region open (paper), 1 fills it with ink, 0.50 is each style's own balance. Skin is normalised first, so the slider means the same on every skin tone. Hair: solid is one mass with its larger highlights, tone uses four pattern levels, texture draws the outline and strand lines (best for curls); auto keeps each style's own hair. Hair lightness is measured from the photo, so light hair gets less ink than black hair at the same density.</div>
+      <div class="explain small">0 keeps a region open (paper), 1 fills it with ink, 0.50 is each style's own balance. Skin is normalised first, so the slider means the same on every skin tone. Even light removes the left–right imbalance of a side light (one half of the face in shadow) and keeps symmetric shading such as beards; 0 shows the photo's lighting as it is. Hair: solid is one mass with its larger highlights, tone uses four pattern levels, texture draws the outline and strand lines (best for curls); auto keeps each style's own hair. Hair lightness is measured from the photo, so light hair gets less ink than black hair at the same density.</div>
     </section>
 
     <section class="panel" data-panel="features">

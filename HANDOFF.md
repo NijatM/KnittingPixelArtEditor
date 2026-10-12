@@ -42,10 +42,11 @@ Fourth batch (2026-10-11) — Day 5 done: **stamps** (`src/pipeline/stamps.ts`, 
 
 Fifth batch (2026-10-12) — Day 7 hair modes done: Regions panel mode auto · solid · tone · texture, measured hair lightness (Nijat 26–63 = dark, Mariana 103–114 = medium-light). Mariana's hair now reads brown instead of a black mass (≈ 10 points less ink in every style); Nijat's renders change by ≤ 7 cells (a few merged flecks) except D on V3 (dither spreads a tiny lightness change). Texture mode = outline + strand lines, best for curls. All 7 days of the plan are now built.
 
+Sixth batch (2026-10-12) — side light tuned: **even light** slider under SKIN (default 0.80, `src/pipeline/light.ts`). Removes only the left–right antisymmetric part of the skin tone (bands across the face midline, medians), stepped at the midline so no seam appears beside the nose. Nijat_V3's shadowed cheek no longer goes solid in A/C/D; the frontally lit photos change by only 24–41 cells at 64 wide and keep their beards.
+
 Next (tuning / polish, no fixed plan left):
-1. Strong side light (Nijat_V3: shadowed cheek goes solid in A/C/D) — e.g. even out lighting per face half before the skin cut.
-2. Moustache / beard blobs in E (and A at small sizes).
-3. Optional: fp16 weights to halve the 15 MB model download; more portraits from the team to tune on.
+1. Moustache / beard blobs in E (and A at small sizes).
+2. Optional: fp16 weights to halve the 15 MB model download; more portraits from the team to tune on.
 
 ## Planning session — 2026-10-09
 

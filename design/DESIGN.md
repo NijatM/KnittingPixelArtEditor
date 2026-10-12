@@ -111,7 +111,7 @@ Selected row: `bg2` + `> ` prefix. Rows that aren't usable yet (no photo loaded)
 - **01 Frame**: RATIO seg 1:1 · 4:5 · 3:4 · 2:3 · free; CROP framing (tight↔wide), vertical; reset to auto.
 - **02 Grid**: SIZE seg 32 · 48 · 64 · 96 · 128; width, height bars; `[x] lock to frame ratio`; CELL aspect w:h (1.00).
 - **03 Style**: style list A–E (+ faint F v2) with ms; PARAMETERS threshold, line weight, cleanup (per style).
-- **04 Regions**: SKIN density; HAIR mode seg auto · solid · tone · texture + density + "measured" lightness (dark / medium / light); CLOTHES density.
+- **04 Regions**: SKIN density + even light; HAIR mode seg auto · solid · tone · texture + density + "measured" lightness (dark / medium / light); CLOTHES density.
 - **05 Features**: checks redraw eyes (auto), brows, mouth, nostrils, jaw line, silhouette; GLASSES status.
 - **06 Background**: seg white · black · pattern · photo; pattern density; `[x] outline the person`.
 - **07 Draw**: tool seg, brush stepper, mirror axis, EDITS summary, clear edits.

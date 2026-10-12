@@ -44,6 +44,7 @@ export interface Features {
 /** Look settings shared by all styles. Densities are 0..1; 0.5 is each style's tuned default. */
 export interface Look {
   skin: number;
+  evenLight: number;  // 0..1: how much of a side light's left–right imbalance on the skin is removed
   hair: number;
   clothes: number;
   cleanup: number;

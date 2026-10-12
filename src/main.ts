@@ -57,7 +57,7 @@ const S = {
   H: 80,
   lock: true,
   cellAspect: 1,
-  look: { skin: 0.5, hair: 0.5, clothes: 0.5, cleanup: 2, lineWeight: 1, hairMode: 'auto', background: 'white', bgDensity: 0.25, features: { ...DEFAULT_FEATURES }, stamps: { ...AUTO_STAMPS } } as Look,
+  look: { skin: 0.5, evenLight: 0.8, hair: 0.5, clothes: 0.5, cleanup: 2, lineWeight: 1, hairMode: 'auto', background: 'white', bgDensity: 0.25, features: { ...DEFAULT_FEATURES }, stamps: { ...AUTO_STAMPS } } as Look,
   style: 'B' as StyleId,
   pal: [...DEFAULT_PAL],
   step: 'photo' as Step,
@@ -519,6 +519,7 @@ const bars = {
   lineWeight: new Bar($('#bar-lineweight'), { min: 0.5, max: 2, value: 1, step: 0.05, fmt: v => `${v.toFixed(2)}×`, onInput: v => { S.look.lineWeight = v; lookChanged(); } }),
   cleanup: new Bar($('#bar-cleanup'), { min: 0, max: 4, value: 2, step: 1, fmt: v => String(v), onInput: v => { S.look.cleanup = v; lookChanged(); } }),
   skin: new Bar($('#bar-skin'), { min: 0, max: 1, value: 0.5, step: 0.01, fmt: fmt2, onInput: v => { S.look.skin = v; lookChanged(); } }),
+  light: new Bar($('#bar-light'), { min: 0, max: 1, value: 0.8, step: 0.05, fmt: fmt2, onInput: v => { S.look.evenLight = v; lookChanged(); } }),
   hair: new Bar($('#bar-hair'), { min: 0, max: 1, value: 0.5, step: 0.01, fmt: fmt2, onInput: v => { S.look.hair = v; lookChanged(); } }),
   clothes: new Bar($('#bar-clothes'), { min: 0, max: 1, value: 0.5, step: 0.01, fmt: fmt2, onInput: v => { S.look.clothes = v; lookChanged(); } }),
   bg: new Bar($('#bar-bg'), { min: 0, max: 1, value: 0.25, step: 0.01, fmt: v => `${Math.round(v * 100)}%`, onInput: v => { S.look.bgDensity = v; lookChanged(); } }),
@@ -543,7 +544,7 @@ function setGrid(W: number | null, H: number | null) {
 function syncControls() {
   bars.framing.set(S.frame.framing); bars.vertical.set(S.frame.oy);
   bars.w.set(S.W); bars.h.set(S.H); bars.cell.set(S.cellAspect); bars.cleanup.set(S.look.cleanup); bars.lineWeight.set(S.look.lineWeight);
-  bars.skin.set(S.look.skin); bars.hair.set(S.look.hair); bars.clothes.set(S.look.clothes); bars.bg.set(S.look.bgDensity);
+  bars.skin.set(S.look.skin); bars.light.set(S.look.evenLight); bars.hair.set(S.look.hair); bars.clothes.set(S.look.clothes); bars.bg.set(S.look.bgDensity);
   $('#bgdensity-row').classList.toggle('off', S.look.background === 'white' || S.look.background === 'black');
   setSeg($('#ratioseg'), b => b.dataset.ratio === S.ratio);
   setSeg($('#sizeseg'), b => +b.textContent! === S.W);

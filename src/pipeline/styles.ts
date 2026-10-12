@@ -1,5 +1,6 @@
 // Styles A–D (research/prototype/exp2.py run2). Work in ink masks (1 = ink), return palette indices.
 import { featureMasks, type FeatureMasks } from './features';
+import { evenLight } from './light';
 import type { LineMap } from './ml';
 import { areaResize } from './prep';
 import { boundary, clean, dropSmall, percentile, type Mask } from './raster';
@@ -222,8 +223,10 @@ function styleE(p: Prepared, r: Regions, look: Look, lines: LineMap) {
 const RENDER = { A: styleA, B: styleB, C: styleC, D: styleD };
 
 /** Renders the given styles; E needs the line map from ml.ts. */
-export function renderStyles(p: Prepared, styles: StyleId[], look: Look, lines?: LineMap): StyleResult[] {
-  const fm = featureMasks(p, look), r = regions(p, fm);
+export function renderStyles(p0: Prepared, styles: StyleId[], look: Look, lines?: LineMap): StyleResult[] {
+  const fm = featureMasks(p0, look), r = regions(p0, fm);
+  // Every style reads the skin tone with the side light evened out.
+  const p = { ...p0, ps: evenLight(p0.ps, r.skin, p0.lm, p0.W, p0.H, look.evenLight ?? 0) };
   return styles.map(style => {
     const t0 = performance.now(), cells = new Uint8Array(p.W * p.H);
     const ink = style === 'E' ? styleE(p, r, look, lines!) : RENDER[style](p, r, fm, look);
