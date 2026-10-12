@@ -57,13 +57,14 @@ const S = {
   H: 80,
   lock: true,
   cellAspect: 1,
-  look: { skin: 0.5, hair: 0.5, clothes: 0.5, cleanup: 2, lineWeight: 1, background: 'white', bgDensity: 0.25, features: { ...DEFAULT_FEATURES }, stamps: { ...AUTO_STAMPS } } as Look,
+  look: { skin: 0.5, hair: 0.5, clothes: 0.5, cleanup: 2, lineWeight: 1, hairMode: 'auto', background: 'white', bgDensity: 0.25, features: { ...DEFAULT_FEATURES }, stamps: { ...AUTO_STAMPS } } as Look,
   style: 'B' as StyleId,
   pal: [...DEFAULT_PAL],
   step: 'photo' as Step,
   pixelsOverStyles: false, // the toolbar toggle can show pixels while on the style step
   res: new Map<StyleId, Rendered>(), // latest result per style, each with its own grid size
   prepMs: 0,
+  hairLum: -1,                         // measured hair lightness of the current frame (from the worker)
   mlNote: '',                          // what style E is doing while it has no result yet
   zoom: 0,
   grid: false,
@@ -159,6 +160,7 @@ let raf = 0, detectorsReady = false;
 
 function applyResult(res: RenderResult) {
   if (res.prepMs) S.prepMs = res.prepMs;
+  S.hairLum = res.hairLum;
   for (const r of res.results) S.res.set(r.style, { ...r, W: res.W, H: res.H });
   if (res.results.some(r => r.style === 'E')) S.mlNote = '';
   paintGallery();
@@ -206,6 +208,7 @@ function startPhoto(id: number, name: string, canvas: HTMLCanvasElement, det: { 
   S.photo = { id, name, canvas, lm: det.lm, regions, glasses, ms: det.ms };
   S.res.clear();
   S.mlNote = '';
+  S.hairLum = -1;
   if (restore) {
     applySettings(restore.settings);
     S.ed.restore(restore.edits.W, restore.edits.H, restore.edits.cells, restore.edits.baked);
@@ -447,7 +450,10 @@ function refresh() {
   bind('gridsize', `${S.W}×${S.H}`);
   bind('cells', `${(S.W * S.H).toLocaleString('en')} cells`);
   bind('stylename', styleInfo(S.style).key);
-  bind('regions', `skin ${S.look.skin.toFixed(2).replace(/^0/, '')}`);
+  const skin = S.look.skin.toFixed(2).replace(/^0/, '');
+  bind('regions', S.look.hairMode === 'auto' ? `skin ${skin}` : `${skin} · ${S.look.hairMode}`);
+  const L = S.hairLum;
+  bind('hairlum', !S.photo ? '—' : L < 0 ? 'no hair found' : `${L < 70 ? 'dark' : L < 110 ? 'medium' : L < 150 ? 'light' : 'very light'} · ${Math.round(L / 2.55)}% lightness`);
   const g = S.photo?.glasses ?? -1;
   bind('glasses', g < 0 ? '—' : g >= GLASSES_MIN_SHARE ? `detected · ${Math.round(g * 100)}% of eye area` : `not detected · ${Math.round(g * 100)}% of eye area`);
   const f = S.look.features, found = g >= GLASSES_MIN_SHARE;
@@ -542,6 +548,7 @@ function syncControls() {
   setSeg($('#ratioseg'), b => b.dataset.ratio === S.ratio);
   setSeg($('#sizeseg'), b => +b.textContent! === S.W);
   setSeg($('#bgseg'), b => b.dataset.bg === S.look.background);
+  setSeg($('#hairseg'), b => b.dataset.hair === S.look.hairMode);
   setCheck($('#lockcheck'), S.lock && S.ratio !== 'free');
   ($('#lockcheck') as HTMLButtonElement).disabled = S.ratio === 'free';
   $$('[data-feature]').forEach(b => setCheck(b, S.look.features[b.dataset.feature as keyof Features]));
@@ -557,6 +564,7 @@ function syncControls() {
 
 seg($('#ratioseg'), b => { S.ratio = b.dataset.ratio!; if (S.ratio !== 'free') setGrid(S.W, null); else { syncControls(); refresh(); } });
 seg($('#sizeseg'), b => setGrid(+b.textContent!, null));
+seg($('#hairseg'), b => { S.look.hairMode = b.dataset.hair as Look['hairMode']; log(`> hair · ${S.look.hairMode}`); lookChanged(); });
 seg($('#bgseg'), b => { S.look.background = b.dataset.bg as Look['background']; syncControls(); lookChanged(); });
 check($('#lockcheck'), on => { S.lock = on; if (on) setGrid(S.W, null); });
 $$('[data-feature]').forEach(b => check(b, on => { S.look.features[b.dataset.feature as keyof Features] = on; syncControls(); lookChanged(); }));

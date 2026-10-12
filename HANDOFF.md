@@ -40,9 +40,12 @@ Third batch (2026-10-11) — Day 4 and Day 6 done (Day 5 stamps still open):
 
 Fourth batch (2026-10-11) — Day 5 done: **stamps** (`src/pipeline/stamps.ts`, replaces the fixed drawing in features.ts). 5 eye, 4 brow, 6 mouth, 4 nose, 4 glasses variants; "auto" per photo + grid size; Stamps panel steppers (auto → variants → off, off = the 05 Features switch), tap-to-cycle in the view with dashed hit boxes, "all auto"; saved with the project. Auto picked the open-mouth stamp for both Mariana photos (open smiles), which fixes the flat-line mouth; the Nijat photos render bit-identically to before. Harness: `research/private_tests/stampsheet.ts` renders every variant per face.
 
-Next:
-1. Day 7: hair modes (solid / tone / texture), tuning on TestPortraits.
-2. Tuning list: strong side light (Nijat_V3 in A/C/D), big curly hair (Mariana) → hair modes on Day 7; moustache blobs in E; optional: fp16 weights to halve the 15 MB model download.
+Fifth batch (2026-10-12) — Day 7 hair modes done: Regions panel mode auto · solid · tone · texture, measured hair lightness (Nijat 26–63 = dark, Mariana 103–114 = medium-light). Mariana's hair now reads brown instead of a black mass (≈ 10 points less ink in every style); Nijat's renders change by ≤ 7 cells (a few merged flecks) except D on V3 (dither spreads a tiny lightness change). Texture mode = outline + strand lines, best for curls. All 7 days of the plan are now built.
+
+Next (tuning / polish, no fixed plan left):
+1. Strong side light (Nijat_V3: shadowed cheek goes solid in A/C/D) — e.g. even out lighting per face half before the skin cut.
+2. Moustache / beard blobs in E (and A at small sizes).
+3. Optional: fp16 weights to halve the 15 MB model download; more portraits from the team to tune on.
 
 ## Planning session — 2026-10-09
 

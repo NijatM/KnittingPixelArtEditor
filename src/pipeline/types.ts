@@ -23,6 +23,8 @@ export interface Prepared {
   bgps: Float32Array; // same tone with the background kept (for the "photo" background)
   segs: Uint8Array;   // SEG category per cell
   acc: Uint8Array;    // 1 where ≥ 25 % of the cell is "others / accessories" (glasses frames, …)
+  lines: Float32Array; // share of the cell on a dark strand line (hair "texture" mode)
+  hairLum: number;    // median hair luminance 0..255 in the frame, -1 if there is no hair
   lm: Float32Array | null; // face points in grid coordinates
   ms: number;
 }
@@ -46,6 +48,7 @@ export interface Look {
   clothes: number;
   cleanup: number;
   lineWeight: number; // style E: 1 = tuned, higher = more cells become line
+  hairMode: 'auto' | 'solid' | 'tone' | 'texture'; // auto = each style's own hair
   features: Features;
   stamps: Stamps;     // feature stamp per kind, 0 = auto
   background: 'white' | 'black' | 'pattern' | 'photo';
@@ -64,4 +67,4 @@ export interface RenderRequest {
 /** cells: palette index per cell (0 = ink, 1 = paper). */
 export interface StyleResult { style: StyleId; cells: Uint8Array; ms: number; ink: number }
 
-export interface RenderResult { id: number; W: number; H: number; prepMs: number; results: StyleResult[] }
+export interface RenderResult { id: number; W: number; H: number; prepMs: number; hairLum: number; results: StyleResult[] }

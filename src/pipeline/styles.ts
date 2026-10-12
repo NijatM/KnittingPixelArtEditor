@@ -2,7 +2,7 @@
 import { featureMasks, type FeatureMasks } from './features';
 import type { LineMap } from './ml';
 import { areaResize } from './prep';
-import { boundary, clean, percentile, type Mask } from './raster';
+import { boundary, clean, dropSmall, percentile, type Mask } from './raster';
 import { SEG, type Look, type Prepared, type StyleId, type StyleResult } from './types';
 
 interface Regions { bg: Mask; person: Mask; hair: Mask; skin: Mask; clothes: Mask; sil: Mask; halo: Mask }
@@ -56,12 +56,12 @@ function finish(ink: Mask, fm: FeatureMasks, r: Regions, look: Look, W: number) 
 /** Region-normalised tone used by C and D, shifted by each region's density (and the background, for "photo"). */
 function normTone(p: Prepared, r: Regions, look: Look) {
   const t = p.ps.slice();
-  const spec: [Mask, Float32Array, number, number, number][] = [
-    [r.skin, p.ps, 3, 70, look.skin], [r.hair, p.ps, 2, 98, look.hair], [r.clothes, p.ps, 2, 90, look.clothes]];
-  if (look.background === 'photo') spec.push([r.bg, p.bgps, 2, 98, look.bgDensity]);
-  for (const [reg, tone, qlo, qhi, d] of spec) {
+  const spec: [Mask, Float32Array, number, number, number, number][] = [
+    [r.skin, p.ps, 3, 70, look.skin, 0], [r.hair, p.ps, 2, 98, look.hair, HAIR_TONE_LIFT * hairLight(p)], [r.clothes, p.ps, 2, 90, look.clothes, 0]];
+  if (look.background === 'photo') spec.push([r.bg, p.bgps, 2, 98, look.bgDensity, 0]);
+  for (const [reg, tone, qlo, qhi, d, lift] of spec) {
     // A near-flat background (plain wall) must not be stretched into full-range noise.
-    const lo = percentile(tone, reg, qlo), hi = percentile(tone, reg, qhi), shift = (0.5 - d) * 255;
+    const lo = percentile(tone, reg, qlo), hi = percentile(tone, reg, qhi), shift = (0.5 - d) * 255 + lift;
     const span = Math.max(hi - lo, reg === r.bg ? BG_MIN_SPAN : 1);
     for (let i = 0; i < t.length; i++)
       if (reg[i]) t[i] = Math.min(255, Math.max(0, Math.min(1, Math.max(0, (tone[i] - hi + span) / span)) * 255 + shift));
@@ -69,10 +69,84 @@ function normTone(p: Prepared, r: Regions, look: Look) {
   return t;
 }
 
+// ---------------------------------------------------------------- hair (SPEC: mode solid / tone / texture + density)
+type HairMode = Exclude<Look['hairMode'], 'auto'>;
+const HAIR_TONE_LIFT = 90; // how much lighter (of 255) the tone of very light hair is drawn
+
+/** 0 for black hair … 1 for very light hair, from the measured median luminance (60 → 0, 170 → 1). */
+const hairLight = (p: Prepared) => (p.hairLum < 0 ? 0 : Math.min(1, Math.max(0, (p.hairLum - 60) / 110)));
+
+/** Hair cells that disagree with ≥ 6 of their hair neighbours flip: lone flecks merge into the mass. */
+function smoothHair(ink: Mask, r: Regions, W: number, H: number): Mask {
+  const out = ink.slice();
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      if (!r.hair[i]) continue;
+      let n = 0, differ = 0;
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx, yy = y + dy;
+          if ((dx || dy) && xx >= 0 && yy >= 0 && xx < W && yy < H && r.hair[yy * W + xx]) { n++; differ += +(ink[yy * W + xx] !== ink[i]); }
+        }
+      if (n >= 5 && differ >= 6) out[i] = ink[i] ? 0 : 1;
+    }
+  return out;
+}
+
+const HAIR: Record<HairMode, (p: Prepared, r: Regions, look: Look) => Mask> = {
+  /** One mass with its larger highlights; light hair gets far less ink at the same density. */
+  solid: (p, r, look) => {
+    const ink = new Uint8Array(p.W * p.H);
+    cut(ink, p.ps, r.hair, densityToQ(look.hair, 88 - 50 * hairLight(p)));
+    return smoothHair(ink, r, p.W, p.H);
+  },
+  /** Four pattern levels (ink · 75 % · 50 % · paper) in coherent zones; light hair stays light. */
+  tone: (p, r, look) => {
+    const { W, H } = p, lo = percentile(p.ps, r.hair, 2), hi = percentile(p.ps, r.hair, 98);
+    const shift = (0.5 - look.hair) * 255 + HAIR_TONE_LIFT * hairLight(p), lvl = new Uint8Array(W * H), ink = new Uint8Array(W * H);
+    for (let i = 0; i < lvl.length; i++)
+      if (r.hair[i]) lvl[i] = Math.round(Math.min(255, Math.max(0, (p.ps[i] - lo) / Math.max(hi - lo, 1) * 255 + shift)) / 255 * 3);
+    const votes = new Int32Array(4);
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < W; x++) {
+        if (!r.hair[y * W + x]) continue;
+        votes.fill(0);
+        for (let dy = -1; dy <= 1; dy++)
+          for (let dx = -1; dx <= 1; dx++) {
+            const xx = x + dx, yy = y + dy;
+            if (xx >= 0 && yy >= 0 && xx < W && yy < H && r.hair[yy * W + xx]) votes[lvl[yy * W + xx]]++;
+          }
+        let best = 0; for (let k = 1; k < 4; k++) if (votes[k] > votes[best]) best = k;
+        ink[y * W + x] = PATTERN(best, x, y);
+      }
+    return ink;
+  },
+  /** The hair's outline, its strand lines and its darkest shadows — curls stay curls. */
+  texture: (p, r, look) => {
+    const { W, H } = p, n = W * H, ink = new Uint8Array(n);
+    const notHair = Uint8Array.from(r.hair, v => 1 - v), rim = boundary(r.hair, notHair, W, H);
+    cut(ink, p.ps, r.hair, densityToQ(look.hair, 10));
+    const t = 0.32 - 0.26 * look.hair; // density 0.5 → lines covering ≥ 19 % of a cell
+    for (let i = 0; i < n; i++) if (r.hair[i] && !rim[i] && p.lines[i] > t) ink[i] = 1;
+    const strands = dropSmall(ink, W, H, 3); // strands are long; lone specks are photo noise
+    for (let i = 0; i < n; i++) strands[i] = r.hair[i] ? strands[i] | rim[i] : 0;
+    return strands;
+  },
+};
+
+/** Replace the hair cells with the chosen mode; in "auto" the style uses `own` (or keeps its hair when null). */
+function applyHair(ink: Mask, p: Prepared, r: Regions, look: Look, own: HairMode | null) {
+  const mode = look.hairMode === 'auto' ? own : look.hairMode;
+  if (!mode) return;
+  const h = HAIR[mode](p, r, look);
+  for (let i = 0; i < ink.length; i++) if (r.hair[i]) ink[i] = h[i];
+}
+
 function styleA(p: Prepared, r: Regions, fm: FeatureMasks, look: Look) {
   const { W, H } = p, ink = new Uint8Array(W * H);
   cut(ink, p.ps, r.skin, densityToQ(look.skin, 22));
-  cut(ink, p.ps, r.hair, densityToQ(look.hair, 88));
+  applyHair(ink, p, r, look, 'solid');
   cut(ink, p.ps, r.clothes, densityToQ(look.clothes, 55));
   if (look.background === 'photo') {
     // Ink the darkest share of the background, but only cells clearly darker than its median.
@@ -111,6 +185,7 @@ function styleC(p: Prepared, r: Regions, fm: FeatureMasks, look: Look) {
       let best = 0; for (let k = 1; k < 4; k++) if (votes[k] > votes[best]) best = k;
       ink[y * W + x] = PATTERN(best, x, y);
     }
+  applyHair(ink, p, r, look, null);
   return finish(ink, fm, r, look, W);
 }
 
@@ -128,6 +203,7 @@ function styleD(p: Prepared, r: Regions, fm: FeatureMasks, look: Look) {
         if (xx >= 0 && xx < W && yy < H) f[yy * W + xx] += e / 8;
       }
     }
+  applyHair(ink, p, r, look, null);
   return finish(ink, fm, r, look, W);
 }
 
@@ -135,7 +211,7 @@ function styleD(p: Prepared, r: Regions, fm: FeatureMasks, look: Look) {
 function styleE(p: Prepared, r: Regions, look: Look, lines: LineMap) {
   const { W, H } = p, cov = areaResize(lines.ink, lines.w, lines.h, W, H), t = (W < 70 ? 0.16 : 0.22) / look.lineWeight;
   let ink = clean(Uint8Array.from(cov, c => +(c > t)), W, H, look.cleanup);
-  cut(ink, p.ps, r.hair, densityToQ(look.hair, 88));
+  applyHair(ink, p, r, look, 'solid');
   cut(ink, p.ps, r.clothes, densityToQ(look.clothes, 55));
   // The model draws mouth, nose and jaw itself; eyes, brows and glasses (and any stamp picked by hand) are stamped.
   const fm = featureMasks(p, look, { modelFace: true });

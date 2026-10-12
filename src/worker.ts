@@ -34,7 +34,7 @@ async function render(req: RenderRequest) {
   }
   const results = renderStyles(cache.prep, req.styles, req.look, map);
   for (const r of results) if (r.style === 'E') r.ms += modelMs;
-  reply({ type: 'result', res: { id: req.id, W: req.W, H: req.H, prepMs, results } }, results.map(r => r.cells.buffer));
+  reply({ type: 'result', res: { id: req.id, W: req.W, H: req.H, prepMs, hairLum: cache.prep.hairLum, results } }, results.map(r => r.cells.buffer));
 }
 
 onmessage = (e: MessageEvent<ToWorker>) => {

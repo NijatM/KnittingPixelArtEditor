@@ -166,6 +166,38 @@ const scaleLm = (lm: Float32Array, c: Crop, sx: number, sy: number) => {
   return o;
 };
 
+/** Separable Gaussian blur (reflect-101 border). */
+function blur(f: Float32Array, w: number, h: number, sigma: number): Float32Array {
+  const r = Math.ceil(sigma * 3), k = new Float32Array(2 * r + 1);
+  let s = 0;
+  for (let i = -r; i <= r; i++) s += k[i + r] = Math.exp(-(i * i) / (2 * sigma * sigma));
+  for (let i = 0; i < k.length; i++) k[i] /= s;
+  const tmp = new Float32Array(w * h), out = new Float32Array(w * h);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      let a = 0;
+      for (let i = -r; i <= r; i++) a += f[y * w + reflect101(x + i, w)] * k[i + r];
+      tmp[y * w + x] = a;
+    }
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      let a = 0;
+      for (let i = -r; i <= r; i++) a += tmp[reflect101(y + i, h) * w + x] * k[i + r];
+      out[y * w + x] = a;
+    }
+  return out;
+}
+
+/**
+ * Strand lines for the hair "texture" mode: pixels clearly darker than their surroundings (difference of
+ * Gaussians on the contrast-enhanced image) — the gaps between curls and strands.
+ */
+function darkLines(pg: Uint8Array, w: number, h: number): Uint8Array {
+  const f = Float32Array.from(pg, v => v / 255), a = blur(f, w, h, 1.2), b = blur(f, w, h, 2.4), out = new Uint8Array(w * h);
+  for (let i = 0; i < out.length; i++) out[i] = +(b[i] - a[i] > 0.035);
+  return out;
+}
+
 export function prepare(src: Source, crop: Crop, W: number, H: number): Prepared {
   const t0 = performance.now(), f = workScale(W), ww = W * f, wh = H * f;
   const { rgb, outside } = resampleCrop(src, crop, ww, wh);
@@ -174,19 +206,29 @@ export function prepare(src: Source, crop: Crop, W: number, H: number): Prepared
   for (let i = 0; i < gray.length; i++)
     gray[i] = Math.round(0.299 * rgb[i * 3] + 0.587 * rgb[i * 3 + 1] + 0.114 * rgb[i * 3 + 2]);
   const pg = clahe(bilateral(gray, ww, wh), ww, wh);
+  const strands = darkLines(pg, ww, wh);
+
+  // Measured hair lightness: median luminance of the hair pixels before any contrast work (-1 = no hair).
+  const hist = new Int32Array(256);
+  let hairN = 0;
+  for (let i = 0; i < gray.length; i++) if (seg[i] === SEG.HAIR) { hist[gray[i]]++; hairN++; }
+  let hairLum = -1;
+  if (hairN > gray.length * 0.01) for (let v = 0, acc = 0; v < 256; v++) if ((acc += hist[v]) >= hairN / 2) { hairLum = v; break; }
 
   // Grid resolution: tone = block mean (background whitened, and kept), region = block majority.
   const ps = new Float32Array(W * H), bgps = new Float32Array(W * H), segs = new Uint8Array(W * H), acc = new Uint8Array(W * H);
+  const lines = new Float32Array(W * H);
   const votes = new Int32Array(6);
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
-      let s = 0, sb = 0; votes.fill(0);
+      let s = 0, sb = 0, sl = 0; votes.fill(0);
       for (let j = 0; j < f; j++)
         for (let i = 0; i < f; i++) {
           const o = (y * f + j) * ww + x * f + i;
-          s += seg[o] === SEG.BG ? 255 : pg[o]; sb += pg[o]; votes[seg[o]]++;
+          s += seg[o] === SEG.BG ? 255 : pg[o]; sb += pg[o]; sl += strands[o]; votes[seg[o]]++;
         }
       ps[y * W + x] = s / (f * f);
+      lines[y * W + x] = sl / (f * f);
       bgps[y * W + x] = sb / (f * f);
       let best = 0; for (let k = 1; k < 6; k++) if (votes[k] > votes[best]) best = k;
       segs[y * W + x] = best;
@@ -194,5 +236,5 @@ export function prepare(src: Source, crop: Crop, W: number, H: number): Prepared
     }
 
   const lm = src.lm ? scaleLm(src.lm, crop, W / crop.w, H / crop.h) : null;
-  return { W, H, ps, bgps, segs, acc, lm, ms: performance.now() - t0 };
+  return { W, H, ps, bgps, segs, acc, lines, hairLum, lm, ms: performance.now() - t0 };
 }

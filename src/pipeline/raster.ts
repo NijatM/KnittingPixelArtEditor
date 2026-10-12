@@ -89,6 +89,26 @@ export function dilate(m: Mask, W: number, H: number): Mask {
   return out;
 }
 
+/** Remove 8-connected groups of set cells smaller than `min` (speckle), keeping lines and shapes. */
+export function dropSmall(m: Mask, W: number, H: number, min: number): Mask {
+  const out = m.slice(), seen = new Uint8Array(W * H), stack: number[] = [], group: number[] = [];
+  for (let s = 0; s < m.length; s++) {
+    if (!m[s] || seen[s]) continue;
+    stack.push(s); seen[s] = 1; group.length = 0;
+    while (stack.length) {
+      const i = stack.pop()!, x = i % W, y = (i / W) | 0;
+      group.push(i);
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const xx = x + dx, yy = y + dy, j = yy * W + xx;
+          if (xx >= 0 && yy >= 0 && xx < W && yy < H && m[j] && !seen[j]) { seen[j] = 1; stack.push(j); }
+        }
+    }
+    if (group.length < min) for (const i of group) out[i] = 0;
+  }
+  return out;
+}
+
 /** Orphan cleanup: flip cells that disagree with >= 7 of their 8 neighbours (edges replicated). */
 export function clean(ink: Mask, W: number, H: number, passes: number, protect?: Mask): Mask {
   let cur = ink.slice();
