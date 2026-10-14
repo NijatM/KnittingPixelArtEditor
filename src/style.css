@@ -3,6 +3,7 @@
 :root {
   --bg: #0b0b0b; --bg2: #141414; --bg3: #1b1b1b; --line: #232323; --line2: #3a3a3a;
   --fg: #d2d2d2; --hi: #f4f4f4; --dim: #8a8a8a; --faint: #4a4a4a; --warn: #d09a4e; --ok: #8fb58a;
+  --accent: #2b5076; --accent-hi: #325d86; /* focus-ring blue, a shade darker: the confirm button */
   --nav: 268px; --insp: 400px;
   color-scheme: dark;
 }
@@ -188,8 +189,8 @@ body.dragover #view { outline: 1px dashed var(--hi); outline-offset: -12px; }
 #resetdlg::backdrop { background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(3px); }
 #resetdlg .note { margin: 8px 0 16px; }
 .dlgbtns { justify-content: flex-end; margin: 0; }
-.btn.danger { border-color: var(--warn); color: var(--warn); }
-.btn.danger:hover, .btn.danger:focus-visible { background: var(--warn); color: var(--bg); }
+.btn.accent { background: var(--accent); border-color: var(--accent); color: #f4f4f4; }
+.btn.accent:hover, .btn.accent:focus-visible { background: var(--accent-hi); border-color: var(--accent-hi); }
 #resetrow .right { color: var(--faint); }
 /* stamp options: the portrait with each option, cropped to the feature */
 .optlink { background: none; border: none; padding: 0; color: var(--dim); cursor: pointer; text-decoration: underline dotted var(--line2); text-underline-offset: 3px; }
