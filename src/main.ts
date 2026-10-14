@@ -12,8 +12,8 @@ import { pixelArtOf, type PixelArt } from './pixelart';
 import { GLASSES_MIN_SHARE, glassesShare } from './pipeline/glasses';
 import { OVAL, pts } from './pipeline/landmarks';
 import { avatarAuto } from './pipeline/avatar';
-import { AUTO_STAMPS, STAMPS, STAMP_KINDS, autoVariant, hitBoxes, type Face, type StampKind } from './pipeline/stamps';
-import { SEG, type Crop, type Features, type Look, type RenderResult, type StyleId, type StyleResult } from './pipeline/types';
+import { AUTO_STAMPS, STAMPS, STAMP_KINDS, autoVariant, hitBoxes, stampName, type Face, type StampKind } from './pipeline/stamps';
+import { SEG, type Crop, type Features, type Lens, type Look, type RenderResult, type StyleId, type StyleResult } from './pipeline/types';
 import { $, $$, Bar, check, seg, setCheck, setSeg } from './ui/controls';
 import type { FromWorker, ToWorker } from './worker';
 
@@ -76,6 +76,7 @@ const S = {
   res: new Map<StyleId, Rendered>(), // latest result per style, each with its own grid size
   prepMs: 0,
   hairLum: -1,                         // measured hair lightness of the current frame (from the worker)
+  lenses: null as Lens[] | null,       // glasses lenses measured in the current frame (from the worker)
   mlNote: '',                          // what ML lines is doing while it has no result yet
   zoom: 0,
   grid: false,
@@ -112,24 +113,91 @@ function gridFace(): Face | null {
   if (!c || !lm) return null;
   const g = new Float32Array(lm.length), sx = S.W / c.w, sy = S.H / c.h;
   for (let i = 0; i < lm.length; i += 2) { g[i] = (lm[i] - c.x) * sx; g[i + 1] = (lm[i + 1] - c.y) * sy; }
-  return { lm: g, W: S.W, H: S.H };
+  const lenses = S.lenses && S.res.get(S.style)?.W === S.W ? S.lenses : null;
+  return { lm: g, W: S.W, H: S.H, lenses };
 }
 const FEATURE_OF: Record<StampKind, keyof Features> = { eyes: 'eyes', brows: 'brows', mouth: 'mouth', nose: 'nostrils', glasses: 'glasses' };
 
-/** The shape "auto" draws: the avatar designs its own, the other styles pick a variant per face and size. */
+/** The shape "auto" draws: the avatar picks its own, the other styles one per face and size ('' = none). */
 const autoName = (kind: StampKind, face: Face) =>
-  S.style === 'avatar' ? avatarAuto(kind, face, S.look.features.glasses) : STAMPS[kind][autoVariant(kind, face) - 1].name;
+  (S.style === 'avatar' ? avatarAuto(kind, face, S.look.features.glasses) : autoVariant(kind, face)) || 'none';
 
-/** Step a stamp: auto → 1 … n → off → auto. Off is the feature switch in 05 Features. */
-function cycleStamp(kind: StampKind, dir: number) {
-  const n = STAMPS[kind].length, f = S.look.features, key = FEATURE_OF[kind];
-  const pos = !f[key] ? n + 1 : S.look.stamps[kind]; // 0 auto, 1..n, n + 1 off
-  const next = (pos + dir + n + 2) % (n + 2);
-  f[key] = next !== n + 1;
-  if (next !== n + 1) S.look.stamps[kind] = next;
-  const face = gridFace(), name = next === n + 1 ? 'off' : next === 0 ? `auto · ${face ? autoName(kind, face) : 'traced'}` : STAMPS[kind][next - 1].name;
-  log(`> ${kind} · ${name}`);
+/** Where a feature stands in its stepper: 0 auto, 1..n a variant, n + 1 off (the switch in 05 Features). */
+function stampPos(kind: StampKind) {
+  const n = STAMPS[kind].length;
+  return !S.look.features[FEATURE_OF[kind]] ? n + 1 : S.look.stamps[kind] ? STAMPS[kind].findIndex(v => v.name === S.look.stamps[kind]) + 1 : 0;
+}
+
+/** Set a feature to auto (''), a variant by name, or off (null). */
+function setStamp(kind: StampKind, name: string | null) {
+  S.look.features[FEATURE_OF[kind]] = name !== null;
+  if (name !== null) S.look.stamps[kind] = name;
+  const face = gridFace();
+  log(`> ${kind} · ${name === null ? 'off' : name || `auto · ${face ? autoName(kind, face) : '—'}`}`);
   syncControls(); lookChanged();
+}
+
+// ---------------------------------------------------------------- stamp options (08 Stamps)
+let openKind: StampKind | null = null, previewTimer = 0;
+/** auto, every offered variant, off (null). */
+const optionNames = (kind: StampKind): (string | null)[] => ['', ...STAMPS[kind].map(v => v.name), null];
+
+/** The part of the grid an option preview shows: eyes, brows and glasses together; the mouth with its surroundings. */
+function optionCrop(kind: StampKind, f: Face) {
+  const b = hitBoxes(f), r = kind === 'mouth' ? [b.mouth.x0 - 3, b.nose.y0, b.mouth.x1 + 3, b.mouth.y1 + 4]
+    : kind === 'nose' ? [b.nose.x0 - 4, b.nose.y0 - 3, b.nose.x1 + 4, b.mouth.y1 + 1]
+    : [b.glasses.x0 - 1, b.brows.y0 - 2, b.glasses.x1 + 1, b.glasses.y1 + 1];
+  const x0 = Math.max(0, Math.floor(r[0])), y0 = Math.max(0, Math.floor(r[1]));
+  return { x0, y0, x1: Math.min(f.W, Math.ceil(r[2])), y1: Math.min(f.H, Math.ceil(r[3])) };
+}
+
+/** Highlight the option in use. */
+function markOptions() {
+  const box = $('#stampopts'), kind = openKind;
+  $$('[data-stamp]').forEach(r => { const on = r.dataset.stamp === kind; r.classList.toggle('open', on); $('[data-opts]', r).setAttribute('aria-expanded', String(on)); });
+  if (!kind || box.hidden) return;
+  const cur = S.look.features[FEATURE_OF[kind]] ? S.look.stamps[kind] : null;
+  $$('.opt', box).forEach((b, i) => b.classList.toggle('on', optionNames(kind)[i] === cur));
+}
+
+/** Show the open feature's options under its row and render their previews (after the latest render settles). */
+function renderOptions() {
+  const box = $('#stampopts'), kind = openKind, face = gridFace();
+  if (!kind || !face || pixels()) { box.hidden = true; markOptions(); return; }
+  const names = optionNames(kind);
+  $(`[data-stamp=${kind}]`).insertAdjacentElement('afterend', box);
+  if (box.dataset.kind !== kind) {
+    box.dataset.kind = kind;
+    box.innerHTML = names.map(n => `<button class="opt" title="${kind} · ${n === '' ? 'auto' : n ?? 'off'}"><canvas width="1" height="1"></canvas><span>${n === '' ? 'auto' : n ?? 'off'}</span></button>`).join('');
+    $$<HTMLButtonElement>('.opt', box).forEach((b, i) => (b.onclick = () => setStamp(kind, names[i])));
+  }
+  box.hidden = false;
+  markOptions();
+  clearTimeout(previewTimer);
+  previewTimer = window.setTimeout(() => {
+    const c = optionCrop(kind, face);
+    (S.style === 'ml' ? ml : instant).variants(S.style, kind, names, r => {
+      if (openKind !== kind || r.W !== S.W || r.H !== S.H) return;
+      $$<HTMLCanvasElement>('.opt canvas', box).forEach((cv, i) => {
+        const w = c.x1 - c.x0, h = c.y1 - c.y0, crop = new Uint8Array(w * h);
+        for (let y = 0; y < h; y++) crop.set(r.cells[i].subarray((c.y0 + y) * r.W + c.x0, (c.y0 + y) * r.W + c.x1), y * w);
+        paintCells(cv, crop, w, h);
+        cv.style.aspectRatio = `${w * S.cellAspect} / ${h}`;
+      });
+    });
+  }, 150);
+}
+
+/** Open (or close) a feature's options. */
+function openOptions(kind: StampKind, toggle = true) {
+  openKind = toggle && openKind === kind ? null : kind;
+  renderOptions();
+}
+
+/** Step a stamp: auto → 1 … n → off → auto. */
+function cycleStamp(kind: StampKind, dir: number) {
+  const n = STAMPS[kind].length, next = (stampPos(kind) + dir + n + 2) % (n + 2);
+  setStamp(kind, next === n + 1 ? null : next === 0 ? '' : STAMPS[kind][next - 1].name);
 }
 
 /** Mirror axis: the face centre (between the outer eye corners), snapped to half a cell; the grid centre otherwise. */
@@ -148,10 +216,16 @@ class Renderer {
   private nextId = 1;
   private firstValid = 1; // results from requests sent before the current photo are dropped
 
+  private previews = new Map<number, (r: { W: number; H: number; cells: Uint8Array[] }) => void>();
+  private nextPreview = 1;
+
   constructor(private styles: StyleId[], onResult: (r: RenderResult) => void, onProgress: (t: string) => void, onError: (m: string) => void = () => {}) {
     this.worker.onmessage = (e: MessageEvent<FromWorker>) => {
       const m = e.data;
       if (m.type === 'progress') { if (m.id >= this.firstValid) onProgress(m.text); return; }
+      // Option previews answer on their own (error ids are negative) and never hold up the renders.
+      if (m.type === 'variants') { this.previews.get(m.id)?.(m); this.previews.delete(m.id); return; }
+      if (m.type === 'error' && m.id < 0) { this.previews.delete(-m.id); return; }
       this.busy = false;
       if (m.type === 'error') { log(`> style ${this.styles.join('')} failed: ${m.message}`); onError(m.message); }
       else if (m.res.id >= this.firstValid) onResult(m.res);
@@ -173,6 +247,16 @@ class Renderer {
     const req = { id: this.nextId++, crop: c, W: S.W, H: S.H, styles: this.styles, look: structuredClone(S.look) };
     this.worker.postMessage({ type: 'render', req } satisfies ToWorker);
   }
+
+  /** Render `style` once per option of a feature; the worker queues it behind any render in flight. */
+  variants(style: StyleId, kind: StampKind, names: (string | null)[], done: (r: { W: number; H: number; cells: Uint8Array[] }) => void) {
+    const c = crop();
+    if (!c) return;
+    const id = this.nextPreview++;
+    this.previews.set(id, done);
+    const req = { id: 0, crop: c, W: S.W, H: S.H, styles: [style], look: structuredClone(S.look) };
+    this.worker.postMessage({ type: 'variants', v: { id, req, kind, names } } satisfies ToWorker);
+  }
 }
 
 type Rendered = StyleResult & { W: number; H: number };
@@ -187,10 +271,12 @@ function applyResult(res: RenderResult) {
   if (pixels()) return; // a render from the photo before the pixel image
   if (res.prepMs) S.prepMs = res.prepMs;
   S.hairLum = res.hairLum;
+  S.lenses = res.lenses;
   for (const r of res.results) S.res.set(r.style, { ...r, W: res.W, H: res.H });
   if (res.results.some(r => r.style === 'ml')) S.mlNote = '';
   paintGallery();
   refresh();
+  if (openKind && S.step === 'stamps' && res.results.some(r => r.style === S.style)) renderOptions();
 }
 const instant = new Renderer(INSTANT, applyResult, () => {});
 const ml = new Renderer(['ml'], applyResult, t => { S.mlNote = t; paintGallery(); refresh(); }, // shown in the ML tile + status
@@ -242,6 +328,7 @@ function startPhoto(id: number, name: string, canvas: HTMLCanvasElement, det: { 
   if (DEBUG) Object.assign(window, { __kpaeDebug: { w, h, rgba: rgba.slice(), seg: det.seg?.slice() ?? null, lm: det.lm } });
   S.photo = { kind: 'photo', id, name, canvas, lm: det.lm, regions, glasses, ms: det.ms };
   S.res.clear();
+  S.lenses = null;
   S.mlNote = '';
   S.hairLum = -1;
   if (restore) {
@@ -280,6 +367,7 @@ function startPixels(id: number, name: string, art: PixelArt, restore: store.Sav
   paintCells(canvas, art.cells, art.W, art.H, art.palette);
   S.photo = { kind: 'pixels', id, name, canvas, lm: null, regions: [], glasses: -1, ms: 0 };
   S.res.clear();
+  S.lenses = null;
   S.mlNote = '';
   S.hairLum = -1;
   if (restore) {
@@ -310,6 +398,8 @@ function applySettings(v: Record<string, unknown>) {
   const pal = s.pal.map(c => { const k = OLD_PAL.indexOf(c); return k >= 0 && s.pal.every(q => OLD_PAL.includes(q)) ? DEFAULT_PAL[k] : c; });
   Object.assign(S, { frame: { ...AUTO_FRAME, ...s.frame }, ratio: s.ratio, W: s.W, H: s.H, lock: s.lock, cellAspect: s.cellAspect, style: OLD_IDS[s.style] ?? s.style, pal, fmt: s.fmt ?? 'png', depth: s.depth ?? 1 });
   S.look = { ...S.look, ...s.look, features: { ...S.look.features, ...s.look.features } };
+  // Stamps are kept by name (older projects saved list positions).
+  S.look.stamps = Object.fromEntries(STAMP_KINDS.map(k => [k, stampName(k, (s.look.stamps as Record<string, unknown> | undefined)?.[k])])) as Look['stamps'];
 }
 let saveTimer = 0, storeWarned = false;
 function storeFailed() {
@@ -491,6 +581,7 @@ function pickStyle(k: StyleId, openPixels: boolean) {
   log(S.ed.live ? `> style ${k} · ${styleInfo(k).t.toLowerCase()}${S.ed.count ? ' · edits kept' : ''}` : '> the base is baked · tick live to follow the style again');
   if (openPixels) { S.pixelsOverStyles = true; }
   paintGallery(); refresh();
+  if (openKind) renderOptions(); // the previews show the style picked
 }
 
 // ---------------------------------------------------------------- steps, views, chrome
@@ -508,6 +599,7 @@ function setStep(step: Step) {
   $$('#nav .lrow').forEach(r => r.classList.toggle('sel', r.dataset.step === step));
   $$('.panel').forEach(p => p.classList.toggle('on', p.dataset.panel === step));
   refresh();
+  if (step === 'stamps' && openKind) renderOptions();
 }
 
 function log(t: string) {
@@ -545,10 +637,11 @@ function refresh() {
     const n = STAMPS[kind].length, v = S.look.stamps[kind], on = S.look.features[FEATURE_OF[kind]];
     if (on && v) picked++;
     $(`[data-stamp=${kind}] .stepper span`).textContent = !on ? 'off'
-      : v ? `${v}/${n} · ${STAMPS[kind][v - 1].name}`
+      : v ? `${stampPos(kind)}/${n} · ${v}`
       : `auto · ${face ? autoName(kind, face) : '—'}${S.style === 'ml' && (kind === 'mouth' || kind === 'nose') ? ' (ML: model)' : ''}`;
   }
   bind('stamps', picked ? `${picked} picked` : 'auto');
+  markOptions();
   $('#glasses-note').textContent = g < 0 ? '' : found ? '· found' : '· none found';
   $$('#nav .lrow').forEach(r => r.classList.toggle('faint', (!S.photo && r.dataset.step !== 'photo') || (pixels() && PHOTO_STEPS.includes(r.dataset.step as Step))));
   $$('.pixnote').forEach(e => (e.hidden = !pixels()));
@@ -765,6 +858,7 @@ const selectAll = () => { if (!editBase()) return; S.ed.selectAll(); S.ed.tool =
 $$<HTMLButtonElement>('[data-sel]').forEach(b => b.addEventListener('click', () => selAct(b.dataset.sel!)));
 seg($('#behindseg'), b => { S.ed.behind = b.dataset.behind as Behind; refresh(); });
 $$<HTMLButtonElement>('[data-cycle]').forEach(b => (b.onclick = () => cycleStamp(b.closest<HTMLElement>('[data-stamp]')!.dataset.stamp as StampKind, +b.dataset.cycle!)));
+$$<HTMLButtonElement>('[data-opts]').forEach(b => (b.onclick = () => openOptions(b.closest<HTMLElement>('[data-stamp]')!.dataset.stamp as StampKind)));
 $('#stamps-auto').onclick = () => {
   S.look.stamps = { ...AUTO_STAMPS };
   for (const k of STAMP_KINDS) if (k !== 'glasses') S.look.features[FEATURE_OF[k]] = true;
@@ -785,7 +879,7 @@ $$<HTMLButtonElement>('[data-brush]').forEach(b => (b.onclick = () => { S.ed.bru
       const boxes = hitBoxes(face), cx = x + 0.5, cy = y + 0.5;
       const inside = (k: StampKind) => { const b = boxes[k]; return cx >= b.x0 && cx <= b.x1 && cy >= b.y0 && cy <= b.y1; };
       const kind = (['brows', 'nose', 'mouth', 'eyes'] as StampKind[]).find(inside) ?? (inside('glasses') ? 'glasses' : null);
-      if (kind) cycleStamp(kind, 1);
+      if (kind) { openOptions(kind, false); log(`> ${kind} · pick an option in the panel`); }
       return;
     }
     const base = editBase();

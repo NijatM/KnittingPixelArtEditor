@@ -1,7 +1,7 @@
 // Feature layer: the stamps (stamps.ts) drawn from the face points, plus the jaw line and accessories on the face.
 import { JAW, OVAL, bounds, pts } from './landmarks';
 import { polyline, type Mask } from './raster';
-import { drawStamps, type StampKind } from './stamps';
+import { autoVariant, drawStamps, type Face, type StampKind } from './stamps';
 import type { Look, Prepared } from './types';
 
 export interface FeatureMasks {
@@ -29,8 +29,9 @@ export function featureMasks(p: Prepared, look: Look, opts: { modelFace?: boolea
   const facialHair = p.facialHair >= FACIAL_HAIR_MIN;
   // E leaves mouth and nose to the model — except the mouth in a moustache / beard, where the model's lines
   // and the hair merge into one blob.
-  if (opts.modelFace) { enabled.mouth &&= look.stamps.mouth > 0 || facialHair; enabled.nose &&= look.stamps.nose > 0; }
-  const s = drawStamps({ lm, W, H }, enabled, look.stamps, facialHair);
+  if (opts.modelFace) { enabled.mouth &&= look.stamps.mouth !== '' || facialHair; enabled.nose &&= look.stamps.nose !== ''; }
+  const face: Face = { lm, W, H, lenses: p.lenses };
+  const s = drawStamps(face, enabled, look.stamps, kind => autoVariant(kind, face), facialHair);
   if (F.jaw && !opts.modelFace) polyline(jaw, W, H, pts(lm, JAW));
   return { sock: s.clear, feats: s.ink, jaw, faceAcc };
 }

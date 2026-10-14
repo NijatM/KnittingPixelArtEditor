@@ -27,7 +27,7 @@ Pages source to "GitHub Actions" once).
 | Face points (478) + hair / skin / clothes / accessories regions, once per photo | `src/detect.ts` (MediaPipe, CPU) |
 | Auto-framing from the face oval, tight↔wide, drag | `src/frame.ts` |
 | Crop → work image (≈10× grid) → grey, bilateral, CLAHE → grid tone + regions | `src/pipeline/prep.ts` |
-| Drawn features: stamps for eyes, brows, mouth, nose, glasses (+ jaw line) | `src/pipeline/stamps.ts`, `src/pipeline/features.ts` |
+| Drawn features: 61 named stamps for eyes, brows, mouth, nose, glasses (+ jaw line), measured glasses lenses | `src/pipeline/stamps.ts`, `src/pipeline/features.ts`, `src/pipeline/prep.ts` |
 | Styles A clean avatar · B region poster · C line portrait · D tone patterns · E Atkinson tonal · F ML lines (ids `avatar` … `ml`; the letter is the gallery position) | `src/pipeline/styles.ts`, `src/pipeline/avatar.ts` |
 | ML lines model (Informative Drawings, ONNX Runtime Web, WebGPU or CPU) | `src/pipeline/ml.ts`, `scripts/convert-informative-drawings.py` |
 | Processing off the main thread in two workers (instant styles, ML lines); prep and line map cached | `src/worker.ts` |

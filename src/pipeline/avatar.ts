@@ -4,10 +4,9 @@
 // a mouth that keeps its teeth, moustache and goatee as their own shapes. Skin shading never decides a cell,
 // so a shadowed cheek can't turn into a black patch.
 import { JAW, OVAL, bounds, pt, pts, type Pt } from './landmarks';
-import { dropSmall, line, percentile, polygon, polyline, type Mask } from './raster';
+import { dropSmall, percentile, polygon, polyline, type Mask } from './raster';
 import {
-  BROWS, EYES, LIPS_INNER_LO, LIPS_INNER_UP, LIPS_OUTER, NOSE, STAMPS, dist, eyeSocket, eyeWidth, lens, mid, mouthOpenness,
-  mouthWidth, type Face, type Out, type StampKind,
+  BROWS, NOSE, dist, drawStamps, eyeOpenness, eyeWidth, lensName, mouthOpenness, mouthWidth, type Face, type StampKind,
 } from './stamps';
 import { SEG, type Look, type Prepared } from './types';
 
@@ -140,105 +139,29 @@ function darkShare(p: Prepared, poly: Pt[], ref: number, margin = 30): number {
 }
 
 // ---------------------------------------------------------------- features
-const eyeOpenness = (f: Face) => EYES.reduce((s, e) => s + dist(pt(f.lm, e.up[4]), pt(f.lm, e.lo[4])) / Math.max(dist(pt(f.lm, e.o), pt(f.lm, e.i)), 1e-6), 0) / 2;
 const set = (m: Mask, f: Face, x: number, y: number) => { if (x >= 0 && y >= 0 && x < f.W && y < f.H) m[y * f.W + x] = 1; };
-/** A square of side s whose centre is nearest to c. */
-const square = (m: Mask, f: Face, c: Pt, s: number) => {
-  const x0 = Math.round(c[0] - s / 2), y0 = Math.round(c[1] - s / 2);
-  for (let dy = 0; dy < s; dy++) for (let dx = 0; dx < s; dx++) set(m, f, x0 + dx, y0 + dy);
-};
-const pupilSize = (ew: number) => (ew < 3 ? 1 : ew < 8 ? 2 : 3);
-
-export type AvatarEyes = 'pupils' | 'lids' | 'dashes';
-/** What auto picks: dashes for narrowed (smiling) eyes, pupils behind glasses, otherwise lid line + pupil. */
-export function avatarEyes(f: Face, glasses: boolean): AvatarEyes {
-  return eyeOpenness(f) < 0.2 ? 'dashes' : glasses || eyeWidth(f) < 4 ? 'pupils' : 'lids';
-}
-
-function drawEyes(f: Face, kind: AvatarEyes, o: Out) {
-  eyeSocket(f, o);
-  const ew = eyeWidth(f), s = pupilSize(ew);
-  for (const e of EYES) {
-    const c = pt(f.lm, e.c), out = pt(f.lm, e.o), inn = pt(f.lm, e.i);
-    if (kind === 'dashes') {
-      const y = (pt(f.lm, e.up[4])[1] + pt(f.lm, e.lo[4])[1]) / 2, a = mid(out, inn, 0.12), b = mid(out, inn, 0.88);
-      line(o.ink, f.W, f.H, [a[0], y], [b[0], y]);
-      continue;
-    }
-    if (kind === 'lids') polyline(o.ink, f.W, f.H, pts(f.lm, e.up.slice(1, -1)));
-    square(o.ink, f, c, s);
-  }
-}
-
-/** Glasses: continuous one-cell rims a bit larger than the eyes, cleared lenses, a bridge and short temple arms. */
-function drawGlasses(f: Face, skin: Mask, o: Out) {
-  const n = f.W * f.H, rim = new Uint8Array(n), fill = new Uint8Array(n), inner: Pt[] = [];
-  const d = dist(pt(f.lm, EYES[0].c), pt(f.lm, EYES[1].c)); // lenses nearly meet at the bridge, like real frames
-  for (const e of EYES) {
-    const [ox, oy] = pt(f.lm, e.o), [ix, iy] = pt(f.lm, e.i), ew = Math.hypot(ix - ox, iy - oy) || 1;
-    const u: Pt = [(ix - ox) / ew, (iy - oy) / ew];
-    let v: Pt = [-u[1], u[0]]; if (v[1] < 0) v = [-v[0], -v[1]];
-    const a = d * 0.41, b = d * 0.37, c: Pt = [(ox + ix) / 2 + v[0] * 0.3, (oy + iy) / 2 + v[1] * 0.3];
-    const ring = lens(c, u, v, a, b, 0.35);
-    polygon(fill, f.W, f.H, ring);
-    polyline(rim, f.W, f.H, ring, true);
-    inner.push([c[0] + u[0] * a - v[0] * b * 0.35, c[1] + u[1] * a - v[1] * b * 0.35]);
-    // temple arm: from the outer edge, level with the lens top third, outwards across the skin to the face edge
-    const sx = c[0] - u[0] * a, y = Math.floor(c[1] - b * 0.45), dir = -Math.sign(u[0]) || 1;
-    for (let x = Math.floor(sx) + dir, k = 0; k < Math.ceil(ew * 1.2); x += dir, k++) {
-      if (x < 0 || x >= f.W || !skin[y * f.W + x]) break;
-      rim[y * f.W + x] = 1;
-    }
-  }
-  if (Math.abs(inner[1][0] - inner[0][0]) >= 1.5) line(rim, f.W, f.H, inner[0], inner[1]); // bridge, when the lenses don't touch
-  for (let k = 0; k < n; k++) {
-    if (fill[k] && !rim[k]) o.clear[k] = 1;
-    if (rim[k]) o.ink[k] = 1;
-  }
-}
-
 export const browThickness = (f: Face) => BROWS.reduce((s, b) => s + b.lo.reduce((t, k, j) => t + dist(pt(f.lm, k), pt(f.lm, b.up[j])), 0) / b.lo.length, 0) / 2;
 
-/** Two rows where the real brow is about two cells thick, one row otherwise; they give way to glasses rims. */
-function drawBrows(f: Face, bold: boolean, o: Out) {
-  for (const b of BROWS) {
-    const lo = pts(f.lm, b.lo), up = pts(f.lm, b.up), centre = lo.map((q, k) => mid(q, up[k]));
-    polyline(o.brow, f.W, f.H, centre);
-    if (bold) polyline(o.brow, f.W, f.H, centre.map(([x, y]): Pt => [x, y - 1]));
-  }
-}
-
-export type AvatarMouth = 'open' | 'smile' | 'line';
-export function avatarMouth(f: Face): AvatarMouth {
+/** open (lips apart) · smile (corners above the middle) · line. */
+export function avatarMouth(f: Face): 'open' | 'smile' | 'line' {
   const mw = mouthWidth(f), l = pt(f.lm, 61), r = pt(f.lm, 291), cy = (pt(f.lm, 13)[1] + pt(f.lm, 14)[1]) / 2;
   if (mw >= 5 && mouthOpenness(f) > 0.1) return 'open';
   return (cy - (l[1] + r[1]) / 2) / mw > 0.05 ? 'smile' : 'line';
 }
 
-function drawMouth(f: Face, kind: AvatarMouth, o: Out) {
-  const outer = pts(f.lm, LIPS_OUTER), l = pt(f.lm, 61), r = pt(f.lm, 291), cy = (pt(f.lm, 13)[1] + pt(f.lm, 14)[1]) / 2;
-  polygon(o.clear, f.W, f.H, outer);
-  if (kind === 'open') { // lips around paper teeth; the teeth keep at least one full row
-    const ring = new Uint8Array(f.W * f.H), teeth = new Uint8Array(f.W * f.H), up = pts(f.lm, LIPS_INNER_UP), lo = pts(f.lm, LIPS_INNER_LO);
-    const gap = Math.max(0, 1.3 - (cy - pt(f.lm, 13)[1]) * 2) / 2;
-    polygon(ring, f.W, f.H, outer);
-    polygon(teeth, f.W, f.H, [...up.map(([x, y]): Pt => [x, y - gap]), ...lo.slice(1, -1).reverse().map(([x, y]): Pt => [x, y + gap])]);
-    for (let i = 0; i < ring.length; i++) if (ring[i] && !teeth[i]) o.ink[i] = 1;
-    return;
+/**
+ * What "auto" draws in this style ('' = nothing): dashes for narrowed (smiling) eyes, pupils behind glasses or on
+ * small faces, otherwise lid + pupil; two-row brows only where the real brow is that thick; the mouth's shape;
+ * a small nose except behind glasses; glasses shaped like the measured lenses.
+ */
+export function avatarAuto(kind: StampKind, f: Face, glasses: boolean): string {
+  switch (kind) {
+    case 'eyes': return eyeOpenness(f) < 0.2 ? 'dashes' : glasses || eyeWidth(f) < 4 ? 'pupils' : 'lids';
+    case 'brows': return browThickness(f) >= 1.6 ? 'bold' : 'thin';
+    case 'mouth': { const m = avatarMouth(f); return m === 'open' ? 'grin' : m; } // an open smile: a D with paper teeth
+    case 'nose': return glasses || eyeWidth(f) < 3.5 ? '' : 'L';
+    case 'glasses': return lensName(f.lenses);
   }
-  if (kind === 'line') { line(o.ink, f.W, f.H, [mid(l, r, 0.1)[0], cy], [mid(l, r, 0.9)[0], cy]); return; }
-  const depth = Math.max(0.8, mouthWidth(f) * 0.14), p: Pt[] = [];
-  for (let k = 0; k <= 12; k++) { const t = k / 12, b = mid(l, r, t); p.push([b[0], b[1] - 0.3 + (cy - (l[1] + r[1]) / 2 + depth * 0.6) * Math.sin(Math.PI * t)]); }
-  polyline(o.ink, f.W, f.H, p);
-}
-
-/** Small nose: one side of the nose and its base (an "L"), only where there is room for it. */
-function drawNose(f: Face, o: Out) {
-  if (eyeWidth(f) < 3.5) return;
-  const b = pt(f.lm, NOSE.bridge), t = pt(f.lm, NOSE.tip), l = pt(f.lm, NOSE.l), s = pt(f.lm, NOSE.base);
-  const x = mid(l, t, 0.35)[0], foot: Pt = [x, s[1] - 0.3];
-  line(o.ink, f.W, f.H, [x, mid(b, t, 0.55)[1]], foot);
-  line(o.ink, f.W, f.H, foot, [mid(foot, s, 0.7)[0], foot[1]]);
 }
 
 /** Moustache zone, nose base → mouth line (measured for darkness). */
@@ -282,23 +205,34 @@ function goatee(f: Face): Pt[] {
   return [[c[0] - w * 0.28, top], [c[0] + w * 0.28, top], [c[0] + w * 0.08, bot], [c[0] - w * 0.08, bot]];
 }
 
-/** What "auto" draws for a feature in this style (Stamps panel). */
-export function avatarAuto(kind: StampKind, f: Face, glasses: boolean): string {
-  switch (kind) {
-    case 'eyes': return avatarEyes(f, glasses);
-    case 'brows': return browThickness(f) >= 1.6 ? 'bold' : 'thin';
-    case 'mouth': return avatarMouth(f);
-    case 'nose': return glasses || eyeWidth(f) < 3.5 ? 'none' : 'side';
-    case 'glasses': return 'frames';
-  }
+// ---------------------------------------------------------------- the style
+const neighbours = (m: Mask, W: number, H: number, x: number, y: number) => {
+  let n = 0;
+  for (let dy = -1; dy <= 1; dy++)
+    for (let dx = -1; dx <= 1; dx++) {
+      const xx = x + dx, yy = y + dy;
+      if ((dx || dy) && xx >= 0 && yy >= 0 && xx < W && yy < H) n += m[yy * W + xx];
+    }
+  return n;
+};
+
+/** One pass along `m`'s border with `other`: spurs (≤ 2 of 8 neighbours in m) go, notches (≥ 6) fill. */
+function smoothEdge(m: Mask, other: Mask, W: number, H: number): Mask {
+  const out = m.slice();
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x, k = neighbours(m, W, H, x, y);
+      if (m[i] && k <= 2 && neighbours(other, W, H, x, y)) out[i] = 0;
+      else if (other[i] && k >= 6) out[i] = 1;
+    }
+  return out;
 }
 
-// ---------------------------------------------------------------- the style
 export function avatarLayers(p: Prepared, look: Look): AvatarLayers {
   const { W, H } = p, n = W * H, cov = coverage(p);
   // Regions: hair takes a cell from 40 % (thin strands survive), the rest goes to the largest share.
-  let hair: Mask = new Uint8Array(n);
-  const skin = new Uint8Array(n), clothes = new Uint8Array(n), bg = new Uint8Array(n);
+  let hair: Mask = new Uint8Array(n), clothes: Mask = new Uint8Array(n);
+  const skin = new Uint8Array(n), bg = new Uint8Array(n);
   const lm0 = p.lm, chinY = lm0 ? pt(lm0, 152)[1] : Infinity, cheek = lm0 ? cheekTone(p, lm0, p.work.gray) : 0;
   for (let i = 0; i < n; i++) {
     if (cov.hair[i] >= 0.4) { hair[i] = 1; continue; }
@@ -310,8 +244,13 @@ export function avatarLayers(p: Prepared, look: Look): AvatarLayers {
     else if (cov.clothes[i] >= b) clothes[i] = 1;
     else bg[i] = 1;
   }
-  hair = fillHoles(dropSmall(hair, W, H, 4), W, H, 3);
-  for (let i = 0; i < n; i++) if (hair[i]) { skin[i] = clothes[i] = bg[i] = 0; } else if (!skin[i] && !clothes[i]) bg[i] = 1;
+  // Clean silhouettes: hair specks and pin-holes, ragged hair edges against the background, clothes specks
+  // (earrings, a strap end) become background.
+  hair = fillHoles(dropSmall(hair, W, H, 5), W, H, 3);
+  const notHair = () => Uint8Array.from(hair, (v, i) => +(!v && !skin[i] && !clothes[i]));
+  hair = smoothEdge(hair, notHair(), W, H);
+  clothes = dropSmall(clothes, W, H, 5);
+  for (let i = 0; i < n; i++) { if (hair[i]) skin[i] = clothes[i] = 0; bg[i] = +(!hair[i] && !skin[i] && !clothes[i]); }
   const person = Uint8Array.from(bg, v => 1 - v);
 
   // Hair: dark hair solid with a few cuts, light hair as outline + strands (or the hair mode picked by hand).
@@ -320,6 +259,16 @@ export function avatarLayers(p: Prepared, look: Look): AvatarLayers {
   // Clothes: solid at the default density; lower density keeps only their darker part.
   const ink = new Uint8Array(n), ct = look.clothes >= 0.5 ? Infinity : percentile(p.ps, clothes, look.clothes * 200);
   for (let i = 0; i < n; i++) ink[i] = hairInk[i] | +(clothes[i] && p.ps[i] <= ct);
+  // Where solid hair lies on solid clothes, a one-cell paper gap on the clothes side keeps the locks readable.
+  // Only along locks (hair cells with two or more hair neighbours side by side): lone diagonal strands just merge,
+  // instead of breaking the clothes into a checkerboard.
+  const at = (x: number, y: number, m: Mask) => x >= 0 && y >= 0 && x < W && y < H && !!m[y * W + x];
+  const lock = (x: number, y: number) => at(x, y, hair) && at(x, y, hairInk) && [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => at(x + dx, y + dy, hair)).length >= 2;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      if (clothes[i] && ink[i] && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => lock(x + dx, y + dy))) ink[i] = 0;
+    }
   // Shading only above the default skin density.
   if (look.skin > 0.5) { const t = percentile(p.ps, skin, (look.skin - 0.5) * 60); for (let i = 0; i < n; i++) if (skin[i] && p.ps[i] <= t) ink[i] = 1; }
 
@@ -329,51 +278,30 @@ export function avatarLayers(p: Prepared, look: Look): AvatarLayers {
   const lm = p.lm;
   if (!lm) return r;
 
-  const f: Face = { lm, W, H }, F = look.features, chosen = look.stamps;
+  const f: Face = { lm, W, H, lenses: p.lenses, skin }, F = look.features;
   if (F.jaw) { const jaw = new Uint8Array(n); polyline(jaw, W, H, pts(lm, JAW)); for (let i = 0; i < n; i++) if (jaw[i] && skin[i]) ink[i] = 1; }
 
   const ref = cheekTone(p, lm);
   // Calibrated on the test photos: bearded ≥ 0.91 / 0.53, clean-shaven and lips alone ≤ 0.64 / 0.11.
   const hasMoustache = darkShare(p, moustache(f), ref) >= 0.8, hasGoatee = darkShare(p, goatee(f), ref) >= 0.4;
-  const browDark = browThickness(f) >= 1.6;
+  // A closed mouth under a moustache: the moustache is the mouth.
+  const auto = (kind: StampKind) => { const a = avatarAuto(kind, f, F.glasses); return kind === 'mouth' && hasMoustache && a === 'line' ? '' : a; };
+  const s = drawStamps(f, { eyes: F.eyes, brows: F.brows, mouth: F.mouth, nose: F.nostrils, glasses: F.glasses }, look.stamps, auto);
+  const closedUnder = hasMoustache && !s.mouth.some(Boolean);
 
-  const o: Out = { clear: sock, ink: feats, brow: new Uint8Array(n) };
-  const user = (kind: StampKind) => (chosen[kind] > 0 ? STAMPS[kind][Math.min(chosen[kind], STAMPS[kind].length) - 1].draw : null);
-  const pick = (kind: StampKind, own: () => void) => { const u = user(kind); if (u) u(f, o); else own(); };
-
-  if (F.brows) pick('brows', () => drawBrows(f, browDark, o));
-  if (F.eyes) pick('eyes', () => drawEyes(f, avatarEyes(f, F.glasses), o));
-  const mouthInk = new Uint8Array(n), mo: Out = { clear: sock, ink: mouthInk, brow: o.brow };
-  const mouthKind = avatarMouth(f), closedUnder = hasMoustache && mouthKind === 'line' && !user('mouth');
-  if (F.mouth) { const u = user('mouth'); if (u) u(f, mo); else if (!closedUnder) drawMouth(f, mouthKind, mo); }
-  if (F.nostrils) pick('nose', () => { if (!F.glasses) drawNose(f, o); }); // behind glasses the bridge says enough
   // Facial hair as its own shapes, kept one paper cell away from the mouth.
   const fh = new Uint8Array(n);
   if (hasMoustache) fillRows(fh, f, moustacheBar(f, closedUnder));
   if (hasGoatee) {
     let lip = Math.floor(pt(lm, 14)[1]);
-    for (let i = 0; i < n; i++) if (mouthInk[i] || fh[i]) lip = Math.max(lip, Math.floor(i / W));
+    for (let i = 0; i < n; i++) if (s.mouth[i] || fh[i]) lip = Math.max(lip, Math.floor(i / W));
     fillRows(fh, f, goateeRows(f, lip));
   }
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
-      const i = y * W + x;
-      if (!mouthInk[i]) continue;
-      for (const yy of [y - 1, y + 1]) if (yy >= 0 && yy < H && !mouthInk[yy * W + x]) { fh[yy * W + x] = 0; sock[yy * W + x] = 1; }
+      if (!s.mouth[y * W + x]) continue;
+      for (const yy of [y - 1, y + 1]) if (yy >= 0 && yy < H && !s.mouth[yy * W + x]) { fh[yy * W + x] = 0; s.clear[yy * W + x] = 1; }
     }
-  for (let i = 0; i < n; i++) { feats[i] |= fh[i] | mouthInk[i]; if (fh[i]) sock[i] = 0; }
-  // Glasses last among the shapes: rims stay continuous, brows touching a rim give way.
-  if (F.glasses) {
-    const u = user('glasses');
-    const g: Out = { clear: new Uint8Array(n), ink: new Uint8Array(n), brow: new Uint8Array(n) };
-    if (u) u(f, g); else drawGlasses(f, skin, g);
-    const near = new Uint8Array(n);
-    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (g.ink[y * W + x]) for (const [dx, dy] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]]) set(near, f, x + dx, y + dy);
-    // A brow that loses most of itself to the rim is dropped whole rather than left as stubs.
-    let had = 0, kept = 0;
-    for (let i = 0; i < n; i++) if (o.brow[i]) { had++; kept += +!near[i]; }
-    for (let i = 0; i < n; i++) { if (near[i] || kept < had * 0.6) o.brow[i] = 0; if (g.clear[i] && !feats[i]) sock[i] = 1; if (g.ink[i]) feats[i] = 1; }
-  }
-  for (let i = 0; i < n; i++) feats[i] |= o.brow[i];
+  for (let i = 0; i < n; i++) { sock[i] = s.clear[i] & +!fh[i]; feats[i] = s.ink[i] | fh[i]; }
   return r;
 }

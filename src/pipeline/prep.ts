@@ -3,7 +3,7 @@
 import { OVAL, bounds, pt, pts, type Pt } from './landmarks';
 import { polygon } from './raster';
 import { LIPS_OUTER } from './stamps';
-import { SEG, type Crop, type Prepared, type Source } from './types';
+import { SEG, type Crop, type Lens, type Prepared, type Source } from './types';
 
 /** Work-image scale: 10× the grid like the prototype, fewer for big grids so a frame stays < ~1000 px wide. */
 export const workScale = (W: number) => Math.max(4, Math.min(10, Math.floor(1000 / W)));
@@ -229,6 +229,47 @@ function facialHairShare(pg: Uint8Array, seg: Uint8Array, w: number, h: number, 
   return dark / zone.length;
 }
 
+/**
+ * Glasses lenses from the "accessories" region (work image): per eye, the columns with frame both above and below
+ * the eye are the lens, its rows the same way; corners with almost no frame mean a rounded lens. Clear frames
+ * often show only their top bar — then nothing is measured (null) and the stamps size the lenses from the eyes.
+ */
+function measureLenses(seg: Uint8Array, w: number, h: number, lm: Float32Array): Lens[] | null {
+  const iris = [pt(lm, 468), pt(lm, 473)], d = Math.hypot(iris[1][0] - iris[0][0], iris[1][1] - iris[0][1]), mid = (iris[0][0] + iris[1][0]) / 2;
+  const out: Lens[] = [];
+  for (const [cx, cy] of iris) {
+    const left = cx < mid, xa = Math.max(0, Math.round(left ? cx - 0.65 * d : mid + 0.03 * d)), xb = Math.min(w - 1, Math.round(left ? mid - 0.03 * d : cx + 0.65 * d));
+    const ya = Math.max(0, Math.round(cy - 0.55 * d)), yb = Math.min(h - 1, Math.round(cy + 0.55 * d));
+    const acc = (x: number, y: number) => seg[y * w + x] === SEG.OTHER;
+    const cols: number[] = [], rows: number[] = [];
+    for (let x = xa; x <= xb; x++) {
+      let up = false, down = false;
+      for (let y = ya; y <= yb && !(up && down); y++) if (acc(x, y)) { if (y < cy) up = true; else if (y > cy + 0.08 * d) down = true; }
+      if (up && down) cols.push(x);
+    }
+    if (cols.length < 0.35 * d) return null; // the rim doesn't go all round
+    const x0 = cols[0], x1 = cols[cols.length - 1];
+    for (let y = ya; y <= yb; y++) {
+      let l = false, r = false;
+      for (let x = x0; x <= x1 && !(l && r); x++) if (acc(x, y)) { if (x < (x0 + x1) / 2) l = true; else r = true; }
+      if (l || r) rows.push(y);
+    }
+    const y0 = rows[0], y1 = rows[rows.length - 1], bw = x1 - x0 + 1, bh = y1 - y0 + 1;
+    if (bh < 0.3 * d) return null;
+    // Frame share in a corner square vs along the middle of the same edge.
+    const density = (xs: number, xe: number, ys: number, ye: number) => {
+      let n = 0, a = 0;
+      for (let y = Math.round(ys); y <= Math.round(ye); y++) for (let x = Math.round(xs); x <= Math.round(xe); x++) { n++; a += +acc(x, y); }
+      return n ? a / n : 0;
+    };
+    const k = 0.22, cw = bw * k, ch = bh * k;
+    const corner = (top: boolean) => (density(x0, x0 + cw, top ? y0 : y1 - ch, top ? y0 + ch : y1) + density(x1 - cw, x1, top ? y0 : y1 - ch, top ? y0 + ch : y1)) / 2;
+    const edge = (top: boolean) => density(x0 + bw * 0.35, x1 - bw * 0.35, top ? y0 : y1 - ch, top ? y0 + ch : y1);
+    out.push({ c: [(x0 + x1 + 1) / 2, (y0 + y1 + 1) / 2], a: bw / 2, b: bh / 2, roundTop: corner(true) < 0.45 * edge(true), roundBottom: corner(false) < 0.45 * edge(false) });
+  }
+  return out;
+}
+
 export function prepare(src: Source, crop: Crop, W: number, H: number): Prepared {
   const t0 = performance.now(), f = workScale(W), ww = W * f, wh = H * f;
   const { rgb, outside } = resampleCrop(src, crop, ww, wh);
@@ -267,6 +308,8 @@ export function prepare(src: Source, crop: Crop, W: number, H: number): Prepared
     }
 
   const lm = src.lm ? scaleLm(src.lm, crop, W / crop.w, H / crop.h) : null;
-  const facialHair = src.lm ? facialHairShare(pg, seg, ww, wh, scaleLm(src.lm, crop, ww / crop.w, wh / crop.h)) : 0;
-  return { W, H, ps, bgps, segs, acc, lines, hairLum, facialHair, lm, work: { f, w: ww, h: wh, gray, tone: pg, seg }, ms: performance.now() - t0 };
+  const lmWork = src.lm ? scaleLm(src.lm, crop, ww / crop.w, wh / crop.h) : null;
+  const facialHair = lmWork ? facialHairShare(pg, seg, ww, wh, lmWork) : 0;
+  const lenses = lmWork ? measureLenses(seg, ww, wh, lmWork)?.map(l => ({ ...l, c: [l.c[0] / f, l.c[1] / f] as Pt, a: l.a / f, b: l.b / f })) ?? null : null;
+  return { W, H, ps, bgps, segs, acc, lines, hairLum, facialHair, lm, lenses, work: { f, w: ww, h: wh, gray, tone: pg, seg }, ms: performance.now() - t0 };
 }

@@ -117,7 +117,7 @@ Selected row: `bg2` + `> ` prefix. Rows that aren't usable yet (no photo loaded)
 - **05 Features**: checks redraw eyes (auto), brows, mouth, nostrils, jaw line, silhouette; GLASSES status.
 - **06 Background**: seg white · black · pattern · photo; pattern density; `[x] outline the person`.
 - **07 Draw**: tool seg (own line), colour, brush stepper, mirror axis; SELECTION size/position, left behind seg around · paper, flip ↔ · flip ↕ · mirror copy · deselect; EDITS summary, clear edits.
-- **08 Stamps**: eyes / brows / mouth / nose / glasses steppers (`auto · traced`, `2/5 · dots`, … `off`), "all auto"; in this step a tap in the view cycles the feature under it (dashed hit boxes).
+- **08 Stamps**: eyes / brows / mouth / nose / glasses steppers (`auto · dashes`, `7/14 · happy`, … `off`), "all auto". The feature names are dotted links: one opens an **option grid** under its row — three tiles per row, each the portrait in the selected style with that option, cropped to the feature, name under it; auto first, off last, the one in use with a `hi` border. Tapping a feature in the view (dashed hit boxes) opens its grid too.
 - **09 Colours**: ink and paper swatch + hex field; swap, reset.
 - **10 Export**: FILE format seg PNG · BMP · SVG; when BMP, bit depth seg 1 · 4 · 8 · 24 (default: smallest depth that holds the palette; depths too small for it disabled); name field, **export png**; SESSION note + forget this project.
 

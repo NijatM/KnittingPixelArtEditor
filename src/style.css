@@ -191,3 +191,12 @@ body.dragover #view { outline: 1px dashed var(--hi); outline-offset: -12px; }
 .btn.danger { border-color: var(--warn); color: var(--warn); }
 .btn.danger:hover, .btn.danger:focus-visible { background: var(--warn); color: var(--bg); }
 #resetrow .right { color: var(--faint); }
+/* stamp options: the portrait with each option, cropped to the feature */
+.optlink { background: none; border: none; padding: 0; color: var(--dim); cursor: pointer; text-decoration: underline dotted var(--line2); text-underline-offset: 3px; }
+.optlink:hover, [data-stamp].open .optlink { color: var(--hi); }
+.opts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 4px 0 12px; }
+.opt { display: flex; flex-direction: column; gap: 3px; padding: 4px; border: 1px solid var(--line); background: none; color: var(--dim); cursor: pointer; font-size: 10.5px; min-width: 0; }
+.opt canvas { display: block; width: 100%; height: auto; image-rendering: pixelated; background: var(--bg3); }
+.opt span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+.opt:hover { border-color: var(--dim); color: var(--fg); }
+.opt.on { border-color: var(--hi); color: var(--hi); }

@@ -1,4 +1,8 @@
+import type { Pt } from './landmarks';
 import type { Stamps } from './stamps';
+
+/** A measured glasses lens: centre, half width / height, and whether its top / bottom corners are rounded. */
+export interface Lens { c: Pt; a: number; b: number; roundTop: boolean; roundBottom: boolean }
 
 /** MediaPipe selfie_multiclass categories. */
 export const SEG = { BG: 0, HAIR: 1, BODY: 2, FACE: 3, CLOTHES: 4, OTHER: 5 } as const;
@@ -27,6 +31,8 @@ export interface Prepared {
   hairLum: number;    // median hair luminance 0..255 in the frame, -1 if there is no hair
   facialHair: number; // share of the lower face clearly darker than the cheeks (moustache / beard ≈ 0.6+)
   lm: Float32Array | null; // face points in grid coordinates
+  /** Glasses lenses measured from the frames' regions (grid coordinates), when the rims show all round; else null. */
+  lenses: Lens[] | null;
   /** The work image (f × f pixels per cell): plain and contrast-enhanced grey + regions, for styles that measure below a cell. */
   work: { f: number; w: number; h: number; gray: Uint8Array; tone: Uint8Array; seg: Uint8Array };
   ms: number;
@@ -72,4 +78,4 @@ export interface RenderRequest {
 /** cells: palette index per cell (0 = ink, 1 = paper). */
 export interface StyleResult { style: StyleId; cells: Uint8Array; ms: number; ink: number }
 
-export interface RenderResult { id: number; W: number; H: number; prepMs: number; hairLum: number; results: StyleResult[] }
+export interface RenderResult { id: number; W: number; H: number; prepMs: number; hairLum: number; lenses: Lens[] | null; results: StyleResult[] }
