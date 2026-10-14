@@ -54,6 +54,8 @@ Tenth batch (2026-10-14) — **binary exports**: default palette is pure `#00000
 
 Eleventh batch (2026-10-14) — **pixel image import** (`src/pixelart.ts`): PNG / BMP pixel art opens as cells, ready to edit, instead of going through detection (before, the team's 50 × 50 BMPs rendered as a white page). Rules in SPEC "Input". Tested on the team's eight portraits in `MIT/TMR/portraits/` (1-bit BMPs, 1-bit palette / grayscale and 8-bit palette PNGs): every one opens 50 × 50 cell-for-cell identical, and PNG / BMP exports without edits are identical to the originals; plus 2× / 7× / 10× / uneven (512 px) enlargements, a 3-colour and a transparent version, an old 500 px 10× export — all exact; JPEG and photos still open as photos (`research/private_tests/pixel_import.mjs`, `samples.mjs`). Editor fixes found on the way: a frozen base (bake / import) shrank with ink not voting, so thin lines turned paper — every colour votes now, ties go to ink; and grid changes rescale the base from its last own-size version (kept through undo), so 50 → 96 → 50 gives back the exact picture.
 
+Twelfth batch (2026-10-14) — **11 reset** under MAKE in the nav: opens a confirmation dialog (`<dialog>`, site look, cancel focused, Esc / backdrop close, yes in the warn colour); "forget this project" in export now opens the same dialog instead of wiping at once. Yes stops autosave, clears IndexedDB and reloads. Editor shortcuts are off inside the dialog. Test: `research/private_tests/reset.mjs`.
+
 Next (tuning / polish, no fixed plan left):
 1. Optional: fp16 weights to halve the 15 MB model download.
 2. More portraits from the team to tune on (only 5 test photos so far; 2 bearded, 2 with glasses, 1 side-lit).

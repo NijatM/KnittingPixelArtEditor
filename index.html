@@ -41,12 +41,25 @@
     <div class="spaced dim navsec">MAKE</div>
     <div class="list">
       <div class="lrow" data-step="export" tabindex="0"><span class="lnum">10</span><span class="left">export</span><span class="right" data-bind="fmt">png</span></div>
+      <div class="lrow" id="resetrow" tabindex="0" role="button" aria-haspopup="dialog"><span class="lnum">11</span><span class="left">reset</span><span class="right">start over</span></div>
     </div>
 
     <div class="navfoot small faint">
       <a href="https://nijatmahamaliyev.com">nijatmahamaliyev.com</a>
     </div>
   </nav>
+
+  <!-- ============================================================ reset (11 reset, forget this project) -->
+  <dialog id="resetdlg" aria-labelledby="resettitle">
+    <div class="kicker">11 · RESET</div>
+    <div class="title" id="resettitle">Reset everything?</div>
+    <div class="dash"></div>
+    <p class="note">This clears the photo or image, every edit and setting, and the project saved in this browser, and starts from scratch. It can't be undone — export first if you want to keep the portrait.</p>
+    <form method="dialog" class="inline dlgbtns">
+      <button class="btn" value="cancel" autofocus>cancel</button>
+      <button class="btn danger" value="reset">yes, reset everything</button>
+    </form>
+  </dialog>
 
   <!-- ============================================================ stage -->
   <main id="stage" data-view="empty">
@@ -260,7 +273,7 @@
       <div class="inline"><button class="btn primary" id="exportbtn">export png</button></div>
       <div class="subhead">SESSION<i></i></div>
       <div class="note small" data-bind="saved">Saved in this browser. Only the last project is kept.</div>
-      <div class="inline"><button class="btn" id="forget">forget this project</button></div>
+      <div class="inline"><button class="btn" id="forget" aria-haspopup="dialog">forget this project</button></div>
       <div class="explain small">Every file holds exactly what the editor shows (edits and a lifted selection included): one pixel per stitch, no margin, grid or labels, every pixel opaque, in exactly your two colours — pure black and white unless you change them. PNG is a 1-bit indexed file. BMP bit depth is your choice: 1, 4 or 8-bit store the colours as a palette, 24-bit stores plain RGB; depths too small for the palette are disabled. SVG merges each row's runs into paths, with cells drawn at the cell aspect. The project (photo, settings, edits) stays in this browser until you forget it or load another photo.</div>
     </section>
 

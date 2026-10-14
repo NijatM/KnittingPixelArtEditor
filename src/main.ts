@@ -256,7 +256,7 @@ function startPhoto(id: number, name: string, canvas: HTMLCanvasElement, det: { 
   if (!fromStore) {
     const seg = det.seg?.slice() ?? null;
     canvas.toBlob(png => {
-      if (png) store.savePhoto({ id, name, png, lm: det.lm, seg, regions, glasses, ms: det.ms }).then(() => scheduleSave(), storeFailed);
+      if (png && !resetting) store.savePhoto({ id, name, png, lm: det.lm, seg, regions, glasses, ms: det.ms }).then(() => scheduleSave(), storeFailed);
     }, 'image/png');
   }
   updateAxis();
@@ -293,7 +293,7 @@ function startPixels(id: number, name: string, art: PixelArt, restore: store.Sav
   }
   if (!fromStore)
     canvas.toBlob(png => {
-      if (png) store.savePhoto({ kind: 'pixels', id, name, png, lm: null, seg: null, regions: [], glasses: -1, ms: 0 }).then(() => scheduleSave(), storeFailed);
+      if (png && !resetting) store.savePhoto({ kind: 'pixels', id, name, png, lm: null, seg: null, regions: [], glasses: -1, ms: 0 }).then(() => scheduleSave(), storeFailed);
     }, 'image/png');
   updateAxis();
   ($('#exportname') as HTMLInputElement).value = exportBase();
@@ -316,8 +316,9 @@ function storeFailed() {
   if (!storeWarned) log('> autosave is not available in this browser · export to keep your work');
   storeWarned = true;
 }
+let resetting = false; // set once a reset is confirmed: nothing may be saved again before the reload
 function scheduleSave() {
-  if (!S.photo) return;
+  if (!S.photo || resetting) return;
   clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => {
     if (!S.photo) return;
@@ -659,7 +660,7 @@ $$('[data-feature]').forEach(b => check(b, on => { S.look.features[b.dataset.fea
 check($('#gridcheck'), on => { S.grid = on; refresh(); });
 $('#frame-reset').onclick = () => { S.frame = { ...AUTO_FRAME }; syncControls(); frameChanged(); };
 
-$$('#nav .lrow').forEach(r => {
+$$('#nav .lrow[data-step]').forEach(r => {
   r.onclick = () => setStep(r.dataset.step as Step);
   r.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setStep(r.dataset.step as Step); } };
 });
@@ -701,7 +702,21 @@ $('#exportbtn').onclick = () => {
 };
 seg($('#fmtseg'), b => { S.fmt = b.dataset.fmt as typeof S.fmt; refresh(); });
 seg($('#depthseg'), b => { S.depth = +b.dataset.depth! as BmpDepth; refresh(); });
-$('#forget').onclick = () => { store.forget().catch(() => {}).finally(() => location.reload()); };
+// Reset (11 reset in the nav, "forget this project" in export): asks first, then forgets the saved project and
+// reloads, so every setting starts from its default. The theme is a browser preference and stays.
+{
+  const dlg = $('#resetdlg') as HTMLDialogElement, ask = () => { if (!dlg.open) dlg.showModal(); };
+  $('#forget').onclick = ask;
+  $('#resetrow').onclick = ask;
+  $('#resetrow').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); ask(); } };
+  dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close('cancel'); }); // a click on the backdrop
+  dlg.addEventListener('close', () => {
+    if (dlg.returnValue !== 'reset') return;
+    resetting = true; clearTimeout(saveTimer);
+    log('> resetting…');
+    store.forget().catch(() => {}).finally(() => location.reload());
+  });
+}
 
 // ---------------------------------------------------------------- editor: tools, pointer, keys
 const editorChanged = () => { refresh(); paintGallery(); };
@@ -793,7 +808,7 @@ $$<HTMLButtonElement>('[data-brush]').forEach(b => (b.onclick = () => { S.ed.bru
 }
 window.addEventListener('keydown', e => {
   const t = e.target as HTMLElement;
-  if (t.closest('input, textarea, .bar') || e.altKey) return;
+  if (t.closest('input, textarea, .bar, dialog') || e.altKey) return; // typing, sliders and the reset dialog keep their keys
   const mod = e.metaKey || e.ctrlKey, k = e.key.toLowerCase();
   if (mod && k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
   if (mod && k === 'y') { e.preventDefault(); redo(); return; }

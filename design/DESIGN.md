@@ -80,6 +80,7 @@ Portrait palette defaults: ink `#000000`, paper `#ffffff` — binary black and w
 | 08 | EDIT | stamps | auto | pixels |
 | 09 | EDIT | colours | two mini swatches | pixels |
 | 10 | MAKE | export | png | pixels |
+| 11 | MAKE | reset | start over (faint) | — opens the reset dialog: "Reset everything?" · cancel · **yes, reset everything** (warn colour); yes forgets the saved project and reloads |
 
 Selected row: `bg2` + `> ` prefix. Rows that aren't usable yet (no photo loaded) use `faint`.
 
