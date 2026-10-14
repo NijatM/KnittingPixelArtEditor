@@ -108,7 +108,7 @@ Selected row: `bg2` + `> ` prefix. Rows that aren't usable yet (no photo loaded)
 
 ## Inspector panels (content per step)
 
-- **00 Photo**: drop zone (dashed, thumbnail, "drop · paste · choose file"); DETECTED rows: face, regions, glasses; okline timing.
+- **00 Photo**: drop zone (dashed, thumbnail, "drop · paste · choose file"); DETECTED rows: face, regions, glasses; okline timing. A pixel image opens straight on 07 Draw; the photo steps (01, 03–06, 08) turn faint and show a warn line saying they don't change it.
 - **01 Frame**: RATIO seg 1:1 · 4:5 · 3:4 · 2:3 · free; CROP framing (tight↔wide), vertical; reset to auto.
 - **02 Grid**: SIZE seg 32 · 50 · 64 · 96 · 128; width, height bars; `[x] lock to frame ratio`; CELL aspect w:h (1.00).
 - **03 Style**: style list A–F (A clean avatar first, + faint G v2) with ms; letters follow the order; PARAMETERS threshold, line weight, cleanup (per style).

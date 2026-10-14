@@ -7,7 +7,8 @@ import { Editor, type Behind, type Tool } from './editor';
 import { download, encodeBmp, encodePng, encodeSvg, depthFits, smallestDepth, type BmpDepth } from './export';
 import * as store from './store';
 import { AUTO_FRAME, computeCrop, type FrameParams } from './frame';
-import { decodeImage, wireImport } from './importer';
+import { decodeImage, loadImage, photoCanvas, wireImport } from './importer';
+import { pixelArtOf, type PixelArt } from './pixelart';
 import { GLASSES_MIN_SHARE, glassesShare } from './pipeline/glasses';
 import { OVAL, pts } from './pipeline/landmarks';
 import { avatarAuto } from './pipeline/avatar';
@@ -48,6 +49,7 @@ type Step = 'photo' | 'frame' | 'grid' | 'style' | 'regions' | 'features' | 'bac
 type View = 'empty' | 'styles' | 'pixels' | 'frame';
 
 interface Photo {
+  kind: 'photo' | 'pixels'; // pixels: an imported pixel image, edited as it is (no detection, no styles)
   id: number;      // ties autosaved settings to this photo
   name: string;
   canvas: HTMLCanvasElement;
@@ -176,7 +178,13 @@ class Renderer {
 type Rendered = StyleResult & { W: number; H: number };
 let raf = 0, detectorsReady = false;
 
+/** An imported pixel image is open: no styles render, the image is the base. */
+const pixels = () => S.photo?.kind === 'pixels';
+// Steps that only change how a photo is turned into pixels.
+const PHOTO_STEPS: Step[] = ['frame', 'style', 'regions', 'features', 'background', 'stamps'];
+
 function applyResult(res: RenderResult) {
+  if (pixels()) return; // a render from the photo before the pixel image
   if (res.prepMs) S.prepMs = res.prepMs;
   S.hairLum = res.hairLum;
   for (const r of res.results) S.res.set(r.style, { ...r, W: res.W, H: res.H });
@@ -189,16 +197,25 @@ const ml = new Renderer(['ml'], applyResult, t => { S.mlNote = t; paintGallery()
   () => { if (!S.res.has('ml')) { S.mlNote = 'could not load the line model'; paintGallery(); } });
 
 function scheduleRender() {
-  if (!raf) raf = requestAnimationFrame(() => { raf = 0; instant.render(); ml.render(); });
+  if (!raf && !pixels()) raf = requestAnimationFrame(() => { raf = 0; instant.render(); ml.render(); });
 }
 
 // ---------------------------------------------------------------- photo
 async function loadPhoto(file: File) {
   const name = file.name || 'pasted image';
   log(`> reading ${name}`);
-  let canvas: HTMLCanvasElement;
-  try { canvas = await decodeImage(file); }
-  catch { log('> could not read this image · try a JPG or PNG'); return; }
+  let img: HTMLImageElement;
+  try { img = await loadImage(file); }
+  catch { log('> could not read this image · try a JPG, PNG or BMP'); return; }
+  // Already pixel art (a few flat colours on a grid, maybe enlarged)? Open it as it is.
+  const art = pixelArtOf(img);
+  if (art) {
+    startPixels(Date.now(), name, art, null);
+    const [sx, sy] = art.scale, enlarged = sx !== 1 || sy !== 1;
+    log(`> pixel art · ${art.W}×${art.H} cells${enlarged ? ` (${+sx.toFixed(2)}${sy !== sx ? `×${+sy.toFixed(2)}` : ''} px each)` : ''} · ${art.colours > 2 ? `${art.colours} colours split into ink and paper` : '2 colours'} · opened for editing`);
+    return;
+  }
+  const canvas = photoCanvas(img);
 
   log(detectorsReady ? '> finding the face…' : '> loading the face models (first photo only)…');
   let det: Awaited<ReturnType<typeof detect>>;
@@ -223,7 +240,7 @@ function startPhoto(id: number, name: string, canvas: HTMLCanvasElement, det: { 
     for (const [k, label] of REGION_NAMES) if (n[k] > w * h * 0.003) regions.push(label);
   }
   if (DEBUG) Object.assign(window, { __kpaeDebug: { w, h, rgba: rgba.slice(), seg: det.seg?.slice() ?? null, lm: det.lm } });
-  S.photo = { id, name, canvas, lm: det.lm, regions, glasses, ms: det.ms };
+  S.photo = { kind: 'photo', id, name, canvas, lm: det.lm, regions, glasses, ms: det.ms };
   S.res.clear();
   S.mlNote = '';
   S.hairLum = -1;
@@ -252,6 +269,38 @@ function startPhoto(id: number, name: string, canvas: HTMLCanvasElement, det: { 
   paintGallery();
   setStep('style');
   scheduleRender();
+}
+
+/** Frame ratio name for a physical width : height, or free. */
+const ratioOf = (w: number, h: number) => Object.entries(RATIOS).find(([, [a, b]]) => Math.abs(w * b - h * a) < 1e-6)?.[0] ?? 'free';
+
+/** Open a pixel image as it is: its cells become the frozen base, ready to edit; its colours become the palette. */
+function startPixels(id: number, name: string, art: PixelArt, restore: store.SavedState | null, fromStore = false) {
+  const canvas = document.createElement('canvas');
+  paintCells(canvas, art.cells, art.W, art.H, art.palette);
+  S.photo = { kind: 'pixels', id, name, canvas, lm: null, regions: [], glasses: -1, ms: 0 };
+  S.res.clear();
+  S.mlNote = '';
+  S.hairLum = -1;
+  if (restore) {
+    applySettings(restore.settings);
+    const e = restore.edits;
+    S.ed.restore(e.W, e.H, e.cells, e.baked ?? art.cells);
+    S.ed.fit(S.W, S.H);
+  } else {
+    Object.assign(S, { W: art.W, H: art.H, cellAspect: art.cellAspect, pal: [...art.palette], ratio: ratioOf(art.W * art.cellAspect, art.H) });
+    S.ed.restore(art.W, art.H, new Uint8Array(art.W * art.H), art.cells);
+  }
+  if (!fromStore)
+    canvas.toBlob(png => {
+      if (png) store.savePhoto({ kind: 'pixels', id, name, png, lm: null, seg: null, regions: [], glasses: -1, ms: 0 }).then(() => scheduleSave(), storeFailed);
+    }, 'image/png');
+  updateAxis();
+  ($('#exportname') as HTMLInputElement).value = exportBase();
+  drawThumb();
+  syncControls();
+  paintGallery();
+  setStep('draw');
 }
 
 // ---------------------------------------------------------------- autosave (IndexedDB, last project only)
@@ -284,7 +333,9 @@ function drawThumb() {
   if (!p) { t.hidden = true; return; }
   const s = 160 / Math.max(p.canvas.width, p.canvas.height);
   t.width = Math.round(p.canvas.width * s); t.height = Math.round(p.canvas.height * s);
-  t.getContext('2d')!.drawImage(p.canvas, 0, 0, t.width, t.height);
+  const ctx = t.getContext('2d')!;
+  ctx.imageSmoothingEnabled = p.kind === 'photo'; // pixel images stay crisp
+  ctx.drawImage(p.canvas, 0, 0, t.width, t.height);
   t.hidden = false;
 }
 
@@ -293,9 +344,9 @@ const exportBase = () => `${(S.photo?.name ?? 'portrait').replace(/\.[^.]+$/, ''
 // ---------------------------------------------------------------- painting
 const hexRgb = (h: string) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
 
-function paintCells(canvas: HTMLCanvasElement, cells: Uint8Array, W: number, H: number) {
+function paintCells(canvas: HTMLCanvasElement, cells: Uint8Array, W: number, H: number, pal = S.pal) {
   canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d')!, img = ctx.createImageData(W, H), p = S.pal.map(hexRgb);
+  const ctx = canvas.getContext('2d')!, img = ctx.createImageData(W, H), p = pal.map(hexRgb);
   for (let i = 0; i < W * H; i++) { const c = p[cells[i]]; img.data[i * 4] = c[0]; img.data[i * 4 + 1] = c[1]; img.data[i * 4 + 2] = c[2]; img.data[i * 4 + 3] = 255; }
   ctx.putImageData(img, 0, 0);
 }
@@ -444,6 +495,7 @@ function pickStyle(k: StyleId, openPixels: boolean) {
 // ---------------------------------------------------------------- steps, views, chrome
 function currentView(): View {
   if (!S.photo) return 'empty';
+  if (pixels()) return 'pixels';
   if (S.step === 'frame') return 'frame';
   if (S.step === 'style') return S.pixelsOverStyles ? 'pixels' : 'styles';
   return 'pixels';
@@ -497,7 +549,8 @@ function refresh() {
   }
   bind('stamps', picked ? `${picked} picked` : 'auto');
   $('#glasses-note').textContent = g < 0 ? '' : found ? '· found' : '· none found';
-  $$('#nav .lrow').forEach(r => r.classList.toggle('faint', !S.photo && r.dataset.step !== 'photo'));
+  $$('#nav .lrow').forEach(r => r.classList.toggle('faint', (!S.photo && r.dataset.step !== 'photo') || (pixels() && PHOTO_STEPS.includes(r.dataset.step as Step))));
+  $$('.pixnote').forEach(e => (e.hidden = !pixels()));
 
   // swatches
   $$('[data-sw]').forEach(e => (e.style.background = S.pal[+e.dataset.sw!]));
@@ -508,7 +561,7 @@ function refresh() {
   const ed = S.ed, n = ed.count;
   bind('edits', n ? plural(n, 'edit') : '—');
   bind('editsdetail', n ? `${plural(n, 'cell')} · ${ed.countOf(0)} ink · ${ed.countOf(1)} paper` : 'none yet');
-  bind('basestate', ed.live ? 'live · follows the style and sliders' : 'baked · frozen until live is ticked');
+  bind('basestate', pixels() ? 'the imported image · edits go on top' : ed.live ? 'live · follows the style and sliders' : 'baked · frozen until live is ticked');
   bind('axis', `${S.photo?.lm ? 'face centre' : 'grid centre'} · x ${ed.axis}`);
   bind('brush', String(ed.brush));
   bind('sel', ed.sel ? `${ed.sel.w}×${ed.sel.h} at ${ed.sel.x}, ${ed.sel.y}${ed.floating ? ' · lifted' : ''}` : 'none · drag with select');
@@ -534,7 +587,10 @@ function refresh() {
   const r = S.res.get(S.style), sh = shown();
   let ink = 0;
   if (sh) for (const v of sh.cells) ink += +(v === 0);
-  $('#status').textContent = r && sh
+  const cellsInk = (c: { W: number; H: number }) => `${c.W}×${c.H} · ${(c.W * c.H).toLocaleString('en')} cells · ${Math.round(ink / (c.W * c.H) * 100)}% ink · ${plural(n, 'edit')}`;
+  $('#status').textContent = pixels() && sh
+    ? `imported · ${S.photo!.name} · ${cellsInk(sh)}`
+    : r && sh
     ? `${ed.live ? 'base' : 'baked'} · ${styleInfo(S.style).t.toLowerCase()} · ${sh.W}×${sh.H} · ${(sh.W * sh.H).toLocaleString('en')} cells · ${Math.round(ink / (sh.W * sh.H) * 100)}% ink · ${plural(n, 'edit')} · ${fmtMs(r.ms + (r.style === 'ml' ? 0 : S.prepMs))}`
     : `${S.photo ? (S.style === 'ml' && S.mlNote ? S.mlNote : 'rendering') : 'no photo'} · ${S.W}×${S.H} · ${(S.W * S.H).toLocaleString('en')} cells`;
 }
@@ -567,7 +623,7 @@ function setGrid(W: number | null, H: number | null) {
   ($('#exportname') as HTMLInputElement).value = exportBase();
   const had = S.ed.count, old = `${S.ed.W}×${S.ed.H}`;
   S.ed.fit(S.W, S.H);
-  if (had && old !== `${S.W}×${S.H}`) log(`> edits scaled from ${old} to ${S.W}×${S.H}`);
+  if ((had || pixels()) && old !== `${S.W}×${S.H}`) log(`> ${pixels() ? 'image' : 'edits'} scaled from ${old} to ${S.W}×${S.H}`);
   updateAxis();
   syncControls(); refresh(); scheduleRender();
 }
@@ -657,9 +713,11 @@ const setMirror = (on: boolean) => { S.ed.mirror = on; refresh(); };
 const undo = () => { S.ed.undo(); editorChanged(); };
 const redo = () => { S.ed.redo(); editorChanged(); };
 const bake = () => {
-  const r = editable();
-  if (!r) { log('> nothing to bake yet'); return; }
-  S.ed.bake(r.cells); log(`> baked ${styleInfo(S.style).t.toLowerCase()} + edits into plain pixels · tick live to follow the style again`); editorChanged();
+  const base = editBase();
+  if (!base) { log('> nothing to bake yet'); return; }
+  S.ed.bake(base);
+  log(pixels() ? '> edits baked into the image' : `> baked ${styleInfo(S.style).t.toLowerCase()} + edits into plain pixels · tick live to follow the style again`);
+  editorChanged();
 };
 $$('[data-tool]').forEach(b => b.addEventListener('click', () => setTool(b.dataset.tool as Tool)));
 $$('[data-ink]').forEach(b => b.addEventListener('click', () => setInk(+b.dataset.ink!)));
@@ -668,6 +726,7 @@ $('#undo').onclick = undo;
 $('#redo').onclick = redo;
 $$('[data-act=bake]').forEach(b => (b.onclick = bake));
 $('#livecheck').onclick = () => {
+  if (pixels()) { log('> an imported pixel image has no style to follow · load a photo for live styles'); return; }
   const r = editable();
   if (!r) return;
   S.ed.setLive(!S.ed.live, r.cells);
@@ -705,7 +764,7 @@ $$<HTMLButtonElement>('[data-brush]').forEach(b => (b.onclick = () => { S.ed.bru
     return [Math.floor((e.clientX - r.left) / r.width * S.ed.W), Math.floor((e.clientY - r.top) / r.height * S.ed.H)];
   };
   cv.addEventListener('pointerdown', e => {
-    if (S.step === 'stamps') { // tap a feature to cycle its stamp
+    if (S.step === 'stamps' && !pixels()) { // tap a feature to cycle its stamp
       const face = gridFace(), [x, y] = cellAt(e);
       if (!face) return;
       const boxes = hitBoxes(face), cx = x + 0.5, cy = y + 0.5;
@@ -788,14 +847,20 @@ window.addEventListener('resize', () => refresh());
 setInterval(() => ($('#clock').textContent = new Date().toTimeString().slice(0, 8)), 1000);
 
 buildGallery();
+for (const s of PHOTO_STEPS) // shown while a pixel image is open
+  $(`.panel[data-panel=${s}] .dash`).insertAdjacentHTML('afterend', '<div class="warn small pixnote" hidden>An imported pixel image is open: this step turns photos into pixels and doesn\'t change it. Edit it in 07 draw.</div>');
 syncControls();
 setStep('photo');
 paintGallery();
 // Reopen the last project, if this browser kept one.
 store.load().then(async saved => {
   if (!saved || S.photo) return;
-  const p = saved.photo, canvas = await decodeImage(p.png);
-  startPhoto(p.id, p.name, canvas, { lm: p.lm, seg: p.seg, ms: p.ms }, saved.state, true);
+  const p = saved.photo;
+  if (p.kind === 'pixels') {
+    const art = pixelArtOf(await loadImage(p.png));
+    if (!art) return;
+    startPixels(p.id, p.name, art, saved.state, true);
+  } else startPhoto(p.id, p.name, await decodeImage(p.png), { lm: p.lm, seg: p.seg, ms: p.ms }, saved.state, true);
   const when = saved.state ? new Date(saved.state.savedAt) : null;
   log(`> reopened the last session${when ? ` (saved ${when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} at ${when.toTimeString().slice(0, 5)})` : ''}`);
 }).catch(() => {});

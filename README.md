@@ -23,6 +23,7 @@ Pages source to "GitHub Actions" once).
 | Step | Where |
 |---|---|
 | Import (file, drag & drop, paste), EXIF orientation, ≤1600 px | `src/importer.ts` |
+| Pixel images (PNG / BMP, ≤ 16 flat colours, native or enlarged) open as cells to edit | `src/pixelart.ts` |
 | Face points (478) + hair / skin / clothes / accessories regions, once per photo | `src/detect.ts` (MediaPipe, CPU) |
 | Auto-framing from the face oval, tight↔wide, drag | `src/frame.ts` |
 | Crop → work image (≈10× grid) → grey, bilateral, CLAHE → grid tone + regions | `src/pipeline/prep.ts` |

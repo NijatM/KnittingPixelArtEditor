@@ -6,7 +6,8 @@ export type Tool = 'pencil' | 'erase' | 'fill' | 'line' | 'select';
 export type Behind = 'around' | 'paper';
 export interface Rect { x: number; y: number; w: number; h: number }
 
-interface Snapshot { W: number; H: number; edits: Uint8Array; baked: Uint8Array | null }
+interface Sized { W: number; H: number; cells: Uint8Array }
+interface Snapshot { W: number; H: number; edits: Uint8Array; baked: Uint8Array | null; bakedAt: Sized | null }
 
 const MAX_UNDO = 200;
 
@@ -25,9 +26,11 @@ function* cellsOnLine(x0: number, y0: number, x1: number, y1: number): Generator
 
 /**
  * Rescale a cell layer to a new grid. Each new cell looks at the old cells it covers and takes the most common
- * non-zero value, so thin drawn lines survive shrinking; growing repeats cells (nearest).
+ * value: for the edits layer the most common non-zero one (0 = auto doesn't vote), so thin drawn lines survive
+ * shrinking; for a frozen base every colour votes and a tie goes to ink (0), for the same reason. Growing repeats
+ * cells (nearest).
  */
-function rescale(src: Uint8Array, W: number, H: number, nW: number, nH: number) {
+function rescale(src: Uint8Array, W: number, H: number, nW: number, nH: number, base = false) {
   const out = new Uint8Array(nW * nH), votes = new Map<number, number>();
   for (let y = 0; y < nH; y++)
     for (let x = 0; x < nW; x++) {
@@ -35,9 +38,9 @@ function rescale(src: Uint8Array, W: number, H: number, nW: number, nH: number) 
       const y0 = Math.floor(y * H / nH), y1 = Math.max(y0 + 1, Math.floor((y + 1) * H / nH));
       votes.clear();
       for (let sy = y0; sy < y1; sy++)
-        for (let sx = x0; sx < x1; sx++) { const v = src[sy * W + sx]; if (v) votes.set(v, (votes.get(v) ?? 0) + 1); }
+        for (let sx = x0; sx < x1; sx++) { const v = src[sy * W + sx]; if (v || base) votes.set(v, (votes.get(v) ?? 0) + 1); }
       let best = 0, n = 0;
-      for (const [v, c] of votes) if (c > n) { best = v; n = c; }
+      for (const [v, c] of votes) if (c > n || (c === n && v < best)) { best = v; n = c; }
       out[y * nW + x] = best;
     }
   return out;
@@ -49,6 +52,8 @@ export class Editor {
   edits: Uint8Array = new Uint8Array(0);
   /** Frozen base (live off): the style output, or style + edits after Bake. null = base follows the style. */
   baked: Uint8Array | null = null;
+  /** The frozen base as last set at its own grid size: grid changes scale from it, so going back is exact. */
+  private bakedAt: Sized | null = null;
   tool: Tool = 'pencil';
   ink = 0;            // palette index the pencil, fill and line draw with
   brush = 1;          // square brush side in cells
@@ -82,7 +87,10 @@ export class Editor {
     if (W === this.W && H === this.H) return;
     this.deselect();
     this.edits = this.W ? rescale(this.edits, this.W, this.H, W, H) : new Uint8Array(W * H);
-    if (this.baked) this.baked = rescale(this.baked, this.W, this.H, W, H);
+    if (this.baked) {
+      const a = this.bakedAt ?? { W: this.W, H: this.H, cells: this.baked };
+      this.baked = a.W === W && a.H === H ? a.cells.slice() : rescale(a.cells, a.W, a.H, W, H, true);
+    }
     this.W = W; this.H = H; this.preview = null;
   }
 
@@ -91,11 +99,12 @@ export class Editor {
     this.reset(W, H);
     this.edits = edits.slice();
     this.baked = baked?.slice() ?? null;
+    this.keepBaked();
   }
 
   /** Forget everything (new photo). */
   reset(W: number, H: number) {
-    this.W = W; this.H = H; this.edits = new Uint8Array(W * H); this.baked = null; this.preview = null;
+    this.W = W; this.H = H; this.edits = new Uint8Array(W * H); this.baked = null; this.bakedAt = null; this.preview = null;
     this.sel = null; this.float = null;
     this.undoStack = []; this.redoStack = [];
   }
@@ -200,6 +209,7 @@ export class Editor {
     this.deselect();
     this.snapshot();
     this.baked = this.composite(base);
+    this.keepBaked();
     this.edits.fill(0);
   }
 
@@ -209,6 +219,7 @@ export class Editor {
     this.drop();
     this.snapshot();
     this.baked = on ? null : base.slice();
+    this.keepBaked();
   }
 
   // Lifted pixels are dropped first, so a move (lift → drags → flips → drop) is one undo step and redo brings it back.
@@ -324,8 +335,11 @@ export class Editor {
     if (this.mirror) flood(this.mirrorX(x), y);
   }
 
+  /** The frozen base was just set at this grid size. */
+  private keepBaked() { this.bakedAt = this.baked ? { W: this.W, H: this.H, cells: this.baked.slice() } : null; }
+
   private snapshot() {
-    this.undoStack.push({ W: this.W, H: this.H, edits: this.edits.slice(), baked: this.baked?.slice() ?? null });
+    this.undoStack.push({ W: this.W, H: this.H, edits: this.edits.slice(), baked: this.baked?.slice() ?? null, bakedAt: this.bakedAt });
     if (this.undoStack.length > MAX_UNDO) this.undoStack.shift();
     this.redoStack = [];
   }
@@ -333,11 +347,12 @@ export class Editor {
   private step(from: Snapshot[], to: Snapshot[]) {
     const s = from.pop();
     if (!s) return;
-    to.push({ W: this.W, H: this.H, edits: this.edits.slice(), baked: this.baked?.slice() ?? null });
-    if (s.W !== this.W || s.H !== this.H) {
-      s.edits = rescale(s.edits, s.W, s.H, this.W, this.H);
-      if (s.baked) s.baked = rescale(s.baked, s.W, s.H, this.W, this.H);
-    }
-    this.edits = s.edits; this.baked = s.baked; this.preview = null; this.sel = null;
+    to.push({ W: this.W, H: this.H, edits: this.edits.slice(), baked: this.baked?.slice() ?? null, bakedAt: this.bakedAt });
+    if (s.W !== this.W || s.H !== this.H) s.edits = rescale(s.edits, s.W, s.H, this.W, this.H);
+    this.edits = s.edits; this.bakedAt = s.bakedAt; this.preview = null; this.sel = null;
+    // A base saved at another grid size comes back from its own-size version, scaled to the grid as it is now.
+    const a = s.bakedAt ?? (s.baked && { W: s.W, H: s.H, cells: s.baked });
+    this.baked = !s.baked || !a ? null : s.W === this.W && s.H === this.H ? s.baked
+      : a.W === this.W && a.H === this.H ? a.cells.slice() : rescale(a.cells, a.W, a.H, this.W, this.H, true);
   }
 }

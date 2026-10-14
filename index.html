@@ -55,7 +55,7 @@
         <div class="drop">
           <div class="big">drop a portrait here</div>
           <div>paste · <button class="btn" data-choose>choose file</button></div>
-          <div class="small faint" style="margin-top:14px">one person · it never leaves this device</div>
+          <div class="small faint" style="margin-top:14px">one person · or a pixel image (PNG / BMP) to edit · it never leaves this device</div>
         </div>
       </div>
       <div id="editor"><canvas id="cv" aria-label="pixel portrait"></canvas></div>
@@ -113,7 +113,7 @@
       <div class="row"><label>regions</label><span class="val" id="det-regions">—</span></div>
       <div class="row"><label>glasses</label><span class="val" id="det-glasses">—</span></div>
       <div class="okline small" id="det-time"></div>
-      <div class="explain small">Face points and hair / skin / clothes regions come from MediaPipe, running in your browser. Nothing is uploaded.</div>
+      <div class="explain small">Face points and hair / skin / clothes regions come from MediaPipe, running in your browser. Nothing is uploaded. A pixel image — a PNG or BMP with at most 16 flat colours, at its own size or enlarged by any factor — opens as it is instead: one cell per image pixel (or per enlarged block), its two colours as ink and paper (more colours are split by lightness), ready to draw on.</div>
     </section>
 
     <section class="panel" data-panel="frame">

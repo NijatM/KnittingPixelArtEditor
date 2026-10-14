@@ -12,7 +12,7 @@ Agreed in planning session 2026-10-09. Evidence for every choice is in `RESEARCH
 | Privacy | Photos never leave the device; everything runs client-side |
 | Knitting | Deferred. Keep a **cell aspect-ratio** setting (default 1:1) for future gauge |
 | Colors | Palette of indexed colors; v1 = **any 2 colors**, default pure black `#000000` / white `#ffffff` (was screen-tinted #0b0b0b / #f4f4f4 until 2026-10-14; saved projects with that pair move to pure) |
-| Input | File picker, drag & drop, paste from clipboard |
+| Input | File picker, drag & drop, paste from clipboard. **Pixel images** (added 2026-10-14, `src/pixelart.ts`): a file with 2–16 flat colours (alpha < 128 = paper) whose colour changes sit on a cell grid opens as it is — no detection, no styles: one cell per pixel when it fits the editor (≤ 250 × 300; an exact enlargement shared by both axes, e.g. 100 px of a 50 × 50, is undone), otherwise whole-block or uneven enlargements are found from where the colours change and checked by redrawing (≤ 1 % off); more than two colours split into ink / paper by lightness (Otsu), each side's most used colour becomes the palette. The image is the frozen base (live off), the photo steps are dimmed, it autosaves like a photo project. JPEGs of pixel art open as photos (compression noise) |
 | Framing | Auto-frame from face landmarks + tight↔wide slider + free drag/resize crop; pixels outside the photo = background; the auto frame tightens (≤ 25 %) so it ends at the photo's bottom edge instead of above a blank band |
 | Frame shape | Quick ratios 1:1, 4:5, 3:4, 2:3 + free W×H |
 | Size | Default **64×80**; quick widths 32 / 50 / 64 / 96 / 128 (50 = the team's knitted portraits, 2026-10-14); free entry |
