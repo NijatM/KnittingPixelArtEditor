@@ -3,7 +3,7 @@ import '@fontsource/ibm-plex-mono/500.css';
 import '@fontsource/ibm-plex-mono/600.css';
 import './style.css';
 import { detect, loadDetectors } from './detect';
-import { Editor, type Tool } from './editor';
+import { Editor, type Behind, type Tool } from './editor';
 import { download, encodeBmp, encodeSvg, depthFits, smallestDepth, type BmpDepth } from './export';
 import * as store from './store';
 import { AUTO_FRAME, computeCrop, type FrameParams } from './frame';
@@ -255,7 +255,7 @@ function scheduleSave() {
     if (!S.photo) return;
     store.saveState({
       version: 1, photoId: S.photo.id, savedAt: Date.now(), settings: structuredClone(settings()),
-      edits: { W: S.ed.W, H: S.ed.H, cells: S.ed.edits.slice(), baked: S.ed.baked?.slice() ?? null },
+      edits: { W: S.ed.W, H: S.ed.H, cells: S.ed.flatEdits(), baked: S.ed.baked?.slice() ?? null },
     }).then(() => { $$('[data-bind=saved]').forEach(e => (e.textContent = `Saved in this browser at ${new Date().toTimeString().slice(0, 5)}. Only the last project is kept.`)); }, storeFailed);
   }, 600);
 }
@@ -319,6 +319,13 @@ function drawEditor() {
     for (let x = 0; x <= W; x++) { ctx.globalAlpha = x % 10 ? 0.35 : 0.9; ctx.fillRect(x * cw, 0, 1, H * ch); }
     for (let y = 0; y <= H; y++) { ctx.globalAlpha = y % 10 ? 0.35 : 0.9; ctx.fillRect(0, y * ch, W * cw, 1); }
     ctx.globalAlpha = 1;
+  }
+  const sel = S.ed.sel;
+  if (sel) { // paper line with ink dashes: visible on both colours
+    const rect = [sel.x * cw + 0.5, sel.y * ch + 0.5, sel.w * cw - 1, sel.h * ch - 1] as const;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = S.pal[1]; ctx.strokeRect(...rect);
+    ctx.strokeStyle = S.pal[0]; ctx.setLineDash([4, 4]); ctx.strokeRect(...rect); ctx.setLineDash([]);
   }
   $('#zoomval').textContent = S.zoom ? (S.zoom > 0 ? '+' : '') + S.zoom : 'fit';
 }
@@ -485,6 +492,11 @@ function refresh() {
   bind('basestate', ed.live ? 'live · follows the style and sliders' : 'baked · frozen until live is ticked');
   bind('axis', `${S.photo?.lm ? 'face centre' : 'grid centre'} · x ${ed.axis}`);
   bind('brush', String(ed.brush));
+  bind('sel', ed.sel ? `${ed.sel.w}×${ed.sel.h} at ${ed.sel.x}, ${ed.sel.y}${ed.floating ? ' · lifted' : ''}` : 'none · drag with select');
+  $$<HTMLButtonElement>('[data-sel]').forEach(b => (b.disabled = !ed.sel));
+  setSeg($('#behindseg'), b => b.dataset.behind === ed.behind);
+  $$('.tb-draw').forEach(e => (e.hidden = ed.tool === 'select'));
+  $$('.tb-select').forEach(e => (e.hidden = ed.tool !== 'select'));
   $$('[data-tool]').forEach(b => b.classList.toggle('on', b.dataset.tool === ed.tool));
   $$('[data-ink]').forEach(b => b.classList.toggle('on', +b.dataset.ink! === ed.ink));
   $$('.mirrorcheck').forEach(b => setCheck(b, ed.mirror));
@@ -620,7 +632,9 @@ $('#forget').onclick = () => { store.forget().catch(() => {}).finally(() => loca
 
 // ---------------------------------------------------------------- editor: tools, pointer, keys
 const editorChanged = () => { refresh(); paintGallery(); };
-const setTool = (t: Tool) => { S.ed.tool = t; refresh(); };
+/** The base the editor draws over: the selected style's result, or the frozen base while that one renders. */
+const editBase = () => editable()?.cells ?? S.ed.baked;
+const setTool = (t: Tool) => { if (t !== 'select' && S.ed.sel) { S.ed.deselect(); paintGallery(); } S.ed.tool = t; refresh(); };
 const setInk = (k: number) => { S.ed.ink = k; refresh(); };
 const setMirror = (on: boolean) => { S.ed.mirror = on; refresh(); };
 const undo = () => { S.ed.undo(); editorChanged(); };
@@ -644,6 +658,21 @@ $('#livecheck').onclick = () => {
   editorChanged();
 };
 $('#clearedits').onclick = () => { S.ed.clear(); editorChanged(); };
+
+// selection: flip, mirror copy, nudge, select all
+const selAct = (act: string) => {
+  const base = editBase();
+  if (!base) return;
+  if (!S.ed.sel) { log('> select an area first · drag with select (S), ⌘A selects everything'); return; }
+  if (act === 'flip-h' || act === 'flip-v') S.ed.flip(act === 'flip-h' ? 'h' : 'v', base);
+  else if (act === 'mirror') { S.ed.mirrorCopy(base); log(`> flipped copy on the other side of the ${S.photo?.lm ? 'face' : 'grid'} centre · drag to place it`); }
+  else if (act === 'drop') S.ed.deselect();
+  if (act !== 'drop') S.ed.tool = 'select';
+  editorChanged();
+};
+const selectAll = () => { if (!editBase()) return; S.ed.selectAll(); S.ed.tool = 'select'; editorChanged(); };
+$$<HTMLButtonElement>('[data-sel]').forEach(b => b.addEventListener('click', () => selAct(b.dataset.sel!)));
+seg($('#behindseg'), b => { S.ed.behind = b.dataset.behind as Behind; refresh(); });
 $$<HTMLButtonElement>('[data-cycle]').forEach(b => (b.onclick = () => cycleStamp(b.closest<HTMLElement>('[data-stamp]')!.dataset.stamp as StampKind, +b.dataset.cycle!)));
 $('#stamps-auto').onclick = () => {
   S.look.stamps = { ...AUTO_STAMPS };
@@ -668,13 +697,16 @@ $$<HTMLButtonElement>('[data-brush]').forEach(b => (b.onclick = () => { S.ed.bru
       if (kind) cycleStamp(kind, 1);
       return;
     }
-    const r = editable() ?? (S.ed.baked ? { cells: S.ed.baked } : null);
-    if (!r || e.button !== 0) return;
+    const base = editBase();
+    if (!base || e.button !== 0) return;
     cv.setPointerCapture(e.pointerId);
-    S.ed.down(...cellAt(e), r.cells);
+    S.ed.down(...cellAt(e), base);
     drawEditor();
   });
-  cv.addEventListener('pointermove', e => { if (S.ed.drawing) { S.ed.move(...cellAt(e)); drawEditor(); } });
+  cv.addEventListener('pointermove', e => {
+    if (S.ed.drawing) { S.ed.move(...cellAt(e)); drawEditor(); return; }
+    cv.style.cursor = S.ed.tool === 'select' && S.step !== 'stamps' && S.ed.inside(...cellAt(e)) ? 'move' : '';
+  });
   const end = () => { if (S.ed.drawing) { S.ed.up(); editorChanged(); } };
   cv.addEventListener('pointerup', end);
   cv.addEventListener('pointercancel', end);
@@ -689,11 +721,21 @@ window.addEventListener('keydown', e => {
   const mod = e.metaKey || e.ctrlKey, k = e.key.toLowerCase();
   if (mod && k === 'z') { e.preventDefault(); if (e.shiftKey) redo(); else undo(); return; }
   if (mod && k === 'y') { e.preventDefault(); redo(); return; }
+  if (mod && k === 'a' && currentView() === 'pixels') { e.preventDefault(); selectAll(); return; }
   if (mod) return;
+  const arrow = ({ arrowleft: [-1, 0], arrowright: [1, 0], arrowup: [0, -1], arrowdown: [0, 1] } as Record<string, number[]>)[k];
+  const base = editBase();
+  if (arrow && S.ed.sel && base) { // nudge the selection one cell (five with shift)
+    e.preventDefault();
+    const n = e.shiftKey ? 5 : 1;
+    S.ed.nudge(arrow[0] * n, arrow[1] * n, base); editorChanged(); return;
+  }
   const act: Record<string, () => void> = {
-    b: () => setTool('pencil'), e: () => setTool('erase'), g: () => setTool('fill'), l: () => setTool('line'),
+    b: () => setTool('pencil'), e: () => setTool('erase'), g: () => setTool('fill'), l: () => setTool('line'), s: () => setTool('select'),
+    h: () => selAct('flip-h'), v: () => selAct('flip-v'), escape: () => selAct('drop'), enter: () => selAct('drop'),
     x: () => setInk(1 - S.ed.ink), m: () => setMirror(!S.ed.mirror), '+': () => zoomBy(1), '=': () => zoomBy(1), '-': () => zoomBy(-1), '0': () => zoomBy(0),
   };
+  if ((k === 'escape' || k === 'enter') && !S.ed.sel) return;
   if (act[k]) { e.preventDefault(); act[k](); }
 });
 

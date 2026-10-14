@@ -46,6 +46,8 @@ Sixth batch (2026-10-12) — side light tuned: **even light** slider under SKIN 
 
 Seventh batch (2026-10-12) — moustache / beard blobs: facial-hair cue in prep (work resolution, so the same at every grid size: bearded Nijat V1/V2 ≈ 0.67, others 0.31–0.41, threshold 0.5). With facial hair: 1-cell paper gaps above/below the mouth and under the nose base (`separate()` in stamps.ts), and E stamps the mouth. Nose, moustache, mouth and beard now read as separate shapes in A–E; clean-shaven photos are unchanged by construction.
 
+Eighth batch (2026-10-14) — **select tool** (`src/editor.ts`, asked for by the user): rectangle select (S, ⌘A all), drag inside / arrow keys (⇧ = 5) to move, H / V flip, **mirror copy** across the face centre, Esc / Enter deselect. The cells a move leaves behind take the colour around the selection ("around", default) or paper (Draw panel "left behind"), not ink. Lifted pixels float until dropped, so what they pass over survives; a move, its drags and flips are one undo step; autosave writes the lifted pixels as if dropped. With select on, the toolbar swaps ink/paper + mirror for flip ↔ · flip ↕ · mirror copy; the Draw panel's tool seg sits on its own line (five tools don't fit next to a label). Test: `research/private_tests/select.mjs` (passes on Nijat_V1, Nijat_V3, Mariana_V1); editor / editor2 / autosave / phone / stamps scripts still pass.
+
 Next (tuning / polish, no fixed plan left):
 1. Optional: fp16 weights to halve the 15 MB model download.
 2. More portraits from the team to tune on (only 5 test photos so far; 2 bearded, 2 with glasses, 1 side-lit).

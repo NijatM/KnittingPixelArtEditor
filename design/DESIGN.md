@@ -102,7 +102,8 @@ Selected row: `bg2` + `> ` prefix. Rows that aren't usable yet (no photo loaded)
 
 - **styles view**: gallery grid `minmax(190px, 1fr)`, label `STYLES · RENDERED FROM YOUR PHOTO AT 64×80`. Clicking a tile picks the style and opens the pixels view.
 - **pixels view**: crisp nearest-neighbour canvas, integer cell size that fits the stage, 1px `line2` outline offset 6px. Optional grid: thin lines every cell, stronger every 10.
-- Toolbar line 2: `[styles|pixels]` · `[pencil|erase|fill|line]` · `[ink|paper]` · `[x] mirror` · `[ ] grid` · zoom `‹ fit ›`.
+- Toolbar line 2: `[styles|pixels]` · `[pencil|erase|fill|line|select]` · `[ink|paper]` · `[x] mirror` · `[ ] grid` · zoom `‹ fit ›`. With select on, `[ink|paper]` and mirror give way to `[flip ↔|flip ↕|mirror copy]`.
+- Selection: 1px paper rectangle with ink dashes (visible on both colours), drawn over the cells; `move` cursor inside it.
 - Statusbar: `‹ undo` `redo ›` `[x] live` **bake** / `base · line portrait · 64×80 · 5,120 cells · 36% ink · 18 edits · 88 ms` / `> log message   21:50:27`.
 
 ## Inspector panels (content per step)
@@ -114,7 +115,7 @@ Selected row: `bg2` + `> ` prefix. Rows that aren't usable yet (no photo loaded)
 - **04 Regions**: SKIN density + even light; HAIR mode seg auto · solid · tone · texture + density + "measured" lightness (dark / medium / light); CLOTHES density.
 - **05 Features**: checks redraw eyes (auto), brows, mouth, nostrils, jaw line, silhouette; GLASSES status.
 - **06 Background**: seg white · black · pattern · photo; pattern density; `[x] outline the person`.
-- **07 Draw**: tool seg, brush stepper, mirror axis, EDITS summary, clear edits.
+- **07 Draw**: tool seg (own line), colour, brush stepper, mirror axis; SELECTION size/position, left behind seg around · paper, flip ↔ · flip ↕ · mirror copy · deselect; EDITS summary, clear edits.
 - **08 Stamps**: eyes / brows / mouth / nose / glasses steppers (`auto · traced`, `2/5 · dots`, … `off`), "all auto"; in this step a tap in the view cycles the feature under it (dashed hit boxes).
 - **09 Colours**: ink and paper swatch + hex field; swap, reset.
 - **10 Export**: FILE format seg PNG · BMP · SVG; when BMP, bit depth seg 1 · 4 · 8 · 24 (default: smallest depth that holds the palette; depths too small for it disabled); name field, **export png**; SESSION note + forget this project.

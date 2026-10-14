@@ -30,7 +30,7 @@ Pages source to "GitHub Actions" once).
 | Styles A region poster · B line portrait · C tone patterns · D Atkinson tonal · E ML lines | `src/pipeline/styles.ts` |
 | Style E line model (Informative Drawings, ONNX Runtime Web, WebGPU or CPU) | `src/pipeline/ml.ts`, `scripts/convert-informative-drawings.py` |
 | Processing off the main thread in two workers (A–D instant, E model); prep and line map cached | `src/worker.ts` |
-| Edits layer, pencil / erase / fill / line, mirror, undo, live / bake | `src/editor.ts` |
+| Edits layer, pencil / erase / fill / line, select (move / flip / mirror copy), mirror, undo, live / bake | `src/editor.ts` |
 | PNG · BMP (1/4/8/24-bit) · SVG export | `src/export.ts` |
 | Autosave of the last project (IndexedDB) | `src/store.ts` |
 | UI (nav / stage / inspector) | `index.html`, `src/main.ts`, `src/style.css`, `src/ui/` |

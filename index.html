@@ -77,9 +77,10 @@
       <div class="tbline">
         <div class="seg" id="viewseg"><button data-view="styles">styles</button><button data-view="pixels">pixels</button></div>
         <span class="sep hide-narrow"></span>
-        <div class="seg tools"><button data-tool="pencil" title="pencil (B)">pencil</button><button data-tool="erase" title="erase back to the style (E)">erase</button><button data-tool="fill" title="fill (G)">fill</button><button data-tool="line" title="line (L)">line</button></div>
-        <div class="seg"><button data-ink="0" title="draw with ink (X swaps)">ink</button><button data-ink="1" title="draw with paper (X swaps)">paper</button></div>
-        <button class="check mirrorcheck" title="mirror around the face centre (M)"><span class="box">[ ]</span> mirror</button>
+        <div class="seg tools"><button data-tool="pencil" title="pencil (B)">pencil</button><button data-tool="erase" title="erase back to the style (E)">erase</button><button data-tool="fill" title="fill (G)">fill</button><button data-tool="line" title="line (L)">line</button><button data-tool="select" title="select an area, drag inside it to move (S)">select</button></div>
+        <div class="seg tb-draw"><button data-ink="0" title="draw with ink (X swaps)">ink</button><button data-ink="1" title="draw with paper (X swaps)">paper</button></div>
+        <button class="check mirrorcheck tb-draw" title="mirror around the face centre (M)"><span class="box">[ ]</span> mirror</button>
+        <div class="seg tb-select" hidden><button data-sel="flip-h" title="flip the selection left–right (H)">flip ↔</button><button data-sel="flip-v" title="flip the selection upside down (V)">flip ↕</button><button data-sel="mirror" title="flipped copy on the other side of the face centre">mirror copy</button></div>
         <button class="check" id="gridcheck"><span class="box">[ ]</span> grid</button>
         <div class="stepper hide-narrow"><button data-zoom="-1" aria-label="zoom out">‹</button><span id="zoomval">fit</span><button data-zoom="1" aria-label="zoom in">›</button></div>
       </div>
@@ -208,15 +209,19 @@
       <div class="title">Draw</div>
       <div class="dash"></div>
       <div class="note">Edits sit on their own layer above the style. Change any slider or style and they stay.</div>
-      <div class="row"><label>tool</label><div class="seg tools"><button data-tool="pencil">pencil</button><button data-tool="erase">erase</button><button data-tool="fill">fill</button><button data-tool="line">line</button></div></div>
+      <div class="inline"><div class="seg tools" aria-label="tool"><button data-tool="pencil">pencil</button><button data-tool="erase">erase</button><button data-tool="fill">fill</button><button data-tool="line">line</button><button data-tool="select">select</button></div></div>
       <div class="row"><label>colour</label><div class="seg"><button data-ink="0">ink</button><button data-ink="1">paper</button></div></div>
       <div class="row"><label>brush</label><div class="val"><div class="stepper"><button data-brush="-1" aria-label="smaller brush">‹</button><span data-bind="brush">1</span><button data-brush="1" aria-label="bigger brush">›</button></div></div></div>
       <div class="row"><label>mirror</label><div class="val"><button class="check mirrorcheck"><span class="box">[ ]</span></button> <span class="dim" data-bind="axis"></span></div></div>
+      <div class="subhead">SELECTION<i></i></div>
+      <div class="row"><label>selected</label><span class="val dim" data-bind="sel">none</span></div>
+      <div class="row"><label>left behind</label><div class="seg" id="behindseg"><button data-behind="around" title="cells left behind take the colour around the selection">around</button><button data-behind="paper" title="cells left behind become paper">paper</button></div></div>
+      <div class="inline"><button class="btn" data-sel="flip-h">flip ↔</button><button class="btn" data-sel="flip-v">flip ↕</button><button class="btn" data-sel="mirror">mirror copy</button><button class="btn" data-sel="drop">deselect</button></div>
       <div class="subhead">EDITS<i></i></div>
       <div class="row"><label>forced</label><span class="val" data-bind="editsdetail">none yet</span></div>
       <div class="row"><label>base</label><span class="val dim" data-bind="basestate"></span></div>
       <div class="inline"><button class="btn" id="clearedits">clear edits</button><button class="btn primary" data-act="bake">bake</button></div>
-      <div class="explain small">Erase returns a cell to "auto" (whatever the style says). Bake flattens style + edits into plain pixels and freezes them; tick "live" to follow the style again (undo brings the bake back). Keys: B pencil · E erase · G fill · L line · X swap colour · M mirror · ⌘Z / ⇧⌘Z undo / redo · + / − / 0 zoom · ⌘ + scroll zoom.</div>
+      <div class="explain small">Erase returns a cell to "auto" (whatever the style says). Bake flattens style + edits into plain pixels and freezes them; tick "live" to follow the style again (undo brings the bake back). Select: drag out a rectangle, drag inside it (or use the arrow keys) to move it; the cells it leaves take the colour around the selection, or paper. Flip turns the selection over where it is; mirror copy puts a flipped copy on the other side of the face centre (one eye onto the other). Moved cells become edits; one move is one undo step. Keys: B pencil · E erase · G fill · L line · S select · ⌘A select all · arrows nudge (⇧ 5 cells) · H / V flip · Esc deselect · X swap colour · M mirror · ⌘Z / ⇧⌘Z undo / redo · + / − / 0 zoom · ⌘ + scroll zoom.</div>
     </section>
 
     <section class="panel" data-panel="stamps">
