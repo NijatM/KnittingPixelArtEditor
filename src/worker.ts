@@ -1,5 +1,5 @@
 // Processing worker: holds the photo, caches the prepared frame, renders styles on request.
-// Two instances run this file: one for the instant styles A–D, one for the ML style E, so a slow model
+// Two instances run this file: one for the instant styles, one for the ML lines style, so a slow model
 // run never holds up the sliders.
 import { lineMap, type LineMap } from './pipeline/ml';
 import { prepare } from './pipeline/prep';
@@ -24,7 +24,7 @@ async function render(req: RenderRequest) {
   let prepMs = 0;
   if (cache?.key !== key) { cache = { key, prep: prepare(src, req.crop, req.W, req.H) }; prepMs = cache.prep.ms; }
   let map: LineMap | undefined, modelMs = 0;
-  if (req.styles.includes('E')) {
+  if (req.styles.includes('ml')) {
     const keepBg = req.look.background === 'photo', lkey = JSON.stringify([req.crop, req.W, keepBg]);
     if (lines?.key !== lkey) {
       const m = await lineMap(src, req.crop, req.W, keepBg, text => reply({ type: 'progress', id: req.id, text }));
@@ -33,7 +33,7 @@ async function render(req: RenderRequest) {
     map = lines.map;
   }
   const results = renderStyles(cache.prep, req.styles, req.look, map);
-  for (const r of results) if (r.style === 'E') r.ms += modelMs;
+  for (const r of results) if (r.style === 'ml') r.ms += modelMs;
   reply({ type: 'result', res: { id: req.id, W: req.W, H: req.H, prepMs, hairLum: cache.prep.hairLum, results } }, results.map(r => r.cells.buffer));
 }
 

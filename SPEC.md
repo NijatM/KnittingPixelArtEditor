@@ -15,10 +15,10 @@ Agreed in planning session 2026-10-09. Evidence for every choice is in `RESEARCH
 | Input | File picker, drag & drop, paste from clipboard |
 | Framing | Auto-frame from face landmarks + tight↔wide slider + free drag/resize crop; pixels outside the photo = background; the auto frame tightens (≤ 25 %) so it ends at the photo's bottom edge instead of above a blank band |
 | Frame shape | Quick ratios 1:1, 4:5, 3:4, 2:3 + free W×H |
-| Size | Default **64×80**; quick widths 32 / 48 / 64 / 96 / 128; free entry |
+| Size | Default **64×80**; quick widths 32 / 50 / 64 / 96 / 128 (50 = the team's knitted portraits, 2026-10-14); free entry |
 | Background | Per portrait: white / black / pattern (Bayer dots, density slider) / photo (the real background drawn in the style, flat walls stay paper); "outline the person" = ink line against white, 1-cell paper gap against the others |
-| Start | **Gallery grid**: every preset renders a thumbnail at the chosen size; click one to start |
-| Presets | A Region poster · B Line portrait · C 4-tone patterns · D Atkinson tonal · E ML lines (Informative Drawings, `opensketch_style`) |
+| Start | **Gallery grid**: every preset renders a thumbnail at the chosen size; click one to start. Default style: clean avatar |
+| Presets | A **Clean avatar** (the team's look, added 2026-10-14) · B Region poster · C Line portrait · D 4-tone patterns · E Atkinson tonal · F ML lines (Informative Drawings, `opensketch_style`). Letters follow the gallery order; code ids are `avatar` · `poster` · `line` · `tone` · `tonal` · `ml` (saved projects with the old letters are mapped) |
 | Feature extraction | MediaPipe Face Landmarker + Selfie Multiclass segmentation; on detection failure, filter-only presets |
 | Skin | Region-normalized by default + **skin density** slider (all region sliders: 0 = paper, 0.5 = each style's tuned balance, 1 = ink) + **even light** (default 0.80, `src/pipeline/light.ts`): skin tone measured in bands across the face midline (medians), only the left–right antisymmetric part is subtracted — removes a side light's shadowed half, keeps symmetric shading such as beards |
 | Hair | **Mode** auto / solid / tone / texture + **density** slider. auto = each style's own hair (A/B/E solid, C patterns, D dither); solid = one mass, lone flecks merged; tone = 4 pattern levels in coherent zones; texture = hair outline + strand lines (difference of Gaussians, specks under 3 cells dropped) + darkest shadows. Hair lightness is **measured** (median luminance of the hair pixels): light hair gets less ink at the same density (black hair unchanged) |
@@ -39,12 +39,13 @@ Agreed in planning session 2026-10-09. Evidence for every choice is in `RESEARCH
 3. Frame crop → work image at 10× grid resolution → grayscale, bilateral smooth, CLAHE.
 4. Region maps at grid res; background → chosen background.
 5. Preset render:
-   - **A Region poster**: per-region percentile thresholds (skin from slider, hair from hair controls, clothes ~p55), orphan cleanup, silhouette outline.
-   - **B Line portrait**: as A but skin left open + jaw line from landmarks.
-   - **C 4-tone patterns**: region-normalized tone → 4 levels → 3×3 mode filter → fixed 2×2 patterns (0/25/50/100%).
-   - **D Atkinson tonal**: region-normalized tone → Atkinson dither.
-   - **E ML lines**: Informative Drawings `opensketch_style` (ONNX) at input ≈ 7 × grid width, clamped 256–768 → ink coverage → grid; hair/clothes by region.
-6. Feature layer (A–E): clear eye sockets + draw lid line and iris, brows, mouth, nostrils — unless glasses detected or toggle off.
+   - **A Clean avatar** (`src/pipeline/avatar.ts`, modelled on the team's hand-finished 50×50 portraits): regions from the work image by coverage (hair takes a cell from 40 %, so thin strands survive; body "skin" under the chin far darker than the cheeks' plain grey counts as clothes); **face and neck stay paper**, the person gets a thin 4-neighbour contour + jaw line; dark hair = one solid mass with a few paper cuts at its brightest interior cells, light hair (median luminance ≥ 95) = outline + strands (cells darker than their 5×5 hair neighbourhood, ≈ 60 % ink); clothes solid. Features are designed shapes at the target grid: eyes = 2×2 pupils (behind glasses or small eyes), lid line + pupil, or dashes when the eyes are narrowed (lid gap < 0.2 of eye width); glasses = continuous one-cell rims sized from the eye distance (two-cell bridge gap), cleared lenses, temple arms to the face edge; brows one row (two where the real brow is ≥ 1.6 cells thick), dropped whole if a rim would leave stubs; nose = small "L", none behind glasses; mouth open (lips around ≥ 1 row of paper teeth) · smile · line; **moustache** (zone dark share ≥ 0.8) = a two-row bar, which *is* the mouth when the mouth is closed; **goatee** (≥ 0.4) = a small tapered patch one paper row under the lip. Skin density above 0.50 adds shading; hand-picked stamps replace the avatar's own shapes.
+   - **B Region poster**: per-region percentile thresholds (skin from slider, hair from hair controls, clothes ~p55), orphan cleanup, silhouette outline.
+   - **C Line portrait**: as B but skin left open + jaw line from landmarks.
+   - **D 4-tone patterns**: region-normalized tone → 4 levels → 3×3 mode filter → fixed 2×2 patterns (0/25/50/100%).
+   - **E Atkinson tonal**: region-normalized tone → Atkinson dither.
+   - **F ML lines**: Informative Drawings `opensketch_style` (ONNX) at input ≈ 7 × grid width, clamped 256–768 → ink coverage → grid; hair/clothes by region.
+6. Feature layer (B–F): clear eye sockets + draw lid line and iris, brows, mouth, nostrils — unless glasses detected or toggle off.
 7. Composite: base → edits layer → display palette.
 
 Known weak spots (tune with `TestPortraits/`): open-smile mouths, beards under E, voluminous curly/light hair, 3/4 views.
@@ -52,7 +53,7 @@ Known weak spots (tune with `TestPortraits/`): open-smile mouths, beards under E
 ## Architecture
 
 - **Vite + TypeScript**, no UI framework; hand-written canvas editor.
-- Processing in **Web Workers**: one for the instant styles A–D, a second one for the ML style E so a model run never blocks the sliders. ONNX Runtime Web for the line model: WebGPU build when the browser has WebGPU (~0.3 s per run on an M2 Pro), otherwise the smaller CPU build (~5.5 s single-threaded; Pages isn't cross-origin isolated, so no WASM threads). The line map is cached per crop + grid, so region / line-weight sliders don't re-run the model; `@mediapipe/tasks-vision` WASM runs once per photo on the main thread with the **CPU** delegate (the GPU delegate took ~14 s on the first photo on an M2 Pro; CPU ~0.4 s).
+- Processing in **Web Workers**: one for the instant styles (A–E), a second one for ML lines (F) so a model run never blocks the sliders. ONNX Runtime Web for the line model: WebGPU build when the browser has WebGPU (~0.3 s per run on an M2 Pro), otherwise the smaller CPU build (~5.5 s single-threaded; Pages isn't cross-origin isolated, so no WASM threads). The line map is cached per crop + grid, so region / line-weight sliders don't re-run the model; `@mediapipe/tasks-vision` WASM runs once per photo on the main thread with the **CPU** delegate (the GPU delegate took ~14 s on the first photo on an M2 Pro; CPU ~0.4 s).
 - **All models in the repo** under `public/models/`: face_landmarker (3.7 MB), selfie_multiclass (16 MB), Informative Drawings `opensketch_style` (17 MB fp32 / ~9 MB fp16), taken from the author's own release, not the `lllyasviel/Annotators` mirror.
 - Project data: `{version, source photo (downscaled), crop, grid{w,h,cellAspect}, palette[], preset{id, params}, edits: Uint8Array (0=auto, k+1=forced color k), baked}`.
 - GitHub Actions builds and deploys to Pages; Vite `base: '/KnittingPixelArtEditor/'`; personal account → `<user>.github.io/KnittingPixelArtEditor`.

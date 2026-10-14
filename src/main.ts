@@ -10,23 +10,29 @@ import { AUTO_FRAME, computeCrop, type FrameParams } from './frame';
 import { decodeImage, wireImport } from './importer';
 import { GLASSES_MIN_SHARE, glassesShare } from './pipeline/glasses';
 import { OVAL, pts } from './pipeline/landmarks';
+import { avatarAuto } from './pipeline/avatar';
 import { AUTO_STAMPS, STAMPS, STAMP_KINDS, autoVariant, hitBoxes, type Face, type StampKind } from './pipeline/stamps';
 import { SEG, type Crop, type Features, type Look, type RenderResult, type StyleId, type StyleResult } from './pipeline/types';
 import { $, $$, Bar, check, seg, setCheck, setSeg } from './ui/controls';
 import type { FromWorker, ToWorker } from './worker';
 
 // ---------------------------------------------------------------- constants
+// Gallery order; the letter shown for a style is its place in this list.
 const STYLES: { k: StyleId; key: string; t: string; d: string }[] = [
-  { k: 'A', key: 'poster', t: 'Region poster', d: 'bold shapes, each region cut separately' },
-  { k: 'B', key: 'line', t: 'Line portrait', d: 'open skin, drawn contours' },
-  { k: 'C', key: '4-tone', t: 'Tone patterns', d: 'paper · 50 · 75 · ink' },
-  { k: 'D', key: 'tonal', t: 'Atkinson tonal', d: 'dithered shading, features kept' },
-  { k: 'E', key: 'ml lines', t: 'ML lines', d: 'Informative Drawings (MIT) · drawn by a model' },
+  { k: 'avatar', key: 'avatar', t: 'Clean avatar', d: 'paper face, solid hair, drawn features' },
+  { k: 'poster', key: 'poster', t: 'Region poster', d: 'bold shapes, each region cut separately' },
+  { k: 'line', key: 'line', t: 'Line portrait', d: 'open skin, drawn contours' },
+  { k: 'tone', key: '4-tone', t: 'Tone patterns', d: 'paper · 50 · 75 · ink' },
+  { k: 'tonal', key: 'tonal', t: 'Atkinson tonal', d: 'dithered shading, features kept' },
+  { k: 'ml', key: 'ml lines', t: 'ML lines', d: 'Informative Drawings (MIT) · drawn by a model' },
 ];
-const INSTANT: StyleId[] = ['A', 'B', 'C', 'D'];
+const INSTANT: StyleId[] = ['avatar', 'poster', 'line', 'tone', 'tonal'];
 const LATER = [
-  { k: 'F', t: 'U²-Net portrait', d: 'non-commercial model', ph: '176 MB · not loaded', tag: 'v2' },
+  { t: 'U²-Net portrait', d: 'non-commercial model', ph: '176 MB · not loaded', tag: 'v2' },
 ];
+const letter = (i: number) => String.fromCharCode(65 + i);
+/** Saved projects from before the avatar style named styles by their old letters. */
+const OLD_IDS: Record<string, StyleId> = { A: 'poster', B: 'line', C: 'tone', D: 'tonal', E: 'ml' };
 const RATIOS: Record<string, [number, number]> = { '1:1': [1, 1], '4:5': [4, 5], '3:4': [3, 4], '2:3': [2, 3] };
 const DEFAULT_PAL = ['#0b0b0b', '#f4f4f4'];
 const DEFAULT_FEATURES: Features = { eyes: true, brows: true, mouth: true, nostrils: true, jaw: true, silhouette: true, glasses: false };
@@ -58,14 +64,14 @@ const S = {
   lock: true,
   cellAspect: 1,
   look: { skin: 0.5, evenLight: 0.8, hair: 0.5, clothes: 0.5, cleanup: 2, lineWeight: 1, hairMode: 'auto', background: 'white', bgDensity: 0.25, features: { ...DEFAULT_FEATURES }, stamps: { ...AUTO_STAMPS } } as Look,
-  style: 'B' as StyleId,
+  style: 'avatar' as StyleId,
   pal: [...DEFAULT_PAL],
   step: 'photo' as Step,
   pixelsOverStyles: false, // the toolbar toggle can show pixels while on the style step
   res: new Map<StyleId, Rendered>(), // latest result per style, each with its own grid size
   prepMs: 0,
   hairLum: -1,                         // measured hair lightness of the current frame (from the worker)
-  mlNote: '',                          // what style E is doing while it has no result yet
+  mlNote: '',                          // what ML lines is doing while it has no result yet
   zoom: 0,
   grid: false,
   ed: new Editor(),
@@ -100,6 +106,10 @@ function gridFace(): Face | null {
 }
 const FEATURE_OF: Record<StampKind, keyof Features> = { eyes: 'eyes', brows: 'brows', mouth: 'mouth', nose: 'nostrils', glasses: 'glasses' };
 
+/** The shape "auto" draws: the avatar designs its own, the other styles pick a variant per face and size. */
+const autoName = (kind: StampKind, face: Face) =>
+  S.style === 'avatar' ? avatarAuto(kind, face, S.look.features.glasses) : STAMPS[kind][autoVariant(kind, face) - 1].name;
+
 /** Step a stamp: auto → 1 … n → off → auto. Off is the feature switch in 05 Features. */
 function cycleStamp(kind: StampKind, dir: number) {
   const n = STAMPS[kind].length, f = S.look.features, key = FEATURE_OF[kind];
@@ -107,7 +117,7 @@ function cycleStamp(kind: StampKind, dir: number) {
   const next = (pos + dir + n + 2) % (n + 2);
   f[key] = next !== n + 1;
   if (next !== n + 1) S.look.stamps[kind] = next;
-  const face = gridFace(), name = next === n + 1 ? 'off' : next === 0 ? `auto · ${face ? STAMPS[kind][autoVariant(kind, face) - 1].name : 'traced'}` : STAMPS[kind][next - 1].name;
+  const face = gridFace(), name = next === n + 1 ? 'off' : next === 0 ? `auto · ${face ? autoName(kind, face) : 'traced'}` : STAMPS[kind][next - 1].name;
   log(`> ${kind} · ${name}`);
   syncControls(); lookChanged();
 }
@@ -162,13 +172,13 @@ function applyResult(res: RenderResult) {
   if (res.prepMs) S.prepMs = res.prepMs;
   S.hairLum = res.hairLum;
   for (const r of res.results) S.res.set(r.style, { ...r, W: res.W, H: res.H });
-  if (res.results.some(r => r.style === 'E')) S.mlNote = '';
+  if (res.results.some(r => r.style === 'ml')) S.mlNote = '';
   paintGallery();
   refresh();
 }
 const instant = new Renderer(INSTANT, applyResult, () => {});
-const ml = new Renderer(['E'], applyResult, t => { S.mlNote = t; paintGallery(); refresh(); }, // shown in the E tile + status
-  () => { if (!S.res.has('E')) { S.mlNote = 'could not load the line model'; paintGallery(); } });
+const ml = new Renderer(['ml'], applyResult, t => { S.mlNote = t; paintGallery(); refresh(); }, // shown in the ML tile + status
+  () => { if (!S.res.has('ml')) { S.mlNote = 'could not load the line model'; paintGallery(); } });
 
 function scheduleRender() {
   if (!raf) raf = requestAnimationFrame(() => { raf = 0; instant.render(); ml.render(); });
@@ -240,7 +250,7 @@ function startPhoto(id: number, name: string, canvas: HTMLCanvasElement, det: { 
 const settings = () => ({ frame: S.frame, ratio: S.ratio, W: S.W, H: S.H, lock: S.lock, cellAspect: S.cellAspect, look: S.look, style: S.style, pal: S.pal, fmt: S.fmt, depth: S.depth });
 function applySettings(v: Record<string, unknown>) {
   const s = v as ReturnType<typeof settings>;
-  Object.assign(S, { frame: { ...AUTO_FRAME, ...s.frame }, ratio: s.ratio, W: s.W, H: s.H, lock: s.lock, cellAspect: s.cellAspect, style: s.style, pal: s.pal, fmt: s.fmt ?? 'png', depth: s.depth ?? 1 });
+  Object.assign(S, { frame: { ...AUTO_FRAME, ...s.frame }, ratio: s.ratio, W: s.W, H: s.H, lock: s.lock, cellAspect: s.cellAspect, style: OLD_IDS[s.style] ?? s.style, pal: s.pal, fmt: s.fmt ?? 'png', depth: s.depth ?? 1 });
   S.look = { ...S.look, ...s.look, features: { ...S.look.features, ...s.look.features } };
 }
 let saveTimer = 0, storeWarned = false;
@@ -363,31 +373,31 @@ function drawFrame() {
 // ---------------------------------------------------------------- gallery + style list
 function buildGallery() {
   const g = $('#ggrid'); g.innerHTML = '';
-  for (const s of STYLES) {
+  for (const [i, s] of STYLES.entries()) {
     const t = document.createElement('button');
     t.className = 'tile'; t.dataset.style = s.k;
-    t.innerHTML = `<span class="n"><span>style ${s.k}</span><span data-ms></span></span><div class="ph wait">rendering…</div><canvas hidden></canvas><span class="t">${s.t}</span><span class="d">${s.d}</span>`;
+    t.innerHTML = `<span class="n"><span>style ${letter(i)}</span><span data-ms></span></span><div class="ph wait">rendering…</div><canvas hidden></canvas><span class="t">${s.t}</span><span class="d">${s.d}</span>`;
     t.onclick = () => pickStyle(s.k, true);
     g.appendChild(t);
   }
-  for (const s of LATER) {
+  for (const [i, s] of LATER.entries()) {
     const d = document.createElement('div');
     d.className = 'tile is-draft';
-    d.innerHTML = `<span class="n"><span>style ${s.k}</span><span>${s.tag}</span></span><div class="ph">${s.ph}</div><span class="t">${s.t}</span><span class="d">${s.d}</span>`;
+    d.innerHTML = `<span class="n"><span>style ${letter(STYLES.length + i)}</span><span>${s.tag}</span></span><div class="ph">${s.ph}</div><span class="t">${s.t}</span><span class="d">${s.d}</span>`;
     g.appendChild(d);
   }
   const l = $('#stylelist'); l.innerHTML = '';
-  for (const s of STYLES) {
+  for (const [i, s] of STYLES.entries()) {
     const r = document.createElement('div');
     r.className = 'lrow'; r.dataset.style = s.k; r.tabIndex = 0;
-    r.innerHTML = `<span class="lnum">${s.k}</span><span class="left">${s.t}</span><span class="right" data-ms></span>`;
+    r.innerHTML = `<span class="lnum">${letter(i)}</span><span class="left">${s.t}</span><span class="right" data-ms></span>`;
     r.onclick = () => pickStyle(s.k, false);
     l.appendChild(r);
   }
-  for (const s of LATER) {
+  for (const [i, s] of LATER.entries()) {
     const r = document.createElement('div');
     r.className = 'lrow faint';
-    r.innerHTML = `<span class="lnum">${s.k}</span><span class="left">${s.t}</span><span class="right">${s.tag}</span>`;
+    r.innerHTML = `<span class="lnum">${letter(STYLES.length + i)}</span><span class="left">${s.t}</span><span class="right">${s.tag}</span>`;
     l.appendChild(r);
   }
 }
@@ -406,7 +416,7 @@ function paintGallery() {
       paintCells(cv, cells, r.W, r.H); cv.style.aspectRatio = `${r.W * S.cellAspect} / ${r.H}`;
     }
     ph.style.aspectRatio = `${S.W * S.cellAspect} / ${S.H}`;
-    ph.textContent = !S.photo ? 'no photo yet' : k === 'E' && S.mlNote ? S.mlNote : 'rendering…';
+    ph.textContent = !S.photo ? 'no photo yet' : k === 'ml' && S.mlNote ? S.mlNote : 'rendering…';
   }
   for (const r of $$('#stylelist .lrow[data-style]')) {
     const k = r.dataset.style as StyleId, res = S.res.get(k);
@@ -474,7 +484,7 @@ function refresh() {
     if (on && v) picked++;
     $(`[data-stamp=${kind}] .stepper span`).textContent = !on ? 'off'
       : v ? `${v}/${n} · ${STAMPS[kind][v - 1].name}`
-      : `auto · ${face ? STAMPS[kind][autoVariant(kind, face) - 1].name : '—'}${S.style === 'E' && (kind === 'mouth' || kind === 'nose') ? ' (E: model)' : ''}`;
+      : `auto · ${face ? autoName(kind, face) : '—'}${S.style === 'ml' && (kind === 'mouth' || kind === 'nose') ? ' (ML: model)' : ''}`;
   }
   bind('stamps', picked ? `${picked} picked` : 'auto');
   $('#glasses-note').textContent = g < 0 ? '' : found ? '· found' : '· none found';
@@ -516,8 +526,8 @@ function refresh() {
   let ink = 0;
   if (sh) for (const v of sh.cells) ink += +(v === 0);
   $('#status').textContent = r && sh
-    ? `${ed.live ? 'base' : 'baked'} · ${styleInfo(S.style).t.toLowerCase()} · ${sh.W}×${sh.H} · ${(sh.W * sh.H).toLocaleString('en')} cells · ${Math.round(ink / (sh.W * sh.H) * 100)}% ink · ${plural(n, 'edit')} · ${fmtMs(r.ms + (r.style === 'E' ? 0 : S.prepMs))}`
-    : `${S.photo ? (S.style === 'E' && S.mlNote ? S.mlNote : 'rendering') : 'no photo'} · ${S.W}×${S.H} · ${(S.W * S.H).toLocaleString('en')} cells`;
+    ? `${ed.live ? 'base' : 'baked'} · ${styleInfo(S.style).t.toLowerCase()} · ${sh.W}×${sh.H} · ${(sh.W * sh.H).toLocaleString('en')} cells · ${Math.round(ink / (sh.W * sh.H) * 100)}% ink · ${plural(n, 'edit')} · ${fmtMs(r.ms + (r.style === 'ml' ? 0 : S.prepMs))}`
+    : `${S.photo ? (S.style === 'ml' && S.mlNote ? S.mlNote : 'rendering') : 'no photo'} · ${S.W}×${S.H} · ${(S.W * S.H).toLocaleString('en')} cells`;
 }
 
 // ---------------------------------------------------------------- controls

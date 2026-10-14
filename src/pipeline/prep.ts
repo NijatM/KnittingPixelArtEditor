@@ -268,5 +268,5 @@ export function prepare(src: Source, crop: Crop, W: number, H: number): Prepared
 
   const lm = src.lm ? scaleLm(src.lm, crop, W / crop.w, H / crop.h) : null;
   const facialHair = src.lm ? facialHairShare(pg, seg, ww, wh, scaleLm(src.lm, crop, ww / crop.w, wh / crop.h)) : 0;
-  return { W, H, ps, bgps, segs, acc, lines, hairLum, facialHair, lm, ms: performance.now() - t0 };
+  return { W, H, ps, bgps, segs, acc, lines, hairLum, facialHair, lm, work: { f, w: ww, h: wh, gray, tone: pg, seg }, ms: performance.now() - t0 };
 }

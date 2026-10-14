@@ -1,4 +1,6 @@
-// Styles A–D (research/prototype/exp2.py run2). Work in ink masks (1 = ink), return palette indices.
+// Region poster, line portrait, tone patterns, Atkinson tonal (research/prototype/exp2.py run2), ML lines, and the
+// avatar (avatar.ts). Work in ink masks (1 = ink), return palette indices.
+import { avatarLayers } from './avatar';
 import { featureMasks, type FeatureMasks } from './features';
 import { evenLight } from './light';
 import type { LineMap } from './ml';
@@ -39,7 +41,7 @@ const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
  * Sockets → paper, features → ink, then the background. The outline keeps person and background apart:
  * an ink line on the person against white, a paper gap on the background side for black / pattern / photo.
  */
-function finish(ink: Mask, fm: FeatureMasks, r: Regions, look: Look, W: number) {
+function finish(ink: Mask, fm: Pick<FeatureMasks, 'sock' | 'feats'>, r: Pick<Regions, 'bg' | 'sil' | 'halo'>, look: Look, W: number) {
   const bg = look.background, outline = look.features.silhouette;
   for (let i = 0; i < ink.length; i++) {
     if (fm.sock[i]) ink[i] = 0;
@@ -144,7 +146,7 @@ function applyHair(ink: Mask, p: Prepared, r: Regions, look: Look, own: HairMode
   for (let i = 0; i < ink.length; i++) if (r.hair[i]) ink[i] = h[i];
 }
 
-function styleA(p: Prepared, r: Regions, fm: FeatureMasks, look: Look) {
+function poster(p: Prepared, r: Regions, fm: FeatureMasks, look: Look) {
   const { W, H } = p, ink = new Uint8Array(W * H);
   cut(ink, p.ps, r.skin, densityToQ(look.skin, 22));
   applyHair(ink, p, r, look, 'solid');
@@ -160,8 +162,8 @@ function styleA(p: Prepared, r: Regions, fm: FeatureMasks, look: Look) {
   return finish(clean(ink, W, H, look.cleanup, protect), fm, r, look, W);
 }
 
-function styleB(p: Prepared, r: Regions, fm: FeatureMasks, look: Look) {
-  const ink = styleA(p, r, fm, look);
+function linePortrait(p: Prepared, r: Regions, fm: FeatureMasks, look: Look) {
+  const ink = poster(p, r, fm, look);
   cut(ink, p.ps, r.skin, densityToQ(look.skin, 8), true); // skin stays open except its darkest shadows
   for (let i = 0; i < ink.length; i++) if (fm.jaw[i] && r.skin[i]) ink[i] = 1;
   return finish(ink, fm, r, look, p.W);
@@ -171,7 +173,7 @@ function styleB(p: Prepared, r: Regions, fm: FeatureMasks, look: Look) {
 const PATTERN = (lvl: number, x: number, y: number) =>
   lvl === 0 ? 1 : lvl === 3 ? 0 : lvl === 1 ? +!(x % 2 === 0 && y % 2 === 0) : +((x + y) % 2 === 1);
 
-function styleC(p: Prepared, r: Regions, fm: FeatureMasks, look: Look) {
+function tonePatterns(p: Prepared, r: Regions, fm: FeatureMasks, look: Look) {
   const { W, H } = p, t = normTone(p, r, look), lvl = new Uint8Array(W * H);
   const photo = look.background === 'photo';
   for (let i = 0; i < lvl.length; i++) lvl[i] = r.bg[i] && !photo ? 3 : Math.round(t[i] / 255 * 3);
@@ -190,7 +192,7 @@ function styleC(p: Prepared, r: Regions, fm: FeatureMasks, look: Look) {
   return finish(ink, fm, r, look, W);
 }
 
-function styleD(p: Prepared, r: Regions, fm: FeatureMasks, look: Look) {
+function tonal(p: Prepared, r: Regions, fm: FeatureMasks, look: Look) {
   const { W, H } = p, t = normTone(p, r, look), f = new Float32Array(W * H), ink = new Uint8Array(W * H);
   const photo = look.background === 'photo';
   for (let i = 0; i < f.length; i++) f[i] = r.bg[i] && !photo ? 1 : t[i] / 255;
@@ -208,8 +210,8 @@ function styleD(p: Prepared, r: Regions, fm: FeatureMasks, look: Look) {
   return finish(ink, fm, r, look, W);
 }
 
-/** E: model lines → cells by coverage, hair / clothes cut by region, eyes / brows / glasses redrawn (exp6.py "F"). */
-function styleE(p: Prepared, r: Regions, look: Look, lines: LineMap) {
+/** ML lines: model lines → cells by coverage, hair / clothes cut by region, eyes / brows / glasses redrawn (exp6.py "F"). */
+function mlLines(p: Prepared, r: Regions, look: Look, lines: LineMap) {
   const { W, H } = p, cov = areaResize(lines.ink, lines.w, lines.h, W, H), t = (W < 70 ? 0.16 : 0.22) / look.lineWeight;
   let ink = clean(Uint8Array.from(cov, c => +(c > t)), W, H, look.cleanup);
   applyHair(ink, p, r, look, 'solid');
@@ -220,16 +222,22 @@ function styleE(p: Prepared, r: Regions, look: Look, lines: LineMap) {
   return finish(ink, fm, r, look, W);
 }
 
-const RENDER = { A: styleA, B: styleB, C: styleC, D: styleD };
+/** Avatar: its own regions, contour and feature shapes (avatar.ts), finished like the others (background, outline). */
+function avatar(p: Prepared, look: Look) {
+  const a = avatarLayers(p, look);
+  return finish(a.ink, a, a, look, p.W);
+}
 
-/** Renders the given styles; E needs the line map from ml.ts. */
+const RENDER = { poster, line: linePortrait, tone: tonePatterns, tonal };
+
+/** Renders the given styles; ML lines needs the line map from ml.ts. */
 export function renderStyles(p0: Prepared, styles: StyleId[], look: Look, lines?: LineMap): StyleResult[] {
   const fm = featureMasks(p0, look), r = regions(p0, fm);
   // Every style reads the skin tone with the side light evened out.
   const p = { ...p0, ps: evenLight(p0.ps, r.skin, p0.lm, p0.W, p0.H, look.evenLight ?? 0) };
   return styles.map(style => {
     const t0 = performance.now(), cells = new Uint8Array(p.W * p.H);
-    const ink = style === 'E' ? styleE(p, r, look, lines!) : RENDER[style](p, r, fm, look);
+    const ink = style === 'ml' ? mlLines(p, r, look, lines!) : style === 'avatar' ? avatar(p, look) : RENDER[style](p, r, fm, look);
     let n = 0;
     for (let i = 0; i < ink.length; i++) { cells[i] = ink[i] ? 0 : 1; n += ink[i]; }
     return { style, cells, ms: performance.now() - t0, ink: n / ink.length };

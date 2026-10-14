@@ -14,7 +14,7 @@ export interface FeatureMasks {
 /** Facial hair cue above this counts as moustache / beard (test photos: bearded ≈ 0.67, others ≤ 0.41). */
 export const FACIAL_HAIR_MIN = 0.5;
 
-/** modelFace: style E, whose model already draws mouth, nose and jaw — they are stamped only when picked by hand. */
+/** modelFace: ML lines, whose model already draws mouth, nose and jaw — they are stamped only when picked by hand. */
 export function featureMasks(p: Prepared, look: Look, opts: { modelFace?: boolean } = {}): FeatureMasks {
   const { W, H, lm } = p, n = W * H, F = look.features;
   const jaw = new Uint8Array(n), faceAcc = new Uint8Array(n);

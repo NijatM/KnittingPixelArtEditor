@@ -16,32 +16,32 @@ export interface Face {
   W: number;
   H: number;
 }
-interface Out { clear: Mask; ink: Mask; brow: Mask }
+export interface Out { clear: Mask; ink: Mask; brow: Mask }
 
 // ---------------------------------------------------------------- geometry (MediaPipe face mesh indices)
 // Per eye: [outer corner, inner corner, upper lid (outer → inner), lower lid (outer → inner), iris centre, iris ring a, b]
-const EYES = [
+export const EYES = [
   { o: 33, i: 133, up: [33, 246, 161, 160, 159, 158, 157, 173, 133], lo: [33, 7, 163, 144, 145, 153, 154, 155, 133], c: 468, a: 469, b: 471 },
   { o: 263, i: 362, up: [263, 466, 388, 387, 386, 385, 384, 398, 362], lo: [263, 249, 390, 373, 374, 380, 381, 382, 362], c: 473, a: 474, b: 476 },
 ];
 // Per brow: lower edge (outer → inner) and upper edge (outer → inner).
-const BROWS = [
+export const BROWS = [
   { lo: [46, 53, 52, 65, 55], up: [70, 63, 105, 66, 107] },
   { lo: [276, 283, 282, 295, 285], up: [300, 293, 334, 296, 336] },
 ];
 export const LIPS_OUTER = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185];
-const LIPS_INNER_UP = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308];
-const LIPS_INNER_LO = [78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308];
-const NOSE = { tip: 1, base: 2, bridge: 6, l: 98, r: 327 };
+export const LIPS_INNER_UP = [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308];
+export const LIPS_INNER_LO = [78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308];
+export const NOSE = { tip: 1, base: 2, bridge: 6, l: 98, r: 327 };
 
-const mid = (a: Pt, b: Pt, t = 0.5): Pt => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
-const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
-const eyeWidth = (f: Face) => EYES.reduce((s, e) => s + dist(pt(f.lm, e.o), pt(f.lm, e.i)), 0) / 2;
-const mouthWidth = (f: Face) => dist(pt(f.lm, 61), pt(f.lm, 291));
+export const mid = (a: Pt, b: Pt, t = 0.5): Pt => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+export const dist = (a: Pt, b: Pt) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+export const eyeWidth = (f: Face) => EYES.reduce((s, e) => s + dist(pt(f.lm, e.o), pt(f.lm, e.i)), 0) / 2;
+export const mouthWidth = (f: Face) => dist(pt(f.lm, 61), pt(f.lm, 291));
 /** Inner-lip gap relative to mouth width: > ~0.08 is an open mouth (smile with teeth). */
 export const mouthOpenness = (f: Face) => dist(pt(f.lm, 13), pt(f.lm, 14)) / Math.max(mouthWidth(f), 1e-6);
 
-function eyeSocket(f: Face, o: Out) {
+export function eyeSocket(f: Face, o: Out) {
   for (const e of EYES) {
     const c = [...e.up, ...e.lo.slice(1, -1).reverse()], p = pts(f.lm, c);
     const cx = p.reduce((s, q) => s + q[0], 0) / p.length, cy = p.reduce((s, q) => s + q[1], 0) / p.length;
@@ -174,7 +174,7 @@ const nose: Variant[] = [
 ];
 
 /** Lens outline around c with axes u (along the eye, towards the nose) and v (down); roundness 0 = square, 1 = oval. */
-function lens(c: Pt, u: Pt, v: Pt, a: number, b: number, roundness: number): Pt[] {
+export function lens(c: Pt, u: Pt, v: Pt, a: number, b: number, roundness: number): Pt[] {
   const r = Math.min(a, b) * roundness, out: Pt[] = [];
   const corners: [number, number, number][] = [[a - r, b - r, 0], [-(a - r), b - r, 90], [-(a - r), -(b - r), 180], [a - r, -(b - r), 270]];
   for (const [ox, oy, start] of corners)

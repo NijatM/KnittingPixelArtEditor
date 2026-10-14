@@ -27,10 +27,13 @@ export interface Prepared {
   hairLum: number;    // median hair luminance 0..255 in the frame, -1 if there is no hair
   facialHair: number; // share of the lower face clearly darker than the cheeks (moustache / beard ≈ 0.6+)
   lm: Float32Array | null; // face points in grid coordinates
+  /** The work image (f × f pixels per cell): plain and contrast-enhanced grey + regions, for styles that measure below a cell. */
+  work: { f: number; w: number; h: number; gray: Uint8Array; tone: Uint8Array; seg: Uint8Array };
   ms: number;
 }
 
-export type StyleId = 'A' | 'B' | 'C' | 'D' | 'E';
+/** Gallery order is set in main.ts; the letters shown there follow that order. */
+export type StyleId = 'avatar' | 'poster' | 'line' | 'tone' | 'tonal' | 'ml';
 
 export interface Features {
   eyes: boolean;
@@ -49,7 +52,7 @@ export interface Look {
   hair: number;
   clothes: number;
   cleanup: number;
-  lineWeight: number; // style E: 1 = tuned, higher = more cells become line
+  lineWeight: number; // ML lines: 1 = tuned, higher = more cells become line
   hairMode: 'auto' | 'solid' | 'tone' | 'texture'; // auto = each style's own hair
   features: Features;
   stamps: Stamps;     // feature stamp per kind, 0 = auto

@@ -27,9 +27,9 @@ Pages source to "GitHub Actions" once).
 | Auto-framing from the face oval, tight↔wide, drag | `src/frame.ts` |
 | Crop → work image (≈10× grid) → grey, bilateral, CLAHE → grid tone + regions | `src/pipeline/prep.ts` |
 | Drawn features: stamps for eyes, brows, mouth, nose, glasses (+ jaw line) | `src/pipeline/stamps.ts`, `src/pipeline/features.ts` |
-| Styles A region poster · B line portrait · C tone patterns · D Atkinson tonal · E ML lines | `src/pipeline/styles.ts` |
-| Style E line model (Informative Drawings, ONNX Runtime Web, WebGPU or CPU) | `src/pipeline/ml.ts`, `scripts/convert-informative-drawings.py` |
-| Processing off the main thread in two workers (A–D instant, E model); prep and line map cached | `src/worker.ts` |
+| Styles A clean avatar · B region poster · C line portrait · D tone patterns · E Atkinson tonal · F ML lines (ids `avatar` … `ml`; the letter is the gallery position) | `src/pipeline/styles.ts`, `src/pipeline/avatar.ts` |
+| ML lines model (Informative Drawings, ONNX Runtime Web, WebGPU or CPU) | `src/pipeline/ml.ts`, `scripts/convert-informative-drawings.py` |
+| Processing off the main thread in two workers (instant styles, ML lines); prep and line map cached | `src/worker.ts` |
 | Edits layer, pencil / erase / fill / line, select (move / flip / mirror copy), mirror, undo, live / bake | `src/editor.ts` |
 | PNG · BMP (1/4/8/24-bit) · SVG export | `src/export.ts` |
 | Autosave of the last project (IndexedDB) | `src/store.ts` |

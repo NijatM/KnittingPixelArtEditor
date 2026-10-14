@@ -93,7 +93,7 @@ Selected row: `bg2` + `> ` prefix. Rows that aren't usable yet (no photo loaded)
 - **btn**: 1px `line2`; `.primary` = `hi` border + text (bake, export).
 - **check**: text toggle `[x] label` / `[ ] label`.
 - **stepper**: `‹ value ›`.
-- **tile** (gallery): HTMAA week-tile: `STYLE B ··· 88 MS`, pixel thumbnail, title, one-line description; selected = `hi` border; not-available = dashed + faint (e.g. `STYLE F · V2 · U²-Net`).
+- **tile** (gallery): HTMAA week-tile: `STYLE B ··· 88 MS`, pixel thumbnail, title, one-line description; selected = `hi` border; not-available = dashed + faint (e.g. `STYLE G · V2 · U²-Net`).
 - **empty / drop**: dashed `line2` box.
 - **explain**: hidden help text with a left rule, shown when `?` is on.
 - **okline / warn**: green/amber one-liners for detection results.
@@ -110,8 +110,8 @@ Selected row: `bg2` + `> ` prefix. Rows that aren't usable yet (no photo loaded)
 
 - **00 Photo**: drop zone (dashed, thumbnail, "drop · paste · choose file"); DETECTED rows: face, regions, glasses; okline timing.
 - **01 Frame**: RATIO seg 1:1 · 4:5 · 3:4 · 2:3 · free; CROP framing (tight↔wide), vertical; reset to auto.
-- **02 Grid**: SIZE seg 32 · 48 · 64 · 96 · 128; width, height bars; `[x] lock to frame ratio`; CELL aspect w:h (1.00).
-- **03 Style**: style list A–E (+ faint F v2) with ms; PARAMETERS threshold, line weight, cleanup (per style).
+- **02 Grid**: SIZE seg 32 · 50 · 64 · 96 · 128; width, height bars; `[x] lock to frame ratio`; CELL aspect w:h (1.00).
+- **03 Style**: style list A–F (A clean avatar first, + faint G v2) with ms; letters follow the order; PARAMETERS threshold, line weight, cleanup (per style).
 - **04 Regions**: SKIN density + even light; HAIR mode seg auto · solid · tone · texture + density + "measured" lightness (dark / medium / light); CLOTHES density.
 - **05 Features**: checks redraw eyes (auto), brows, mouth, nostrils, jaw line, silhouette; GLASSES status.
 - **06 Background**: seg white · black · pattern · photo; pattern density; `[x] outline the person`.
