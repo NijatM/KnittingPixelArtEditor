@@ -1,4 +1,5 @@
-// File exports, 1 cell = 1 pixel / unit. Cells are palette indices; the palette holds "#rrggbb" colours.
+// File exports, 1 cell = 1 pixel / unit, nothing else in the file (no margin, grid or labels). Cells are palette
+// indices; the palette holds "#rrggbb" colours and every pixel is opaque.
 export type BmpDepth = 1 | 4 | 8 | 24;
 
 const rgb = (h: string) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
@@ -34,6 +35,54 @@ export function encodeBmp(cells: Uint8Array, W: number, H: number, palette: stri
   return new Blob([buf], { type: 'image/bmp' });
 }
 
+// ---------------------------------------------------------------- PNG
+const CRC = new Uint32Array(256).map((_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+
+function chunk(type: string, data: Uint8Array): Uint8Array<ArrayBuffer> {
+  const c = new Uint8Array(12 + data.length), v = new DataView(c.buffer);
+  v.setUint32(0, data.length);
+  for (let i = 0; i < 4; i++) c[4 + i] = type.charCodeAt(i);
+  c.set(data, 8);
+  let crc = ~0;
+  for (let i = 4; i < 8 + data.length; i++) crc = CRC[(crc ^ c[i]) & 255] ^ (crc >>> 8);
+  v.setUint32(8 + data.length, ~crc >>> 0);
+  return c;
+}
+
+/** zlib stream of stored (uncompressed) deflate blocks: pixel-art rows are tiny, and it needs no async compressor. */
+function zlibStored(data: Uint8Array): Uint8Array<ArrayBuffer> {
+  const blocks = Math.max(1, Math.ceil(data.length / 65535)), out = new Uint8Array(2 + blocks * 5 + data.length + 4);
+  out[0] = 0x78; out[1] = 0x01;
+  let o = 2;
+  for (let b = 0; b < blocks; b++) {
+    const s = b * 65535, n = Math.min(65535, data.length - s);
+    out.set([b === blocks - 1 ? 1 : 0, n & 255, n >> 8, ~n & 255, (~n >> 8) & 255], o);
+    out.set(data.subarray(s, s + n), o + 5);
+    o += 5 + n;
+  }
+  let a = 1, d = 0;
+  for (const x of data) { a = (a + x) % 65521; d = (d + a) % 65521; }
+  new DataView(out.buffer).setUint32(o, ((d << 16) | a) >>> 0);
+  return out;
+}
+
+/** Indexed PNG at the smallest bit depth that holds the palette — 1-bit for two colours — opaque (no tRNS). */
+export function encodePng(cells: Uint8Array, W: number, H: number, palette: string[]): Blob {
+  const depth = ([1, 2, 4, 8] as const).find(d => palette.length <= 2 ** d) ?? 8, rowBytes = Math.ceil(W * depth / 8);
+  const raw = new Uint8Array((rowBytes + 1) * H); // each row: filter 0 (none) + packed indices, high bits first
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const bit = x * depth;
+      raw[y * (rowBytes + 1) + 1 + (bit >> 3)] |= cells[y * W + x] << (8 - depth - (bit & 7));
+    }
+  const ihdr = new Uint8Array(13), v = new DataView(ihdr.buffer);
+  v.setUint32(0, W); v.setUint32(4, H); ihdr.set([depth, 3, 0, 0, 0], 8); // colour type 3 = indexed
+  const plte = new Uint8Array(palette.flatMap(rgb));
+  const sig = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+  return new Blob([sig, chunk('IHDR', ihdr), chunk('PLTE', plte), chunk('IDAT', zlibStored(raw)), chunk('IEND', new Uint8Array(0))], { type: 'image/png' });
+}
+
+// ---------------------------------------------------------------- SVG
 /** SVG: one path per colour, horizontal runs of cells merged; cell width = cell aspect (w:h), height 1. */
 export function encodeSvg(cells: Uint8Array, W: number, H: number, palette: string[], cellAspect: number): Blob {
   const a = +cellAspect.toFixed(4), paths = palette.map(() => [] as string[]);

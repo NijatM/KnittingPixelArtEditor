@@ -31,7 +31,7 @@ Pages source to "GitHub Actions" once).
 | ML lines model (Informative Drawings, ONNX Runtime Web, WebGPU or CPU) | `src/pipeline/ml.ts`, `scripts/convert-informative-drawings.py` |
 | Processing off the main thread in two workers (instant styles, ML lines); prep and line map cached | `src/worker.ts` |
 | Edits layer, pencil / erase / fill / line, select (move / flip / mirror copy), mirror, undo, live / bake | `src/editor.ts` |
-| PNG · BMP (1/4/8/24-bit) · SVG export | `src/export.ts` |
+| PNG (1-bit indexed) · BMP (1/4/8/24-bit) · SVG export of the final composite, opaque, no margin | `src/export.ts` |
 | Autosave of the last project (IndexedDB) | `src/store.ts` |
 | UI (nav / stage / inspector) | `index.html`, `src/main.ts`, `src/style.css`, `src/ui/` |
 

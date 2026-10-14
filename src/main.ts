@@ -4,7 +4,7 @@ import '@fontsource/ibm-plex-mono/600.css';
 import './style.css';
 import { detect, loadDetectors } from './detect';
 import { Editor, type Behind, type Tool } from './editor';
-import { download, encodeBmp, encodeSvg, depthFits, smallestDepth, type BmpDepth } from './export';
+import { download, encodeBmp, encodePng, encodeSvg, depthFits, smallestDepth, type BmpDepth } from './export';
 import * as store from './store';
 import { AUTO_FRAME, computeCrop, type FrameParams } from './frame';
 import { decodeImage, wireImport } from './importer';
@@ -34,7 +34,10 @@ const letter = (i: number) => String.fromCharCode(65 + i);
 /** Saved projects from before the avatar style named styles by their old letters. */
 const OLD_IDS: Record<string, StyleId> = { A: 'poster', B: 'line', C: 'tone', D: 'tonal', E: 'ml' };
 const RATIOS: Record<string, [number, number]> = { '1:1': [1, 1], '4:5': [4, 5], '3:4': [3, 4], '2:3': [2, 3] };
-const DEFAULT_PAL = ['#0b0b0b', '#f4f4f4'];
+// Binary black and white: what the editor shows is what the files hold (1-bit PNG / BMP of pure #000 and #fff).
+const DEFAULT_PAL = ['#000000', '#ffffff'];
+/** The earlier screen-tinted default; projects saved with it move to pure black and white. */
+const OLD_PAL = ['#0b0b0b', '#f4f4f4'];
 const DEFAULT_FEATURES: Features = { eyes: true, brows: true, mouth: true, nostrils: true, jaw: true, silhouette: true, glasses: false };
 const REGION_NAMES: [number, string][] = [[SEG.HAIR, 'hair'], [SEG.FACE, 'skin'], [SEG.CLOTHES, 'clothes'], [SEG.OTHER, 'accessories']];
 
@@ -88,11 +91,16 @@ function editable() {
   const r = S.res.get(S.style);
   return r && r.W === S.ed.W && r.H === S.ed.H ? r : null;
 }
-/** What the grid shows and exports: edits over the frozen or live base. */
-function shown(): { cells: Uint8Array; W: number; H: number } | null {
+/** The editor's final composite (edits, lifted pixels, over the frozen or live base): exactly what export writes. */
+function final(): { cells: Uint8Array; W: number; H: number } | null {
   const r = editable();
   if (r) return { cells: S.ed.composite(r.cells), W: r.W, H: r.H };
-  if (S.ed.baked) return { cells: S.ed.composite(S.ed.baked), W: S.ed.W, H: S.ed.H };
+  return S.ed.baked ? { cells: S.ed.composite(S.ed.baked), W: S.ed.W, H: S.ed.H } : null;
+}
+/** What the grid shows: the final composite, or the style alone for the moment it lags a grid change. */
+function shown(): { cells: Uint8Array; W: number; H: number } | null {
+  const f = final();
+  if (f) return f;
   const any = S.res.get(S.style);
   return any ? { cells: any.cells, W: any.W, H: any.H } : null;
 }
@@ -250,7 +258,8 @@ function startPhoto(id: number, name: string, canvas: HTMLCanvasElement, det: { 
 const settings = () => ({ frame: S.frame, ratio: S.ratio, W: S.W, H: S.H, lock: S.lock, cellAspect: S.cellAspect, look: S.look, style: S.style, pal: S.pal, fmt: S.fmt, depth: S.depth });
 function applySettings(v: Record<string, unknown>) {
   const s = v as ReturnType<typeof settings>;
-  Object.assign(S, { frame: { ...AUTO_FRAME, ...s.frame }, ratio: s.ratio, W: s.W, H: s.H, lock: s.lock, cellAspect: s.cellAspect, style: OLD_IDS[s.style] ?? s.style, pal: s.pal, fmt: s.fmt ?? 'png', depth: s.depth ?? 1 });
+  const pal = s.pal.map(c => { const k = OLD_PAL.indexOf(c); return k >= 0 && s.pal.every(q => OLD_PAL.includes(q)) ? DEFAULT_PAL[k] : c; });
+  Object.assign(S, { frame: { ...AUTO_FRAME, ...s.frame }, ratio: s.ratio, W: s.W, H: s.H, lock: s.lock, cellAspect: s.cellAspect, style: OLD_IDS[s.style] ?? s.style, pal, fmt: s.fmt ?? 'png', depth: s.depth ?? 1 });
   S.look = { ...S.look, ...s.look, features: { ...S.look.features, ...s.look.features } };
 }
 let saveTimer = 0, storeWarned = false;
@@ -619,9 +628,9 @@ $$<HTMLInputElement>('[data-hex]').forEach(i => (i.onchange = () => { const v = 
 $('#swap').onclick = () => { S.pal.reverse(); paintGallery(); refresh(); };
 $('#resetpal').onclick = () => { S.pal = [...DEFAULT_PAL]; paintGallery(); refresh(); };
 
-// export (PNG now; BMP and SVG come with the export step)
+// export: the final composite only, 1 px (or SVG unit) per cell, opaque palette colours, no margin or overlays
 $('#exportbtn').onclick = () => {
-  const r = shown();
+  const r = final();
   if (!r) { log(S.photo ? '> this style is still rendering' : '> nothing to export yet · load a portrait first'); return; }
   const name = (($('#exportname') as HTMLInputElement).value.trim() || exportBase()).replace(/\.(png|bmp|svg)$/i, '') + '.' + S.fmt;
   const done = (b: Blob, what: string) => { download(b, name); log(`> exported ${name} · ${what}`); };
@@ -631,9 +640,7 @@ $('#exportbtn').onclick = () => {
   } else if (S.fmt === 'svg') {
     done(encodeSvg(r.cells, r.W, r.H, S.pal, S.cellAspect), `${r.W}×${r.H} cells as paths`);
   } else {
-    const c = document.createElement('canvas');
-    paintCells(c, r.cells, r.W, r.H);
-    c.toBlob(b => { if (b) done(b, `${r.W}×${r.H} px, 1 px per stitch`); }, 'image/png');
+    done(encodePng(r.cells, r.W, r.H, S.pal), `${r.W}×${r.H} px, ${S.pal.length <= 2 ? '1-bit' : 'indexed'}, 1 px per stitch`);
   }
 };
 seg($('#fmtseg'), b => { S.fmt = b.dataset.fmt as typeof S.fmt; refresh(); });

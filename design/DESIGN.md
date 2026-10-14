@@ -38,7 +38,7 @@ No course name and no week number anywhere.
 
 Type: IBM Plex Mono 400/500/600 (self-host the TTFs in the app, as SubdivisionEngine does). Body 13px/1.45; labels 11px, letter-spacing .14em, uppercase; panel title 21px/500; name 15px/600. Border radius is always 0.
 
-Portrait palette defaults: ink `#0b0b0b`, paper `#f4f4f4` (user-editable; exports use exactly these).
+Portrait palette defaults: ink `#000000`, paper `#ffffff` — binary black and white (user-editable; exports use exactly these, 1-bit).
 
 ## Layout
 
