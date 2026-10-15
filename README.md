@@ -41,3 +41,7 @@ Planning and research: `SPEC.md`, `design/DESIGN.md`, `RESEARCH.md`, `HANDOFF.md
 ## License
 
 Code: MIT (`LICENSE`). Models and other third-party files keep their own licenses — see `MODELS.md`.
+
+## AI usage
+
+Made by NijatM with Claude Code CLI (version 2.1.289), using the Claude Opus 5.5 model at xhigh effort.
