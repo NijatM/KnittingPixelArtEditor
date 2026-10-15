@@ -6,7 +6,7 @@ import { detect, loadDetectors } from './detect';
 import { Editor, type Behind, type Tool } from './editor';
 import { download, encodeBmp, encodePng, encodeSvg, depthFits, smallestDepth, type BmpDepth } from './export';
 import * as store from './store';
-import { AUTO_FRAME, computeCrop, type FrameParams } from './frame';
+import { AUTO_FRAME, computeCrop, headBox, type FrameParams, type Head } from './frame';
 import { decodeImage, loadImage, photoCanvas, wireImport } from './importer';
 import { pixelArtOf, type PixelArt } from './pixelart';
 import { GLASSES_MIN_SHARE, glassesShare } from './pipeline/glasses';
@@ -54,6 +54,7 @@ interface Photo {
   name: string;
   canvas: HTMLCanvasElement;
   lm: Float32Array | null;
+  head: Head | null; // hair + face extent, for the auto frame
   regions: string[];
   glasses: number; // share of accessories in the eye box, -1 if unknown
   ms: number;
@@ -86,7 +87,7 @@ const S = {
 };
 
 const aspect = () => S.H / (S.W * S.cellAspect); // physical frame height / width
-const crop = (): Crop | null => S.photo && computeCrop(S.photo.canvas.width, S.photo.canvas.height, S.photo.lm, aspect(), S.frame);
+const crop = (): Crop | null => S.photo && computeCrop(S.photo.canvas.width, S.photo.canvas.height, S.photo.lm, aspect(), S.frame, S.photo.head);
 const styleInfo = (k: StyleId) => STYLES.find(s => s.k === k)!;
 
 /** The selected style's result when it matches the edit grid (results can lag a grid change briefly). */
@@ -326,7 +327,7 @@ function startPhoto(id: number, name: string, canvas: HTMLCanvasElement, det: { 
     for (const [k, label] of REGION_NAMES) if (n[k] > w * h * 0.003) regions.push(label);
   }
   if (DEBUG) Object.assign(window, { __kpaeDebug: { w, h, rgba: rgba.slice(), seg: det.seg?.slice() ?? null, lm: det.lm } });
-  S.photo = { kind: 'photo', id, name, canvas, lm: det.lm, regions, glasses, ms: det.ms };
+  S.photo = { kind: 'photo', id, name, canvas, lm: det.lm, head: det.lm && det.seg ? headBox(det.seg, w, h, det.lm) : null, regions, glasses, ms: det.ms };
   S.res.clear();
   S.lenses = null;
   S.mlNote = '';
@@ -365,7 +366,7 @@ const ratioOf = (w: number, h: number) => Object.entries(RATIOS).find(([, [a, b]
 function startPixels(id: number, name: string, art: PixelArt, restore: store.SavedState | null, fromStore = false) {
   const canvas = document.createElement('canvas');
   paintCells(canvas, art.cells, art.W, art.H, art.palette);
-  S.photo = { kind: 'pixels', id, name, canvas, lm: null, regions: [], glasses: -1, ms: 0 };
+  S.photo = { kind: 'pixels', id, name, canvas, lm: null, head: null, regions: [], glasses: -1, ms: 0 };
   S.res.clear();
   S.lenses = null;
   S.mlNote = '';

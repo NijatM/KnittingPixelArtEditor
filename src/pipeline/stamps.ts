@@ -61,9 +61,13 @@ const arc = (a: Pt, b: Pt, bow: number, n = 12): Pt[] => Array.from({ length: n 
 
 // ---------------------------------------------------------------- variants
 type Draw = (f: Face, o: Out) => void;
-/** hidden: drawn by a style's "auto" (photo-traced shapes) but not offered in the panel. */
-export interface Variant { name: string; draw: Draw; hidden?: boolean }
+/**
+ * hidden: drawn by a style's "auto" (photo-traced shapes) but not offered in the panel.
+ * oneSided: a design that differs left and right on purpose (a wink, an "L" nose) — never mirrored.
+ */
+export interface Variant { name: string; draw: Draw; hidden?: boolean; oneSided?: boolean }
 const v = (name: string, draw: Draw, hidden = false): Variant => ({ name, draw, hidden });
+const one = (x: Variant): Variant => ({ ...x, oneSided: true });
 
 // eyes ---------------------------------------------------------------------------------------------
 export function eyeSocket(f: Face, o: Out) {
@@ -94,6 +98,14 @@ const eyes: Variant[] = [
     const [x, y] = pt(f.lm, e.o), dx = Math.sign(x - pt(f.lm, e.i)[0]);
     line(o.ink, f.W, f.H, l[0], [x + dx * 0.6, y - 1.2]);
   })),
+  v('almond', eachEye((f, o, e) => { // the team's eye: a crease, a lid row corner to corner, under it the corners and the pupil
+    const [x, y] = pt(f.lm, e.c), ox = pt(f.lm, e.o)[0], ix = pt(f.lm, e.i)[0], s = pupilSize(f);
+    const x0 = Math.round(Math.min(ox, ix)), x1 = Math.round(Math.max(ox, ix)) - 1, top = Math.round(y - 0.5) - 1;
+    for (let cx = x0; cx <= x1; cx++) set(o.ink, f, cx, top);
+    block(o.ink, f, [x, top - 0.5], Math.max(2, s), 1);
+    set(o.ink, f, x0, top + 1); set(o.ink, f, x1, top + 1);
+    block(o.ink, f, [x, top + 1 + s / 2], s, s > 1 ? s - 1 : 1);
+  })),
   v('dashes', eachEye((f, o, e) => { const a = mid(pt(f.lm, e.o), pt(f.lm, e.i), 0.12), b = mid(pt(f.lm, e.o), pt(f.lm, e.i), 0.88), y = eyeLine(f, e); line(o.ink, f.W, f.H, [a[0], y], [b[0], y]); })),
   v('happy', eachEye((f, o, e) => { // closed, smiling: ∩
     const y = eyeLine(f, e) + 0.4, a = mid(pt(f.lm, e.o), pt(f.lm, e.i), 0.08), b = mid(pt(f.lm, e.o), pt(f.lm, e.i), 0.92);
@@ -109,13 +121,13 @@ const eyes: Variant[] = [
     const a = mid(pt(f.lm, e.o), pt(f.lm, e.i), 0.12), b = mid(pt(f.lm, e.o), pt(f.lm, e.i), 0.88), y = eyeLine(f, e), dx = Math.sign(a[0] - b[0]);
     line(o.ink, f.W, f.H, [a[0], y], [b[0], y]); line(o.ink, f.W, f.H, [a[0] + dx, y - 1], [a[0] + dx, y - 1]);
   })),
-  v('glance left', eachEye((f, o, e) => { const [x, y] = pt(f.lm, e.c); block(o.ink, f, [x - Math.max(1, eyeWidth(f) * 0.2), y], pupilSize(f)); })),
-  v('glance right', eachEye((f, o, e) => { const [x, y] = pt(f.lm, e.c); block(o.ink, f, [x + Math.max(1, eyeWidth(f) * 0.2), y], pupilSize(f)); })),
-  v('wink', eachEye((f, o, e, left) => { // the picture's left eye open, the right one closed and smiling
+  one(v('glance left', eachEye((f, o, e) => { const [x, y] = pt(f.lm, e.c); block(o.ink, f, [x - Math.max(1, eyeWidth(f) * 0.2), y], pupilSize(f)); }))),
+  one(v('glance right', eachEye((f, o, e) => { const [x, y] = pt(f.lm, e.c); block(o.ink, f, [x + Math.max(1, eyeWidth(f) * 0.2), y], pupilSize(f)); }))),
+  one(v('wink', eachEye((f, o, e, left) => { // the picture's left eye open, the right one closed and smiling
     if (left) { block(o.ink, f, pt(f.lm, e.c), pupilSize(f)); return; }
     const y = eyeLine(f, e) + 0.4, a = mid(pt(f.lm, e.o), pt(f.lm, e.i), 0.08), b = mid(pt(f.lm, e.o), pt(f.lm, e.i), 0.92);
     polyline(o.ink, f.W, f.H, arc([a[0], y], [b[0], y], -Math.max(0.9, eyeWidth(f) * 0.22)));
-  })),
+  }))),
   v('traced', eachEye((f, o, e) => { polyline(o.ink, f.W, f.H, pts(f.lm, e.up)); const [x, y] = pt(f.lm, e.c); disk(o.ink, f.W, f.H, x, y, Math.max(irisRadius(f, e), 0.75)); }), true),
 ];
 
@@ -197,7 +209,7 @@ const mouth: Variant[] = [
   v('open', mouthDraw(openMouth)),
   v('grin', mouthDraw((f, o) => grin(f, o, false))),
   v('laugh', mouthDraw((f, o) => grin(f, o, true))),
-  v('smirk', mouthDraw((f, o) => { const [l, r] = corners(f), y = mouthY(f); polyline(o.ink, f.W, f.H, [[mid(l, r, 0.15)[0], y], [mid(l, r, 0.65)[0], y], [mid(l, r, 0.92)[0], y - 1.2]]); })),
+  one(v('smirk', mouthDraw((f, o) => { const [l, r] = corners(f), y = mouthY(f); polyline(o.ink, f.W, f.H, [[mid(l, r, 0.15)[0], y], [mid(l, r, 0.65)[0], y], [mid(l, r, 0.92)[0], y - 1.2]]); }))),
   v('flat smile', mouthDraw((f, o) => { // straight in the middle, the last fifth curving up
     const [l, r] = corners(f), y = mouthY(f), a = mid(l, r, 0.08)[0], b = mid(l, r, 0.92)[0], w = b - a;
     polyline(o.ink, f.W, f.H, [[a, y - 1], [a + w * 0.18, y], [b - w * 0.18, y], [b, y - 1]]);
@@ -222,20 +234,20 @@ const ell = (side: number, top = 0.55): Draw => (f, o) => {
   line(o.ink, f.W, f.H, foot, [mid(foot, s, 0.7)[0], foot[1]]);
 };
 const nose: Variant[] = [
-  v('L', ell(-1)),
-  v('J', ell(1)),
-  v('short L', ell(-1, 0.85)),
-  v('short J', ell(1, 0.85)),
+  one(v('L', ell(-1))),
+  one(v('J', ell(1))),
+  one(v('short L', ell(-1, 0.85))),
+  one(v('short J', ell(1, 0.85))),
   v('dot', (f, o) => { const [x, y] = pt(f.lm, NOSE.base); set(o.ink, f, Math.floor(x), Math.floor(y)); }),
   v('nostrils', (f, o) => { for (const s of [NOSE.l, NOSE.r]) { const [x, y] = mid(pt(f.lm, s), pt(f.lm, NOSE.base), 0.4); set(o.ink, f, Math.floor(x), Math.floor(y)); } }),
   v('base', (f, o) => { const { l, r, s } = nosePts(f); line(o.ink, f.W, f.H, [mid(l, r, 0.3)[0], s[1]], [mid(l, r, 0.7)[0], s[1]]); }),
   v('bridge', (f, o) => { const { b, t, l, s } = nosePts(f), x = mid(l, t, 0.35)[0]; line(o.ink, f.W, f.H, [x, mid(b, t, 0.25)[1]], [x, s[1] - 0.3]); }),
   v('v', (f, o) => { const [x, y] = pt(f.lm, NOSE.base); set(o.ink, f, Math.floor(x) - 1, Math.floor(y) - 1); set(o.ink, f, Math.floor(x), Math.floor(y)); set(o.ink, f, Math.floor(x) + 1, Math.floor(y) - 1); }),
-  v('slash', (f, o) => { const { t, l, s: b } = nosePts(f); line(o.ink, f.W, f.H, [mid(l, t, 0.5)[0] + 0.5, t[1] - 1.2], [mid(l, t, 0.5)[0] - 0.6, b[1] - 0.2]); }),
-  v('curve', (f, o) => { // the side of the nostril as a small "("
+  one(v('slash', (f, o) => { const { t, l, s: b } = nosePts(f); line(o.ink, f.W, f.H, [mid(l, t, 0.5)[0] + 0.5, t[1] - 1.2], [mid(l, t, 0.5)[0] - 0.6, b[1] - 0.2]); })),
+  one(v('curve', (f, o) => { // the side of the nostril as a small "("
     const { t, l, s: b } = nosePts(f), x = mid(l, t, 0.45)[0];
     polyline(o.ink, f.W, f.H, [[x + 0.6, t[1] - 1], [x - 0.4, (t[1] + b[1]) / 2], [x + 0.6, b[1] + 0.2]]);
-  }),
+  })),
 ];
 
 // glasses --------------------------------------------------------------------------------------------
@@ -351,39 +363,107 @@ function separate(f: Face, mouthInk: Mask, o: Out) {
 
 export interface Drawn extends Out { mouth: Mask }
 
+// ---------------------------------------------------------------- symmetry (the avatar's clean base)
+// Mirror pairs among the feature points: MediaPipe's two halves, listed in the same order on both sides.
+const PAIRS: [number, number][] = [
+  ...EYES[0].up.map((k, j): [number, number] => [k, EYES[1].up[j]]), ...EYES[0].lo.map((k, j): [number, number] => [k, EYES[1].lo[j]]),
+  [468, 473],
+  ...BROWS[0].lo.map((k, j): [number, number] => [k, BROWS[1].lo[j]]), ...BROWS[0].up.map((k, j): [number, number] => [k, BROWS[1].up[j]]),
+  [61, 291], [146, 375], [91, 321], [181, 405], [84, 314], [37, 267], [39, 269], [40, 270], [185, 409],
+  [78, 308], [191, 415], [80, 310], [81, 311], [82, 312], [95, 324], [88, 318], [178, 402], [87, 317], [98, 327],
+];
+const CENTRE = [0, 13, 14, 17, 1, 2, 6, 152];
+
+/** Eyes at least this wide (cells) in the avatar: small faces get their features drawn larger, like the team's portraits. */
+const MIN_EYE = 5;
+
 /**
- * Draw the enabled features: the chosen variant per feature, or what `auto` names ('' = nothing). Brows first,
- * then eyes (their sockets cleared before anything is inked), glasses, mouth, nose. Glasses rims stay continuous:
- * a brow that would touch a rim moves up (up to three rows) to sit just above it, as in the team's portraits, and
- * is left out only when there is no room.
+ * The face made symmetric for drawing: turned upright (eye line level), then every mirror pair of feature points
+ * moved to the average of the two sides about a vertical axis through the face, snapped to a half cell so the
+ * grid mirrors exactly (cell x ↔ axis2 − 1 − x). On small grids the eyes (with their brows) and the mouth are
+ * scaled up about their own centres until the eyes are MIN_EYE cells wide (at most 1.35×), so they read the way
+ * the team draws them. Measured lenses are evened out the same way.
  */
-export function drawStamps(f: Face, enabled: Record<StampKind, boolean>, chosen: Stamps, auto: (kind: StampKind) => string, facialHair = false): Drawn {
-  const n = f.W * f.H, o: Drawn = { clear: new Uint8Array(n), ink: new Uint8Array(n), brow: new Uint8Array(n), mouth: new Uint8Array(n) };
-  const rims = new Uint8Array(n);
+export function symmetricFace(f: Face): { face: Face; axis2: number } {
+  const lm = Float32Array.from(f.lm), [lx, ly] = pt(f.lm, 468), [rx, ry] = pt(f.lm, 473);
+  const ox = (lx + rx) / 2, oy = (ly + ry) / 2, a = -Math.atan2(ry - ly, rx - lx), cos = Math.cos(a), sin = Math.sin(a);
+  for (let i = 0; i < lm.length; i += 2) {
+    const x = f.lm[i] - ox, y = f.lm[i + 1] - oy;
+    lm[i] = ox + x * cos - y * sin; lm[i + 1] = oy + x * sin + y * cos;
+  }
+  const mx = (k: number) => lm[2 * k];
+  const cx = ((mx(468) + mx(473)) / 2 + (mx(61) + mx(291)) / 2) / 2, axis2 = Math.round(2 * cx), c = axis2 / 2;
+  for (const [l, r] of PAIRS) {
+    const d = (lm[2 * r] - lm[2 * l]) / 2, y = (lm[2 * l + 1] + lm[2 * r + 1]) / 2;
+    lm[2 * l] = c - d; lm[2 * r] = c + d; lm[2 * l + 1] = lm[2 * r + 1] = y;
+  }
+  for (const k of CENTRE) lm[2 * k] = c;
+  // Iris rings: round, the average size of the two, around each (now symmetric) centre.
+  const ir = (dist(pt(f.lm, 469), pt(f.lm, 471)) + dist(pt(f.lm, 474), pt(f.lm, 476))) / 4;
+  for (const [ci, ring] of [[468, [469, 470, 471, 472]], [473, [474, 475, 476, 477]]] as const)
+    ring.forEach((k, j) => { const t = j * Math.PI / 2; lm[2 * k] = lm[2 * ci] + ir * Math.cos(t); lm[2 * k + 1] = lm[2 * ci + 1] - ir * Math.sin(t); });
+  // Emphasis on small grids.
+  const ew = eyeWidth({ ...f, lm }), k = Math.min(1.35, Math.max(1, MIN_EYE / Math.max(ew, 1e-6)));
+  if (k > 1) {
+    const grow = (idx: number[], [cx0, cy0]: Pt, g: number) => { for (const i of idx) { lm[2 * i] = cx0 + (lm[2 * i] - cx0) * g; lm[2 * i + 1] = cy0 + (lm[2 * i + 1] - cy0) * g; } };
+    EYES.forEach((e, j) => grow([...new Set([...e.up, ...e.lo, e.c, e.a, e.b, ...[469, 470, 471, 472].map(i => i + 5 * j), ...BROWS[j].lo, ...BROWS[j].up])], pt(lm, e.c), k));
+    const mc = mid(pt(lm, 61), pt(lm, 291));
+    grow([...new Set([...LIPS_OUTER, ...LIPS_INNER_UP, ...LIPS_INNER_LO])], mc, Math.min(1.2, k));
+  }
+  let lenses = f.lenses;
+  if (lenses) {
+    const [p, q] = lenses, d = (q.c[0] - p.c[0]) / 2, y = (p.c[1] + q.c[1]) / 2, A = (p.a + q.a) / 2, B = (p.b + q.b) / 2;
+    lenses = [{ ...p, c: [c - d, y], a: A, b: B }, { ...q, c: [c + d, y], a: A, b: B }];
+  }
+  return { face: { ...f, lm, lenses }, axis2 };
+}
+
+/** Copy the left half of a mask onto the right across the axis (cell x ↔ axis2 − 1 − x). */
+export function mirrorLeft(m: Mask, W: number, H: number, axis2: number) {
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const xm = axis2 - 1 - x;
+      if (xm > x && xm < W) m[y * W + xm] = m[y * W + x];
+      else if (xm > x) continue;
+      else if (xm < 0) m[y * W + x] = 0; // right of the axis with no left partner on the grid
+    }
+}
+
+/**
+ * Draw the enabled features: the chosen variant per feature, or what `auto` names ('' = nothing). Each feature
+ * draws on its own layer: eyes clear their sockets, glasses their lenses (only when the eyes are redrawn). Glasses
+ * rims stay continuous: a brow that would touch a rim moves up (up to three rows) to sit just above it, as in the
+ * team's portraits, and is left out only when there is no room. With `axis2`, every feature is mirrored left to
+ * right — exactly symmetric — except one-sided designs (a wink, a smirk, an "L" nose), which keep their shape.
+ */
+export function drawStamps(f: Face, enabled: Record<StampKind, boolean>, chosen: Stamps, auto: (kind: StampKind) => string, facialHair = false, axis2?: number): Drawn {
+  const n = f.W * f.H, part: Partial<Record<StampKind, Out>> = {};
   for (const kind of ['brows', 'eyes', 'glasses', 'mouth', 'nose'] as StampKind[]) {
     if (!enabled[kind]) continue;
     const x = variant(kind, chosen[kind]) ?? variant(kind, auto(kind));
     if (!x) continue;
-    if (kind === 'glasses') { // without redrawn eyes, keep the photo's eyes inside the lenses
-      x.draw(f, { clear: enabled.eyes ? o.clear : new Uint8Array(n), ink: rims, brow: o.brow });
-      for (let i = 0; i < n; i++) o.ink[i] |= rims[i];
-    } else if (kind === 'mouth') {
-      x.draw(f, { clear: o.clear, ink: o.mouth, brow: o.brow });
-      for (let i = 0; i < n; i++) o.ink[i] |= o.mouth[i];
-    } else x.draw(f, o);
+    const o: Out = { clear: new Uint8Array(n), ink: new Uint8Array(n), brow: new Uint8Array(n) };
+    x.draw(f, o);
+    if (kind === 'glasses' && !enabled.eyes) o.clear.fill(0); // keep the photo's eyes inside the lenses
+    part[kind] = o;
   }
-  if (rims.some(Boolean)) {
+  const rims = part.glasses?.ink, brow = part.brows?.brow;
+  if (rims && brow) {
     const near = dilate(rims, f.W, f.H), cx = (pt(f.lm, EYES[0].c)[0] + pt(f.lm, EYES[1].c)[0]) / 2;
     for (const left of [true, false]) {
       const cells: number[] = [];
-      for (let i = 0; i < n; i++) if (o.brow[i] && (i % f.W < cx) === left) cells.push(i);
+      for (let i = 0; i < n; i++) if (brow[i] && (i % f.W < cx) === left) cells.push(i);
       const lift = [0, 1, 2, 3].find(k => cells.every(i => i - k * f.W >= 0 && !near[i - k * f.W]));
-      for (const i of cells) o.brow[i] = 0;
-      if (lift !== undefined) for (const i of cells) o.brow[i - lift * f.W] = 1;
+      for (const i of cells) brow[i] = 0;
+      if (lift !== undefined) for (const i of cells) brow[i - lift * f.W] = 1;
     }
   }
+  if (axis2 !== undefined)
+    for (const [kind, o] of Object.entries(part) as [StampKind, Out][])
+      if (!(variant(kind, chosen[kind]) ?? variant(kind, auto(kind)))?.oneSided) for (const m of [o.clear, o.ink, o.brow]) mirrorLeft(m, f.W, f.H, axis2);
+  const o: Drawn = { clear: new Uint8Array(n), ink: new Uint8Array(n), brow: brow ?? new Uint8Array(n), mouth: part.mouth?.ink ?? new Uint8Array(n) };
+  for (const p of Object.values(part)) for (let i = 0; i < n; i++) { o.clear[i] |= p.clear[i]; o.ink[i] |= p.ink[i] | p.brow[i]; }
   if (facialHair) separate(f, o.mouth, o);
-  for (let i = 0; i < n; i++) o.ink[i] |= o.brow[i];
   return o;
 }
 

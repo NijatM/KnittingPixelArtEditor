@@ -279,6 +279,8 @@ export function prepare(src: Source, crop: Crop, W: number, H: number): Prepared
     gray[i] = Math.round(0.299 * rgb[i * 3] + 0.587 * rgb[i * 3 + 1] + 0.114 * rgb[i * 3 + 2]);
   const pg = clahe(bilateral(gray, ww, wh), ww, wh);
   const strands = darkLines(pg, ww, wh);
+  // Bright ridges at the scale of a strand: a third of a cell blur minus a 0.9-cell blur of the tone.
+  const pf = Float32Array.from(pg, v => v / 255), nb = blur(pf, ww, wh, 0.35 * f), wb = blur(pf, ww, wh, 0.9 * f);
 
   // Measured hair lightness: median luminance of the hair pixels before any contrast work (-1 = no hair).
   const hist = new Int32Array(256);
@@ -289,18 +291,19 @@ export function prepare(src: Source, crop: Crop, W: number, H: number): Prepared
 
   // Grid resolution: tone = block mean (background whitened, and kept), region = block majority.
   const ps = new Float32Array(W * H), bgps = new Float32Array(W * H), segs = new Uint8Array(W * H), acc = new Uint8Array(W * H);
-  const lines = new Float32Array(W * H);
+  const lines = new Float32Array(W * H), ridge = new Float32Array(W * H);
   const votes = new Int32Array(6);
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
-      let s = 0, sb = 0, sl = 0; votes.fill(0);
+      let s = 0, sb = 0, sl = 0, sr = 0; votes.fill(0);
       for (let j = 0; j < f; j++)
         for (let i = 0; i < f; i++) {
           const o = (y * f + j) * ww + x * f + i;
-          s += seg[o] === SEG.BG ? 255 : pg[o]; sb += pg[o]; sl += strands[o]; votes[seg[o]]++;
+          s += seg[o] === SEG.BG ? 255 : pg[o]; sb += pg[o]; sl += strands[o]; sr += nb[o] - wb[o]; votes[seg[o]]++;
         }
       ps[y * W + x] = s / (f * f);
       lines[y * W + x] = sl / (f * f);
+      ridge[y * W + x] = sr / (f * f);
       bgps[y * W + x] = sb / (f * f);
       let best = 0; for (let k = 1; k < 6; k++) if (votes[k] > votes[best]) best = k;
       segs[y * W + x] = best;
@@ -311,5 +314,5 @@ export function prepare(src: Source, crop: Crop, W: number, H: number): Prepared
   const lmWork = src.lm ? scaleLm(src.lm, crop, ww / crop.w, wh / crop.h) : null;
   const facialHair = lmWork ? facialHairShare(pg, seg, ww, wh, lmWork) : 0;
   const lenses = lmWork ? measureLenses(seg, ww, wh, lmWork)?.map(l => ({ ...l, c: [l.c[0] / f, l.c[1] / f] as Pt, a: l.a / f, b: l.b / f })) ?? null : null;
-  return { W, H, ps, bgps, segs, acc, lines, hairLum, facialHair, lm, lenses, work: { f, w: ww, h: wh, gray, tone: pg, seg }, ms: performance.now() - t0 };
+  return { W, H, ps, bgps, segs, acc, lines, ridge, hairLum, facialHair, lm, lenses, work: { f, w: ww, h: wh, gray, tone: pg, seg }, ms: performance.now() - t0 };
 }

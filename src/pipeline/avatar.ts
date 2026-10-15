@@ -6,8 +6,9 @@
 import { JAW, OVAL, bounds, pt, pts, type Pt } from './landmarks';
 import { dropSmall, percentile, polygon, polyline, type Mask } from './raster';
 import {
-  BROWS, NOSE, dist, drawStamps, eyeOpenness, eyeWidth, lensName, mouthOpenness, mouthWidth, type Face, type StampKind,
+  BROWS, NOSE, dist, drawStamps, eyeOpenness, eyeWidth, lensName, mirrorLeft, mouthOpenness, mouthWidth, symmetricFace, type Face, type StampKind,
 } from './stamps';
+import { FACIAL_HAIR_MIN } from './features';
 import { SEG, type Look, type Prepared } from './types';
 
 export interface AvatarLayers {
@@ -71,48 +72,58 @@ function edge4(inside: Mask, outside: Mask, W: number, H: number): Mask {
 }
 
 // ---------------------------------------------------------------- hair
-/** Dark hair: one solid mass with a few paper cuts where the photo's hair is brightest (inside, never on the edge). */
-function solidHair(p: Prepared, hair: Mask, share: number): Mask {
-  const { W, H } = p, ink = hair.slice();
-  if (share <= 0) return ink;
-  const t = percentile(p.ps, hair, 100 - share), cut = new Uint8Array(W * H);
-  for (let y = 1; y < H - 1; y++)
-    for (let x = 1; x < W - 1; x++) {
-      const i = y * W + x;
-      if (!hair[i] || p.ps[i] < t) continue;
-      let inner = true;
-      for (let dy = -1; dy <= 1 && inner; dy++) for (let dx = -1; dx <= 1; dx++) if (!hair[i + dy * W + dx]) { inner = false; break; }
-      if (inner) cut[i] = 1;
+/** Zhang–Suen thinning: a mask worn down to one-cell-wide lines. */
+function thin(m: Mask, W: number, H: number): Mask {
+  const out = m.slice(), at = (x: number, y: number) => (x >= 0 && y >= 0 && x < W && y < H ? out[y * W + x] : 0);
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const pass of [0, 1]) {
+      const del: number[] = [];
+      for (let y = 0; y < H; y++)
+        for (let x = 0; x < W; x++) {
+          if (!out[y * W + x]) continue;
+          const q = [at(x, y - 1), at(x + 1, y - 1), at(x + 1, y), at(x + 1, y + 1), at(x, y + 1), at(x - 1, y + 1), at(x - 1, y), at(x - 1, y - 1)];
+          const nb = q.reduce((s, v) => s + v, 0);
+          if (nb < 2 || nb > 6) continue;
+          let a = 0;
+          for (let k = 0; k < 8; k++) a += +(!q[k] && !!q[(k + 1) % 8]);
+          if (a !== 1) continue;
+          const [p2, , p4, , p6, , p8] = q;
+          if (pass === 0 ? p2 * p4 * p6 || p4 * p6 * p8 : p2 * p4 * p8 || p2 * p6 * p8) continue;
+          del.push(y * W + x);
+        }
+      for (const i of del) out[i] = 0;
+      if (del.length) changed = true;
     }
-  const keep = dropSmall(cut, W, H, 2);
-  for (let i = 0; i < ink.length; i++) if (keep[i]) ink[i] = 0;
-  return ink;
+  }
+  return out;
 }
 
-/** Light or curly hair: the hair's outline plus its darker strands (cells darker than their neighbourhood). */
-function strandHair(p: Prepared, hair: Mask, density: number, cleanup: number): Mask {
-  const { W, H } = p, ink = new Uint8Array(W * H), rim = edge4(hair, Uint8Array.from(hair, v => 1 - v), W, H);
-  for (let y = 0; y < H; y++)
-    for (let x = 0; x < W; x++) {
-      const i = y * W + x;
-      if (!hair[i]) continue;
-      let s = 0, n = 0;
-      for (let dy = -2; dy <= 2; dy++)
-        for (let dx = -2; dx <= 2; dx++) {
-          const xx = x + dx, yy = y + dy;
-          if (xx >= 0 && yy >= 0 && xx < W && yy < H && hair[yy * W + xx]) { s += p.ps[yy * W + xx]; n++; }
-        }
-      if (p.ps[i] < s / n + (density - 0.5) * 60 + 12) ink[i] = 1; // ≈ 60 % ink at the default, like the team's curls
+/**
+ * Hair the way the team draws it: solid locks split by one-cell paper lines where the photo's hair catches the
+ * light (bright ridges between curls), thinned to lines with the short bits dropped. The outline stays ink, so
+ * the silhouette is clean. `share` is the part of the hair that may become a line: a lot for light or curly
+ * hair, a little for dark hair (a highlight or two).
+ */
+function lockHair(p: Prepared, hair: Mask, share: number): Mask {
+  const { W, H } = p, n = W * H, ink = hair.slice(), r = p.ridge;
+  if (share <= 0) return ink;
+  const rim = edge4(hair, Uint8Array.from(hair, v => 1 - v), W, H), t = Math.max(0, percentile(r, hair, 100 - share * 100));
+  // A line cell is the brightest within two cells along its row or its column, so lines stay three cells apart
+  // and every lock between them is at least two cells wide.
+  const peak = (i: number, x: number, y: number) => {
+    let row = true, col = true;
+    for (let d = -2; d <= 2 && (row || col); d++) {
+      if (d && x + d >= 0 && x + d < W && r[i + d] > r[i]) row = false;
+      if (d && y + d >= 0 && y + d < H && r[i + d * W] > r[i]) col = false;
     }
-  // Lone paper specks inside the mass become ink; ink specks go (under 3 cells at the default cleanup).
-  for (let y = 1; y < H - 1; y++)
-    for (let x = 1; x < W - 1; x++) {
-      const i = y * W + x;
-      if (hair[i] && !ink[i] && ink[i - 1] && ink[i + 1] && ink[i - W] && ink[i + W]) ink[i] = 1;
-    }
-  const strands = dropSmall(ink, W, H, 1 + cleanup);
-  for (let i = 0; i < ink.length; i++) strands[i] = hair[i] ? strands[i] | rim[i] : 0;
-  return strands;
+    return row || col;
+  };
+  const cand = new Uint8Array(n);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = y * W + x; cand[i] = +(hair[i] && !rim[i] && r[i] > t && peak(i, x, y)); }
+  const lines = dropSmall(thin(cand, W, H), W, H, Math.max(3, Math.round(W / 14))); // long strands only: 4 cells at 50 wide
+  for (let i = 0; i < n; i++) if (lines[i]) ink[i] = 0;
+  return ink;
 }
 
 // ---------------------------------------------------------------- measurements on the work image
@@ -151,15 +162,15 @@ export function avatarMouth(f: Face): 'open' | 'smile' | 'line' {
 
 /**
  * What "auto" draws in this style ('' = nothing): dashes for narrowed (smiling) eyes, pupils behind glasses or on
- * small faces, otherwise lid + pupil; two-row brows only where the real brow is that thick; the mouth's shape;
- * a small nose except behind glasses; glasses shaped like the measured lenses.
+ * small faces, otherwise the almond (lid row, corners and pupil); two-row brows only where the real brow is that thick; the mouth's shape;
+ * a short nose base except behind glasses (all symmetric: the base is mirrored); glasses shaped like the measured lenses.
  */
 export function avatarAuto(kind: StampKind, f: Face, glasses: boolean): string {
   switch (kind) {
-    case 'eyes': return eyeOpenness(f) < 0.2 ? 'dashes' : glasses || eyeWidth(f) < 4 ? 'pupils' : 'lids';
-    case 'brows': return browThickness(f) >= 1.6 ? 'bold' : 'thin';
+    case 'eyes': return eyeOpenness(f) < 0.2 ? 'dashes' : glasses || eyeWidth(f) < 4 ? 'pupils' : 'almond';
+    case 'brows': return browThickness(f) >= 1.6 ? 'bold' : glasses ? 'thin' : ''; // thin brows: the eye's crease stands in
     case 'mouth': { const m = avatarMouth(f); return m === 'open' ? 'grin' : m; } // an open smile: a D with paper teeth
-    case 'nose': return glasses || eyeWidth(f) < 3.5 ? '' : 'L';
+    case 'nose': return glasses || eyeWidth(f) < 3.5 ? '' : 'base'; // symmetric, like the rest of the base
     case 'glasses': return lensName(f.lenses);
   }
 }
@@ -253,21 +264,23 @@ export function avatarLayers(p: Prepared, look: Look): AvatarLayers {
   for (let i = 0; i < n; i++) { if (hair[i]) skin[i] = clothes[i] = 0; bg[i] = +(!hair[i] && !skin[i] && !clothes[i]); }
   const person = Uint8Array.from(bg, v => 1 - v);
 
-  // Hair: dark hair solid with a few cuts, light hair as outline + strands (or the hair mode picked by hand).
+  // Hair: locks split by highlight lines — many for light or curly hair, a few for dark hair (or the hair mode
+  // picked by hand: solid · tone · texture = few · some · many). The density slider adds or removes lines.
   const light = p.hairLum >= 95, mode = look.hairMode === 'auto' ? (light ? 'texture' : 'solid') : look.hairMode;
-  const hairInk = mode === 'texture' ? strandHair(p, hair, look.hair, look.cleanup) : solidHair(p, hair, mode === 'tone' ? 18 : Math.max(0, (0.5 - look.hair) * 20 + 4));
+  const share = { solid: 0.1, tone: 0.3, texture: 0.7 }[mode] + (0.5 - look.hair) * 0.4;
+  const hairInk = lockHair(p, hair, Math.min(0.8, Math.max(0, share)));
   // Clothes: solid at the default density; lower density keeps only their darker part.
   const ink = new Uint8Array(n), ct = look.clothes >= 0.5 ? Infinity : percentile(p.ps, clothes, look.clothes * 200);
   for (let i = 0; i < n; i++) ink[i] = hairInk[i] | +(clothes[i] && p.ps[i] <= ct);
-  // Where solid hair lies on solid clothes, a one-cell paper gap on the clothes side keeps the locks readable.
-  // Only along locks (hair cells with two or more hair neighbours side by side): lone diagonal strands just merge,
-  // instead of breaking the clothes into a checkerboard.
+  // Where solid (dark) hair lies on solid clothes, a one-cell paper gap on the clothes side keeps the locks
+  // readable. Only along locks (hair cells with two or more hair neighbours side by side): lone diagonal strands
+  // just merge, instead of breaking the clothes into a checkerboard. Light or curly hair has its own lines.
   const at = (x: number, y: number, m: Mask) => x >= 0 && y >= 0 && x < W && y < H && !!m[y * W + x];
   const lock = (x: number, y: number) => at(x, y, hair) && at(x, y, hairInk) && [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => at(x + dx, y + dy, hair)).length >= 2;
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       const i = y * W + x;
-      if (clothes[i] && ink[i] && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => lock(x + dx, y + dy))) ink[i] = 0;
+      if (mode !== 'texture' && clothes[i] && ink[i] && [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => lock(x + dx, y + dy))) ink[i] = 0;
     }
   // Shading only above the default skin density.
   if (look.skin > 0.5) { const t = percentile(p.ps, skin, (look.skin - 0.5) * 60); for (let i = 0; i < n; i++) if (skin[i] && p.ps[i] <= t) ink[i] = 1; }
@@ -278,15 +291,19 @@ export function avatarLayers(p: Prepared, look: Look): AvatarLayers {
   const lm = p.lm;
   if (!lm) return r;
 
-  const f: Face = { lm, W, H, lenses: p.lenses, skin }, F = look.features;
+  const photo: Face = { lm, W, H, lenses: p.lenses, skin }, F = look.features;
   if (F.jaw) { const jaw = new Uint8Array(n); polyline(jaw, W, H, pts(lm, JAW)); for (let i = 0; i < n; i++) if (jaw[i] && skin[i]) ink[i] = 1; }
 
   const ref = cheekTone(p, lm);
-  // Calibrated on the test photos: bearded ≥ 0.91 / 0.53, clean-shaven and lips alone ≤ 0.64 / 0.11.
-  const hasMoustache = darkShare(p, moustache(f), ref) >= 0.8, hasGoatee = darkShare(p, goatee(f), ref) >= 0.4;
+  // Facial hair needs the lower-face cue (bearded 0.59–0.67 at every grid size, everyone else ≤ 0.46), then the
+  // zone itself: the moustache zone alone ranges 0.39–0.86 and overlaps between the photos.
+  const bearded = p.facialHair >= FACIAL_HAIR_MIN;
+  const hasMoustache = bearded && darkShare(p, moustache(photo), ref) >= 0.6, hasGoatee = bearded && darkShare(p, goatee(photo), ref) >= 0.3;
+  // Features are drawn on the face made symmetric and upright; what stays on auto is mirrored: a clean base.
+  const { face: f, axis2 } = symmetricFace(photo);
   // A closed mouth under a moustache: the moustache is the mouth.
   const auto = (kind: StampKind) => { const a = avatarAuto(kind, f, F.glasses); return kind === 'mouth' && hasMoustache && a === 'line' ? '' : a; };
-  const s = drawStamps(f, { eyes: F.eyes, brows: F.brows, mouth: F.mouth, nose: F.nostrils, glasses: F.glasses }, look.stamps, auto);
+  const s = drawStamps(f, { eyes: F.eyes, brows: F.brows, mouth: F.mouth, nose: F.nostrils, glasses: F.glasses }, look.stamps, auto, false, axis2);
   const closedUnder = hasMoustache && !s.mouth.some(Boolean);
 
   // Facial hair as its own shapes, kept one paper cell away from the mouth.
@@ -297,6 +314,7 @@ export function avatarLayers(p: Prepared, look: Look): AvatarLayers {
     for (let i = 0; i < n; i++) if (s.mouth[i] || fh[i]) lip = Math.max(lip, Math.floor(i / W));
     fillRows(fh, f, goateeRows(f, lip));
   }
+  mirrorLeft(fh, W, H, axis2);
   for (let y = 0; y < H; y++)
     for (let x = 0; x < W; x++) {
       if (!s.mouth[y * W + x]) continue;

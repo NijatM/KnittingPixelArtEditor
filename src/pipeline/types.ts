@@ -28,6 +28,7 @@ export interface Prepared {
   segs: Uint8Array;   // SEG category per cell
   acc: Uint8Array;    // 1 where ≥ 25 % of the cell is "others / accessories" (glasses frames, …)
   lines: Float32Array; // share of the cell on a dark strand line (hair "texture" mode)
+  ridge: Float32Array; // mean brightness above the surroundings (narrow − wide blur) per cell: highlights between curls
   hairLum: number;    // median hair luminance 0..255 in the frame, -1 if there is no hair
   facialHair: number; // share of the lower face clearly darker than the cheeks (moustache / beard ≈ 0.6+)
   lm: Float32Array | null; // face points in grid coordinates
