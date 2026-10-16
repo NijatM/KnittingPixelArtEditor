@@ -1,11 +1,34 @@
 # KnittingPixelArtEditor
 
-Photo portraits into knittable pixel art. A free, browser-only editor: drop in a portrait, start from a clean avatar
-put together from the team's 40 characters (the parts closest to you), or from one of several two-colour styles
-rendered from your photo, then refine it. The photo never leaves your device — face detection (MediaPipe) and all
-image processing run locally.
+Turn a portrait into two-colour pixel art for knitting. One cell is one stitch.
+
+It is a free editor that runs entirely in the browser. Your photo never leaves your device: face detection
+(MediaPipe) and all image processing happen locally.
 
 Nijat Mahamaliyev · Tailored Materiality Research
+
+## What you can do
+
+- **Start from a photo**: drop, paste or choose one. The face is found, framed and turned into every style at once.
+- **Start without a photo**: pick one of the team's 40 characters.
+- **Open pixel art**: PNG or BMP files open as editable cells, at their own size or enlarged.
+- **Change the parts**: hair, eyes, brows, nose, mouth, glasses and facial hair, each with a preview of every option.
+- **Edit by hand**: pencil, erase, fill, line, select (move, flip, mirror copy), mirror drawing, undo, bake.
+- **Export**: PNG (1-bit), BMP (1/4/8/24-bit) or SVG. The file holds exactly what the editor shows: one pixel
+  per stitch, no margin.
+- **Autosave**: the last project is kept in the browser, and 11 reset starts over.
+
+## Styles
+
+| | Style | What it does |
+|---|---|---|
+| A | **Clean avatar** (default) | Built from the team's 40 characters, not traced from the photo. *Custom* uses the hair closest to yours and that character's face, swapping in glasses, facial hair, closed eyes or a grin when your photo shows them. *Prebuilt* shows one character exactly as drawn. Sizes: 25, 50, 72, 80, 96 or 128 stitches square. |
+| B | Image-driven avatar | Traced from the photo: paper face, solid hair, drawn features. |
+| C | Region poster | Bold shapes, each region cut separately. |
+| D | Line portrait | Open skin, drawn contours. |
+| E | Tone patterns | Paper, 50 %, 75 % and ink. |
+| F | Atkinson tonal | Dithered shading, features kept. |
+| G | ML lines | Lines drawn by a model (Informative Drawings, MIT licence; a 15 MB download on first use). |
 
 ## Run it
 
@@ -16,29 +39,32 @@ npm run build      # typecheck + production build into dist/
 npm run preview    # serve dist/ the way GitHub Pages will
 ```
 
-Pushing to `main` builds and deploys to GitHub Pages (`.github/workflows/deploy.yml`; set the repository's
-Pages source to "GitHub Actions" once).
+Pushing to `main` deploys to GitHub Pages (`.github/workflows/deploy.yml`).
 
-## How it works
+The clean avatar's library in `public/avatars/` is generated from the folder of 40 characters, which stays
+outside the repo. To rebuild it (needs numpy, scipy and Pillow):
 
-| Step | Where |
+```sh
+python3 scripts/build-avatar-library.py <portrait-40-multi-resolution folder>
+```
+
+## Code map
+
+| What | Where |
 |---|---|
-| Import (file, drag & drop, paste), EXIF orientation, ≤1600 px | `src/importer.ts` |
-| Pixel images (PNG / BMP, ≤ 16 flat colours, native or enlarged) open as cells to edit | `src/pixelart.ts` |
-| Face points (478) + hair / skin / clothes / accessories regions, once per photo | `src/detect.ts` (MediaPipe, CPU) |
-| Auto-framing from the face oval, tight↔wide, drag | `src/frame.ts` |
-| Crop → work image (≈10× grid) → grey, bilateral, CLAHE → grid tone + regions | `src/pipeline/prep.ts` |
-| Clean avatar: the team's 40 characters cut into parts (hair with head, eyes, brows, nose, mouth, glasses, facial hair) at 25–128 px; custom = parts closest to the photo, prebuilt = a character as drawn | `scripts/build-avatar-library.py` → `public/avatars/`, `src/pipeline/clean.ts` |
-| Drawn parts for the photo styles: 61 named shapes for eyes, brows, mouth, nose, glasses (+ jaw line), measured glasses lenses | `src/pipeline/stamps.ts`, `src/pipeline/features.ts`, `src/pipeline/prep.ts` |
-| Styles A clean avatar · B image-driven avatar · C region poster · D line portrait · E tone patterns · F Atkinson tonal · G ML lines (ids `clean`, `avatar` … `ml`; the letter is the gallery position) | `src/pipeline/clean.ts`, `src/pipeline/styles.ts`, `src/pipeline/avatar.ts` |
-| ML lines model (Informative Drawings, ONNX Runtime Web, WebGPU or CPU) | `src/pipeline/ml.ts`, `scripts/convert-informative-drawings.py` |
-| Processing off the main thread in two workers (instant styles, ML lines); prep and line map cached | `src/worker.ts` |
-| Edits layer, pencil / erase / fill / line, select (move / flip / mirror copy), mirror, undo, live / bake | `src/editor.ts` |
-| PNG (1-bit indexed) · BMP (1/4/8/24-bit) · SVG export of the final composite, opaque, no margin | `src/export.ts` |
-| Autosave of the last project (IndexedDB) | `src/store.ts` |
-| UI (nav / stage / inspector) | `index.html`, `src/main.ts`, `src/style.css`, `src/ui/` |
+| Import, pixel-art detection | `src/importer.ts`, `src/pixelart.ts` |
+| Face points and regions (MediaPipe) | `src/detect.ts` |
+| Framing | `src/frame.ts` |
+| Photo preparation (crop, tone, regions) | `src/pipeline/prep.ts` |
+| Clean avatar: part library, matching, composing | `scripts/build-avatar-library.py`, `public/avatars/`, `src/pipeline/clean.ts` |
+| Image-driven avatar and the photo styles | `src/pipeline/avatar.ts`, `src/pipeline/styles.ts`, `src/pipeline/stamps.ts`, `src/pipeline/ml.ts` |
+| Rendering off the main thread | `src/worker.ts` |
+| Editor | `src/editor.ts` |
+| Export | `src/export.ts` |
+| Autosave | `src/store.ts` |
+| Interface | `index.html`, `src/main.ts`, `src/style.css`, `src/ui/` |
 
-Planning and research: `SPEC.md`, `design/DESIGN.md`, `RESEARCH.md`, `HANDOFF.md`.
+Planning notes: `SPEC.md`, `design/DESIGN.md`, `HANDOFF.md`, `RESEARCH.md`.
 
 ## License
 
