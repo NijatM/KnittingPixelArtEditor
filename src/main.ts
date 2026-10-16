@@ -151,6 +151,8 @@ const optionNames = (kind: StampKind): (string | null)[] => ['', ...STAMPS[kind]
 /** Clean avatar: auto, then every option for this head (character nicknames, 'none'). */
 const partNames = (kind: CleanPart): string[] => ['', ...(S.clean?.options[kind] ?? [])];
 const isClean = () => S.style === 'clean';
+/** What the clean avatar's parts are called in the panel and the log (the hair brings its head along). */
+const PART_NAME: Record<CleanPart, string> = { hair: 'hair + head', eyes: 'eyes', brows: 'brows', nose: 'nose', mouth: 'mouth', glasses: 'glasses', facial: 'facial hair' };
 
 /** The part of the grid an option preview shows: eyes, brows and glasses together; the mouth with its surroundings. */
 function optionCrop(kind: StampKind, f: Face) {
@@ -254,7 +256,7 @@ function renderPartOptions(box: HTMLElement) {
   if (box.dataset.kind !== key) {
     box.dataset.kind = key;
     const label = (n: string) => (n === '' ? `auto · ${info.auto[kind]}` : n);
-    box.innerHTML = names.map(n => `<button class="opt" title="${kind} · ${label(n)}"><canvas width="1" height="1"></canvas><span>${n === '' ? 'auto' : n}</span></button>`).join('');
+    box.innerHTML = names.map(n => `<button class="opt" title="${PART_NAME[kind]} · ${label(n)}"><canvas width="1" height="1"></canvas><span>${n === '' ? 'auto' : n}</span></button>`).join('');
     $$<HTMLButtonElement>('.opt', box).forEach((b, i) => (b.onclick = () => setPart(kind, names[i])));
   }
   box.hidden = false;
@@ -304,7 +306,7 @@ function cleanWith(kind: CleanPart, name: string) {
 function setPart(kind: CleanPart, name: string) {
   const was = S.look.clean.mode;
   S.look.clean = cleanWith(kind, name);
-  log(`> ${kind} · ${name === '' ? `auto · ${S.clean?.auto[kind] ?? '—'}` : name}${was === 'prebuilt' ? ' · now custom, starting from the character' : ''}`);
+  log(`> ${PART_NAME[kind]} · ${name === '' ? `auto · ${S.clean?.auto[kind] ?? '—'}` : name}${was === 'prebuilt' ? ' · now custom, starting from the character' : ''}`);
   syncControls(); lookChanged();
 }
 
@@ -1132,7 +1134,7 @@ $$<HTMLButtonElement>('[data-brush]').forEach(b => (b.onclick = () => { S.ed.bru
   cv.addEventListener('pointerdown', e => {
     if (S.step === 'stamps' && !pixels() && isClean()) { // tap a part to see its options
       const kind = cleanPartAt(...cellAt(e));
-      if (kind) { openPartOptions(kind, false); log(`> ${kind} · pick an option in the panel`); }
+      if (kind) { openPartOptions(kind, false); log(`> ${PART_NAME[kind]} · pick an option in the panel`); }
       return;
     }
     if (S.step === 'stamps' && !pixels()) { // tap a feature to cycle its stamp
