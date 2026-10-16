@@ -201,3 +201,9 @@ body.dragover #view { outline: 1px dashed var(--hi); outline-offset: -12px; }
 .opt span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
 .opt:hover { border-color: var(--dim); color: var(--fg); }
 .opt.on { border-color: var(--hi); color: var(--hi); }
+.optlink:hover, [data-part].open .optlink { color: var(--hi); }
+/* clean avatar: the 40 characters, four to a row, drawn at the grid's size */
+.opts.chars { grid-template-columns: repeat(4, minmax(0, 1fr)); max-height: 360px; overflow-y: auto; }
+.opt img { display: block; width: 100%; height: auto; aspect-ratio: 1; image-rendering: pixelated; background: #fff; }
+.opt .auto { display: grid; place-items: center; aspect-ratio: 1; border: 1px dashed var(--line2); color: var(--dim); }
+.opt.near:not(.on) { border-style: dashed; border-color: var(--line2); }

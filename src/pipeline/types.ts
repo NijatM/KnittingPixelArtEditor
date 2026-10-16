@@ -1,3 +1,4 @@
+import type { CleanInfo, CleanLook } from './clean';
 import type { Pt } from './landmarks';
 import type { Stamps } from './stamps';
 
@@ -40,7 +41,7 @@ export interface Prepared {
 }
 
 /** Gallery order is set in main.ts; the letters shown there follow that order. */
-export type StyleId = 'avatar' | 'poster' | 'line' | 'tone' | 'tonal' | 'ml';
+export type StyleId = 'clean' | 'avatar' | 'poster' | 'line' | 'tone' | 'tonal' | 'ml';
 
 export interface Features {
   eyes: boolean;
@@ -62,7 +63,8 @@ export interface Look {
   lineWeight: number; // ML lines: 1 = tuned, higher = more cells become line
   hairMode: 'auto' | 'solid' | 'tone' | 'texture'; // auto = each style's own hair
   features: Features;
-  stamps: Stamps;     // feature stamp per kind, 0 = auto
+  stamps: Stamps;     // feature part per kind ('' = auto), for the styles drawn from the photo
+  clean: CleanLook;   // clean avatar: custom or prebuilt, and the part picked per kind
   background: 'white' | 'black' | 'pattern' | 'photo';
   bgDensity: number; // pattern / photo background: share of ink, 0..1
 }
@@ -79,4 +81,7 @@ export interface RenderRequest {
 /** cells: palette index per cell (0 = ink, 1 = paper). */
 export interface StyleResult { style: StyleId; cells: Uint8Array; ms: number; ink: number }
 
-export interface RenderResult { id: number; W: number; H: number; prepMs: number; hairLum: number; lenses: Lens[] | null; results: StyleResult[] }
+export interface RenderResult {
+  id: number; W: number; H: number; prepMs: number; hairLum: number; lenses: Lens[] | null; results: StyleResult[];
+  clean: CleanInfo | null; // what the clean avatar picked and offers (when it was rendered)
+}

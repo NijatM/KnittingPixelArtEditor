@@ -230,8 +230,8 @@ function avatar(p: Prepared, look: Look) {
 
 const RENDER = { poster, line: linePortrait, tone: tonePatterns, tonal };
 
-/** Renders the given styles; ML lines needs the line map from ml.ts. */
-export function renderStyles(p0: Prepared, styles: StyleId[], look: Look, lines?: LineMap): StyleResult[] {
+/** Renders the given styles drawn from the photo (the clean avatar is put together in clean.ts); ML lines needs the line map from ml.ts. */
+export function renderStyles(p0: Prepared, styles: Exclude<StyleId, 'clean'>[], look: Look, lines?: LineMap): StyleResult[] {
   const fm = featureMasks(p0, look), r = regions(p0, fm);
   // Every style reads the skin tone with the side light evened out.
   const p = { ...p0, ps: evenLight(p0.ps, r.skin, p0.lm, p0.W, p0.H, look.evenLight ?? 0) };

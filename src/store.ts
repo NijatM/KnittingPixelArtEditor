@@ -6,7 +6,7 @@ const STORE = 'project';
 export interface SavedPhoto {
   id: number;            // ties a state record to its photo
   name: string;
-  kind?: 'photo' | 'pixels'; // pixels: an imported pixel image, stored at one pixel per cell
+  kind?: 'photo' | 'pixels' | 'blank'; // pixels: an imported pixel image, stored at one pixel per cell; blank: no photo (clean avatar only)
   png: Blob;             // the ≤1600 px working photo, lossless, so a reload renders exactly the same
   lm: Float32Array | null;
   seg: Uint8Array | null;

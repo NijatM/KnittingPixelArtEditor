@@ -12,6 +12,7 @@ import { pixelArtOf, type PixelArt } from './pixelart';
 import { GLASSES_MIN_SHARE, glassesShare } from './pipeline/glasses';
 import { OVAL, pts } from './pipeline/landmarks';
 import { avatarAuto } from './pipeline/avatar';
+import { AUTO_CLEAN, CLEAN_PARTS, CLEAN_SIZES, cleanSize, type CleanInfo, type CleanPart } from './pipeline/clean';
 import { AUTO_STAMPS, STAMPS, STAMP_KINDS, autoVariant, hitBoxes, stampName, type Face, type StampKind } from './pipeline/stamps';
 import { SEG, type Crop, type Features, type Lens, type Look, type RenderResult, type StyleId, type StyleResult } from './pipeline/types';
 import { $, $$, Bar, check, seg, setCheck, setSeg } from './ui/controls';
@@ -20,19 +21,20 @@ import type { FromWorker, ToWorker } from './worker';
 // ---------------------------------------------------------------- constants
 // Gallery order; the letter shown for a style is its place in this list.
 const STYLES: { k: StyleId; key: string; t: string; d: string }[] = [
-  { k: 'avatar', key: 'avatar', t: 'Clean avatar', d: 'paper face, solid hair, drawn features' },
+  { k: 'clean', key: 'clean', t: 'Clean avatar', d: 'the team\'s characters · parts closest to you' },
+  { k: 'avatar', key: 'image-driven', t: 'Image-driven avatar', d: 'traced from the photo · drawn features' },
   { k: 'poster', key: 'poster', t: 'Region poster', d: 'bold shapes, each region cut separately' },
   { k: 'line', key: 'line', t: 'Line portrait', d: 'open skin, drawn contours' },
   { k: 'tone', key: '4-tone', t: 'Tone patterns', d: 'paper · 50 · 75 · ink' },
   { k: 'tonal', key: 'tonal', t: 'Atkinson tonal', d: 'dithered shading, features kept' },
   { k: 'ml', key: 'ml lines', t: 'ML lines', d: 'Informative Drawings (MIT) · drawn by a model' },
 ];
-const INSTANT: StyleId[] = ['avatar', 'poster', 'line', 'tone', 'tonal'];
+const INSTANT: StyleId[] = ['clean', 'avatar', 'poster', 'line', 'tone', 'tonal'];
 const LATER = [
   { t: 'U²-Net portrait', d: 'non-commercial model', ph: '176 MB · not loaded', tag: 'v2' },
 ];
 const letter = (i: number) => String.fromCharCode(65 + i);
-/** Saved projects from before the avatar style named styles by their old letters. */
+/** Saved projects from before the avatar style named styles by their old letters ('avatar' is now the image-driven avatar). */
 const OLD_IDS: Record<string, StyleId> = { A: 'poster', B: 'line', C: 'tone', D: 'tonal', E: 'ml' };
 const RATIOS: Record<string, [number, number]> = { '1:1': [1, 1], '4:5': [4, 5], '3:4': [3, 4], '2:3': [2, 3] };
 // Binary black and white: what the editor shows is what the files hold (1-bit PNG / BMP of pure #000 and #fff).
@@ -49,7 +51,8 @@ type Step = 'photo' | 'frame' | 'grid' | 'style' | 'regions' | 'features' | 'bac
 type View = 'empty' | 'styles' | 'pixels' | 'frame';
 
 interface Photo {
-  kind: 'photo' | 'pixels'; // pixels: an imported pixel image, edited as it is (no detection, no styles)
+  // pixels: an imported pixel image, edited as it is (no detection, no styles); blank: no photo, the clean avatar only
+  kind: 'photo' | 'pixels' | 'blank';
   id: number;      // ties autosaved settings to this photo
   name: string;
   canvas: HTMLCanvasElement;
@@ -64,13 +67,13 @@ interface Photo {
 const S = {
   photo: null as Photo | null,
   frame: { ...AUTO_FRAME } as FrameParams,
-  ratio: '4:5',
-  W: 64,
-  H: 80,
+  ratio: '1:1',
+  W: 50,
+  H: 50,
   lock: true,
   cellAspect: 1,
-  look: { skin: 0.5, evenLight: 0.8, hair: 0.5, clothes: 0.5, cleanup: 2, lineWeight: 1, hairMode: 'auto', background: 'white', bgDensity: 0.25, features: { ...DEFAULT_FEATURES }, stamps: { ...AUTO_STAMPS } } as Look,
-  style: 'avatar' as StyleId,
+  look: { skin: 0.5, evenLight: 0.8, hair: 0.5, clothes: 0.5, cleanup: 2, lineWeight: 1, hairMode: 'auto', background: 'white', bgDensity: 0.25, features: { ...DEFAULT_FEATURES }, stamps: { ...AUTO_STAMPS }, clean: structuredClone(AUTO_CLEAN) } as Look,
+  style: 'clean' as StyleId,
   pal: [...DEFAULT_PAL],
   step: 'photo' as Step,
   pixelsOverStyles: false, // the toolbar toggle can show pixels while on the style step
@@ -78,6 +81,7 @@ const S = {
   prepMs: 0,
   hairLum: -1,                         // measured hair lightness of the current frame (from the worker)
   lenses: null as Lens[] | null,       // glasses lenses measured in the current frame (from the worker)
+  clean: null as CleanInfo | null,     // what the clean avatar picked and offers (from the worker)
   mlNote: '',                          // what ML lines is doing while it has no result yet
   zoom: 0,
   grid: false,
@@ -138,32 +142,84 @@ function setStamp(kind: StampKind, name: string | null) {
   syncControls(); lookChanged();
 }
 
-// ---------------------------------------------------------------- stamp options (08 Stamps)
-let openKind: StampKind | null = null, previewTimer = 0;
+// ---------------------------------------------------------------- part options (08 Parts)
+// The photo styles' parts (eyes, brows, mouth, nose, glasses, drawn from the face points) and the clean avatar's
+// (hair … facial hair, from the team's characters) share one options box, opened under a row.
+let openKind: StampKind | null = null, openPart: CleanPart | null = null, previewTimer = 0;
 /** auto, every offered variant, off (null). */
 const optionNames = (kind: StampKind): (string | null)[] => ['', ...STAMPS[kind].map(v => v.name), null];
+/** Clean avatar: auto, then every option for this head (character nicknames, 'none'). */
+const partNames = (kind: CleanPart): string[] => ['', ...(S.clean?.options[kind] ?? [])];
+const isClean = () => S.style === 'clean';
 
 /** The part of the grid an option preview shows: eyes, brows and glasses together; the mouth with its surroundings. */
 function optionCrop(kind: StampKind, f: Face) {
   const b = hitBoxes(f), r = kind === 'mouth' ? [b.mouth.x0 - 3, b.nose.y0, b.mouth.x1 + 3, b.mouth.y1 + 4]
     : kind === 'nose' ? [b.nose.x0 - 4, b.nose.y0 - 3, b.nose.x1 + 4, b.mouth.y1 + 1]
     : [b.glasses.x0 - 1, b.brows.y0 - 2, b.glasses.x1 + 1, b.glasses.y1 + 1];
+  return clampBox(r);
+}
+const clampBox = (r: number[]) => {
   const x0 = Math.max(0, Math.floor(r[0])), y0 = Math.max(0, Math.floor(r[1]));
-  return { x0, y0, x1: Math.min(f.W, Math.ceil(r[2])), y1: Math.min(f.H, Math.ceil(r[3])) };
+  return { x0, y0, x1: Math.min(S.W, Math.ceil(r[2])), y1: Math.min(S.H, Math.ceil(r[3])) };
+};
+
+/** Clean avatar: where each part sits on the grid (from the head's anchors), for tapping and the previews. */
+function cleanBoxes(info: CleanInfo) {
+  const a = info.at, d = a.d, ey = (a.eyes[0][1] + a.eyes[1][1]) / 2, [l, r] = [a.eyes[0][0], a.eyes[1][0]];
+  const box = (x0: number, y0: number, x1: number, y1: number) => ({ x0, y0, x1, y1 });
+  return {
+    brows: box(l - 0.55 * d, ey - 0.85 * d, r + 0.55 * d + 1, ey - 0.3 * d),
+    eyes: box(l - 0.4 * d, ey - 0.3 * d, r + 0.4 * d + 1, ey + 0.3 * d + 1),
+    glasses: box(l - 0.75 * d, ey - 0.45 * d, r + 0.75 * d + 1, ey + 0.5 * d + 1),
+    nose: box(a.nose[0] - 0.3 * d, ey + 0.3 * d, a.nose[0] + 0.3 * d + 1, a.nose[1] + 0.25 * d + 1),
+    mouth: box(a.mouth[0] - 0.55 * d, a.mouth[1] - 0.25 * d, a.mouth[0] + 0.55 * d + 1, a.mouth[1] + 0.3 * d + 1),
+    facial: box(a.mouth[0] - 0.95 * d, a.mouth[1] - 0.55 * d, a.mouth[0] + 0.95 * d + 1, a.mouth[1] + 1.3 * d),
+    face: box(l - 0.95 * d, ey - 1.0 * d, r + 0.95 * d + 1, a.mouth[1] + 0.75 * d),
+  };
+}
+
+/** Which clean avatar part a tap on cell (x, y) means: the smallest box it falls in, else the hair around them. */
+function cleanPartAt(x: number, y: number): CleanPart | null {
+  const info = S.clean;
+  if (!info) return null;
+  const b = cleanBoxes(info), cx = x + 0.5, cy = y + 0.5, inside = (k: keyof typeof b) => cx >= b[k].x0 && cx <= b[k].x1 && cy >= b[k].y0 && cy <= b[k].y1;
+  const hit = (['brows', 'eyes', 'nose', 'mouth', 'glasses', 'facial'] as const).find(inside);
+  if (hit) return hit;
+  return x >= info.x0 && y >= info.y0 && x < info.x0 + info.size && y < info.y0 + info.size ? 'hair' : null;
 }
 
 /** Highlight the option in use. */
 function markOptions() {
-  const box = $('#stampopts'), kind = openKind;
-  $$('[data-stamp]').forEach(r => { const on = r.dataset.stamp === kind; r.classList.toggle('open', on); $('[data-opts]', r).setAttribute('aria-expanded', String(on)); });
-  if (!kind || box.hidden) return;
-  const cur = S.look.features[FEATURE_OF[kind]] ? S.look.stamps[kind] : null;
-  $$('.opt', box).forEach((b, i) => b.classList.toggle('on', optionNames(kind)[i] === cur));
+  const box = $('#stampopts');
+  $$('[data-stamp]').forEach(r => { const on = r.dataset.stamp === openKind; r.classList.toggle('open', on); $('[data-opts]', r).setAttribute('aria-expanded', String(on)); });
+  $$('[data-part]').forEach(r => { const on = r.dataset.part === openPart; r.classList.toggle('open', on); $('[data-opts]', r).setAttribute('aria-expanded', String(on)); });
+  if (box.hidden) return;
+  if (box.dataset.kind?.startsWith('part:') && openPart) {
+    const cur = cleanValue(openPart), names = partNames(openPart);
+    $$('.opt', box).forEach((b, i) => b.classList.toggle('on', names[i] === cur));
+  } else if (openKind) {
+    const cur = S.look.features[FEATURE_OF[openKind]] ? S.look.stamps[openKind] : null;
+    $$('.opt', box).forEach((b, i) => b.classList.toggle('on', optionNames(openKind!)[i] === cur));
+  }
 }
 
-/** Show the open feature's options under its row and render their previews (after the latest render settles). */
+/** Paint option previews (cells of the whole grid) cropped to box c. */
+function paintPreviews(box: HTMLElement, cells: Uint8Array[], W: number, c: { x0: number; y0: number; x1: number; y1: number }) {
+  $$<HTMLCanvasElement>('.opt canvas', box).forEach((cv, i) => {
+    if (!cells[i]) return;
+    const w = c.x1 - c.x0, h = c.y1 - c.y0, crop = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) crop.set(cells[i].subarray((c.y0 + y) * W + c.x0, (c.y0 + y) * W + c.x1), y * w);
+    paintCells(cv, crop, w, h);
+    cv.style.aspectRatio = `${w * S.cellAspect} / ${h}`;
+  });
+}
+
+/** Show the open row's options under it and render their previews (after the latest render settles). */
 function renderOptions() {
-  const box = $('#stampopts'), kind = openKind, face = gridFace();
+  const box = $('#stampopts');
+  if (isClean()) { renderPartOptions(box); return; }
+  const kind = openKind, face = gridFace();
   if (!kind || !face || pixels()) { box.hidden = true; markOptions(); return; }
   const names = optionNames(kind);
   $(`[data-stamp=${kind}]`).insertAdjacentElement('afterend', box);
@@ -176,15 +232,40 @@ function renderOptions() {
   markOptions();
   clearTimeout(previewTimer);
   previewTimer = window.setTimeout(() => {
-    const c = optionCrop(kind, face);
-    (S.style === 'ml' ? ml : instant).variants(S.style, kind, names, r => {
-      if (openKind !== kind || r.W !== S.W || r.H !== S.H) return;
-      $$<HTMLCanvasElement>('.opt canvas', box).forEach((cv, i) => {
-        const w = c.x1 - c.x0, h = c.y1 - c.y0, crop = new Uint8Array(w * h);
-        for (let y = 0; y < h; y++) crop.set(r.cells[i].subarray((c.y0 + y) * r.W + c.x0, (c.y0 + y) * r.W + c.x1), y * w);
-        paintCells(cv, crop, w, h);
-        cv.style.aspectRatio = `${w * S.cellAspect} / ${h}`;
-      });
+    const c = optionCrop(kind, face), looks = names.map(name => {
+      const look = structuredClone(S.look);
+      look.features[FEATURE_OF[kind]] = name !== null;
+      look.stamps[kind] = name ?? '';
+      return look;
+    });
+    (S.style === 'ml' ? ml : instant).variants(S.style, looks, r => {
+      if (openKind !== kind || r.W !== S.W || r.H !== S.H || isClean()) return;
+      paintPreviews(box, r.cells, r.W, c);
+    });
+  }, 150);
+}
+
+/** Clean avatar options: every hair (the whole avatar) or every fitting face part (the face) on your current mix. */
+function renderPartOptions(box: HTMLElement) {
+  const kind = openPart, info = S.clean;
+  if (!kind || !info || pixels()) { box.hidden = true; markOptions(); return; }
+  const names = partNames(kind), key = `part:${kind}:${names.join(',')}`;
+  $(`[data-part=${kind}]`).insertAdjacentElement('afterend', box);
+  if (box.dataset.kind !== key) {
+    box.dataset.kind = key;
+    const label = (n: string) => (n === '' ? `auto · ${info.auto[kind]}` : n);
+    box.innerHTML = names.map(n => `<button class="opt" title="${kind} · ${label(n)}"><canvas width="1" height="1"></canvas><span>${n === '' ? 'auto' : n}</span></button>`).join('');
+    $$<HTMLButtonElement>('.opt', box).forEach((b, i) => (b.onclick = () => setPart(kind, names[i])));
+  }
+  box.hidden = false;
+  markOptions();
+  clearTimeout(previewTimer);
+  previewTimer = window.setTimeout(() => {
+    const f = cleanBoxes(info).face, c = kind === 'hair' ? clampBox([info.x0, info.y0, info.x0 + info.size, info.y0 + info.size]) : clampBox([f.x0, f.y0, f.x1, f.y1]);
+    const looks = names.map(n => ({ ...structuredClone(S.look), clean: cleanWith(kind, n) }));
+    instant.variants('clean', looks, r => {
+      if (openPart !== kind || r.W !== S.W || r.H !== S.H || !isClean()) return;
+      paintPreviews(box, r.cells, r.W, c);
     });
   }, 150);
 }
@@ -194,6 +275,10 @@ function openOptions(kind: StampKind, toggle = true) {
   openKind = toggle && openKind === kind ? null : kind;
   renderOptions();
 }
+function openPartOptions(kind: CleanPart, toggle = true) {
+  openPart = toggle && openPart === kind ? null : kind;
+  renderOptions();
+}
 
 /** Step a stamp: auto → 1 … n → off → auto. */
 function cycleStamp(kind: StampKind, dir: number) {
@@ -201,8 +286,72 @@ function cycleStamp(kind: StampKind, dir: number) {
   setStamp(kind, next === n + 1 ? null : next === 0 ? '' : STAMPS[kind][next - 1].name);
 }
 
-/** Mirror axis: the face centre (between the outer eye corners), snapped to half a cell; the grid centre otherwise. */
+// ---------------------------------------------------------------- clean avatar: mode, characters, parts
+/** The 40 characters (nickname, name), from the library's manifest. */
+let characters: { nick: string; name: string; number: number }[] = [];
+const avatarUrl = (nick: string, size: number) => `${import.meta.env.BASE_URL}avatars/${nick}/${size}.png`;
+
+/** A part's value as the panel shows it: what is set ('' auto), or in prebuilt the character's own. */
+const cleanValue = (kind: CleanPart) => (S.look.clean.mode === 'prebuilt' ? S.clean?.parts[kind] ?? '' : S.look.clean.parts[kind]);
+
+/** The clean look with one part set; from prebuilt it turns custom, starting from that character's own parts. */
+function cleanWith(kind: CleanPart, name: string) {
+  const c = S.look.clean, parts = c.mode === 'prebuilt' && S.clean ? { ...S.clean.parts } : { ...c.parts };
+  parts[kind] = name;
+  return { mode: 'custom' as const, character: c.character, parts };
+}
+
+function setPart(kind: CleanPart, name: string) {
+  const was = S.look.clean.mode;
+  S.look.clean = cleanWith(kind, name);
+  log(`> ${kind} · ${name === '' ? `auto · ${S.clean?.auto[kind] ?? '—'}` : name}${was === 'prebuilt' ? ' · now custom, starting from the character' : ''}`);
+  syncControls(); lookChanged();
+}
+
+/** Step a part through auto, then every option for this head. */
+function cyclePart(kind: CleanPart, dir: number) {
+  const names = partNames(kind), cur = names.indexOf(cleanValue(kind));
+  setPart(kind, names[((cur < 0 ? 0 : cur) + dir + names.length) % names.length]);
+}
+
+function setCleanMode(mode: 'custom' | 'prebuilt') {
+  S.look.clean = { ...S.look.clean, mode };
+  log(mode === 'prebuilt' ? `> prebuilt · ${S.look.clean.character || `closest · ${S.clean?.closest ?? '—'}`}` : '> custom · parts closest to the photo, change any of them in 08 parts');
+  syncControls(); lookChanged();
+}
+
+/** Prebuilt: show a character (by nickname, '' = the closest), or step from the one shown. */
+function setCharacter(nick: string) {
+  S.look.clean = { ...S.look.clean, mode: 'prebuilt', character: nick };
+  const c = characters.find(c => c.nick === nick);
+  log(`> prebuilt · ${c ? `${String(c.number).padStart(2, '0')} ${c.name.toLowerCase()}` : `closest · ${S.clean?.closest ?? '—'}`}`);
+  syncControls(); lookChanged();
+}
+function stepCharacter(dir: number) {
+  const cur = S.look.clean.mode === 'prebuilt' ? S.look.clean.character || S.clean?.character : S.clean?.head;
+  const i = Math.max(0, characters.findIndex(c => c.nick === cur));
+  if (characters.length) setCharacter(characters[(i + dir + characters.length) % characters.length].nick);
+}
+
+/** The character picker: every character at the grid's size; the one in use (or the closest) marked. */
+function paintCharacters() {
+  const box = $('#charopts'), size = cleanSize(S.W, S.H);
+  if (box.dataset.size !== String(size) || box.childElementCount !== characters.length + 1) {
+    box.dataset.size = String(size);
+    box.innerHTML = `<button class="opt" data-nick=""><span class="auto">auto</span><span>closest</span></button>`
+      + characters.map(c => `<button class="opt" data-nick="${c.nick}" title="${String(c.number).padStart(2, '0')} · ${c.name}"><img alt="" src="${avatarUrl(c.nick, size)}"><span>${c.nick}</span></button>`).join('');
+    $$<HTMLButtonElement>('.opt', box).forEach(b => (b.onclick = () => setCharacter(b.dataset.nick!)));
+  }
+  const pre = S.look.clean.mode === 'prebuilt';
+  $$<HTMLButtonElement>('.opt', box).forEach(b => {
+    b.classList.toggle('on', pre && b.dataset.nick === S.look.clean.character);
+    b.classList.toggle('near', b.dataset.nick === S.clean?.closest && !!S.photo && S.photo.kind === 'photo');
+  });
+}
+
+/** Mirror axis: the face centre (between the outer eye corners, or the clean avatar's eyes), snapped to half a cell; the grid centre otherwise. */
 function updateAxis() {
+  if (isClean() && S.clean && S.res.get('clean')?.W === S.W && S.res.get('clean')?.H === S.H) { S.ed.axis = Math.round((S.clean.at.axis + 0.5) * 2) / 2; return; }
   const c = crop(), lm = S.photo?.lm;
   const x = c && lm ? ((lm[2 * 33] + lm[2 * 263]) / 2 - c.x) * S.W / c.w : S.W / 2;
   S.ed.axis = Math.round(Math.min(S.W, Math.max(0, x)) * 2) / 2;
@@ -249,14 +398,14 @@ class Renderer {
     this.worker.postMessage({ type: 'render', req } satisfies ToWorker);
   }
 
-  /** Render `style` once per option of a feature; the worker queues it behind any render in flight. */
-  variants(style: StyleId, kind: StampKind, names: (string | null)[], done: (r: { W: number; H: number; cells: Uint8Array[] }) => void) {
+  /** Render `style` once per look (one per option); the worker queues it behind any render in flight. */
+  variants(style: StyleId, looks: Look[], done: (r: { W: number; H: number; cells: Uint8Array[] }) => void) {
     const c = crop();
     if (!c) return;
     const id = this.nextPreview++;
     this.previews.set(id, done);
-    const req = { id: 0, crop: c, W: S.W, H: S.H, styles: [style], look: structuredClone(S.look) };
-    this.worker.postMessage({ type: 'variants', v: { id, req, kind, names } } satisfies ToWorker);
+    const req = { id: 0, crop: c, W: S.W, H: S.H, styles: [style], look: looks[0] };
+    this.worker.postMessage({ type: 'variants', v: { id, req, looks } } satisfies ToWorker);
   }
 }
 
@@ -265,26 +414,32 @@ let raf = 0, detectorsReady = false;
 
 /** An imported pixel image is open: no styles render, the image is the base. */
 const pixels = () => S.photo?.kind === 'pixels';
-// Steps that only change how a photo is turned into pixels.
+/** No photo: started from a character, only the clean avatar renders. */
+const blank = () => S.photo?.kind === 'blank';
+// Steps that only change how a photo is turned into pixels (without a photo, style and parts still pick a character).
 const PHOTO_STEPS: Step[] = ['frame', 'style', 'regions', 'features', 'background', 'stamps'];
+const NEEDS_PHOTO: Step[] = ['frame', 'regions', 'features', 'background'];
 
 function applyResult(res: RenderResult) {
   if (pixels()) return; // a render from the photo before the pixel image
   if (res.prepMs) S.prepMs = res.prepMs;
   S.hairLum = res.hairLum;
   S.lenses = res.lenses;
+  if (res.clean) S.clean = res.clean;
   for (const r of res.results) S.res.set(r.style, { ...r, W: res.W, H: res.H });
+  if (res.clean) updateAxis();
   if (res.results.some(r => r.style === 'ml')) S.mlNote = '';
   paintGallery();
   refresh();
-  if (openKind && S.step === 'stamps' && res.results.some(r => r.style === S.style)) renderOptions();
+  if ((openKind || openPart) && S.step === 'stamps' && res.results.some(r => r.style === S.style)) renderOptions();
+  if (res.clean) { paintCharacters(); refresh(); }
 }
 const instant = new Renderer(INSTANT, applyResult, () => {});
 const ml = new Renderer(['ml'], applyResult, t => { S.mlNote = t; paintGallery(); refresh(); }, // shown in the ML tile + status
   () => { if (!S.res.has('ml')) { S.mlNote = 'could not load the line model'; paintGallery(); } });
 
 function scheduleRender() {
-  if (!raf && !pixels()) raf = requestAnimationFrame(() => { raf = 0; instant.render(); ml.render(); });
+  if (!raf && !pixels()) raf = requestAnimationFrame(() => { raf = 0; instant.render(); if (!blank()) ml.render(); });
 }
 
 // ---------------------------------------------------------------- photo
@@ -330,6 +485,7 @@ function startPhoto(id: number, name: string, canvas: HTMLCanvasElement, det: { 
   S.photo = { kind: 'photo', id, name, canvas, lm: det.lm, head: det.lm && det.seg ? headBox(det.seg, w, h, det.lm) : null, regions, glasses, ms: det.ms };
   S.res.clear();
   S.lenses = null;
+  S.clean = null;
   S.mlNote = '';
   S.hairLum = -1;
   if (restore) {
@@ -338,6 +494,7 @@ function startPhoto(id: number, name: string, canvas: HTMLCanvasElement, det: { 
     S.ed.fit(S.W, S.H);
   } else {
     S.frame = { ...AUTO_FRAME };
+    S.look.clean = structuredClone(AUTO_CLEAN); // a new person: the clean avatar matches them afresh
     S.look.features = { ...S.look.features, glasses: glasses >= GLASSES_MIN_SHARE };
     S.ed.reset(S.W, S.H);
   }
@@ -369,6 +526,7 @@ function startPixels(id: number, name: string, art: PixelArt, restore: store.Sav
   S.photo = { kind: 'pixels', id, name, canvas, lm: null, head: null, regions: [], glasses: -1, ms: 0 };
   S.res.clear();
   S.lenses = null;
+  S.clean = null;
   S.mlNote = '';
   S.hairLum = -1;
   if (restore) {
@@ -392,13 +550,53 @@ function startPixels(id: number, name: string, art: PixelArt, restore: store.Sav
   setStep('draw');
 }
 
+/**
+ * Start without a photo: the clean avatar alone, prebuilt, from the first character (or the saved project's). The
+ * steps that need a photo are dimmed; dropping a photo later starts a normal project.
+ */
+function startBlank(id: number, restore: store.SavedState | null, fromStore = false) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 1;
+  S.photo = { kind: 'blank', id, name: 'character', canvas, lm: null, head: null, regions: [], glasses: -1, ms: 0 };
+  S.res.clear();
+  S.lenses = null;
+  S.clean = null;
+  S.mlNote = '';
+  S.hairLum = -1;
+  if (restore) {
+    applySettings(restore.settings);
+    S.ed.restore(restore.edits.W, restore.edits.H, restore.edits.cells, restore.edits.baked);
+    S.ed.fit(S.W, S.H);
+  } else {
+    S.style = 'clean';
+    S.look.clean = { ...structuredClone(AUTO_CLEAN), mode: 'prebuilt', character: characters[0]?.nick ?? 'sidepart' };
+    S.look.features = { ...S.look.features, glasses: false };
+    if (!CLEAN_SIZES.includes(S.W) || S.W !== S.H) Object.assign(S, { W: 50, H: 50, ratio: '1:1' });
+    S.ed.reset(S.W, S.H);
+  }
+  if (!fromStore)
+    canvas.toBlob(png => {
+      if (png && !resetting) store.savePhoto({ kind: 'blank', id, name: 'character', png, lm: null, seg: null, regions: [], glasses: -1, ms: 0 }).then(() => scheduleSave(), storeFailed);
+    }, 'image/png');
+  ml.source({ type: 'source', source: null });
+  instant.source({ type: 'source', source: null });
+  ($('#exportname') as HTMLInputElement).value = exportBase();
+  drawThumb();
+  syncControls();
+  paintGallery();
+  setStep('style');
+  scheduleRender();
+}
+
 // ---------------------------------------------------------------- autosave (IndexedDB, last project only)
 const settings = () => ({ frame: S.frame, ratio: S.ratio, W: S.W, H: S.H, lock: S.lock, cellAspect: S.cellAspect, look: S.look, style: S.style, pal: S.pal, fmt: S.fmt, depth: S.depth });
 function applySettings(v: Record<string, unknown>) {
   const s = v as ReturnType<typeof settings>;
+  const clean = (s.look as Partial<Look> | undefined)?.clean;
   const pal = s.pal.map(c => { const k = OLD_PAL.indexOf(c); return k >= 0 && s.pal.every(q => OLD_PAL.includes(q)) ? DEFAULT_PAL[k] : c; });
   Object.assign(S, { frame: { ...AUTO_FRAME, ...s.frame }, ratio: s.ratio, W: s.W, H: s.H, lock: s.lock, cellAspect: s.cellAspect, style: OLD_IDS[s.style] ?? s.style, pal, fmt: s.fmt ?? 'png', depth: s.depth ?? 1 });
-  S.look = { ...S.look, ...s.look, features: { ...S.look.features, ...s.look.features } };
+  S.look = { ...S.look, ...s.look, features: { ...S.look.features, ...s.look.features },
+    clean: { ...AUTO_CLEAN, ...clean, parts: { ...AUTO_CLEAN.parts, ...clean?.parts } } };
   // Stamps are kept by name (older projects saved list positions).
   S.look.stamps = Object.fromEntries(STAMP_KINDS.map(k => [k, stampName(k, (s.look.stamps as Record<string, unknown> | undefined)?.[k])])) as Look['stamps'];
 }
@@ -422,7 +620,7 @@ function scheduleSave() {
 
 function drawThumb() {
   const t = $('#thumb') as HTMLCanvasElement, p = S.photo;
-  if (!p) { t.hidden = true; return; }
+  if (!p || p.kind === 'blank') { t.hidden = true; return; }
   const s = 160 / Math.max(p.canvas.width, p.canvas.height);
   t.width = Math.round(p.canvas.width * s); t.height = Math.round(p.canvas.height * s);
   const ctx = t.getContext('2d')!;
@@ -431,7 +629,7 @@ function drawThumb() {
   t.hidden = false;
 }
 
-const exportBase = () => `${(S.photo?.name ?? 'portrait').replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '_')}_${S.W}x${S.H}`;
+const exportBase = () => `${(blank() ? `avatar_${S.look.clean.mode === 'prebuilt' && S.look.clean.character || 'custom'}` : S.photo?.name ?? 'portrait').replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '_')}_${S.W}x${S.H}`;
 
 // ---------------------------------------------------------------- painting
 const hexRgb = (h: string) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
@@ -465,12 +663,12 @@ function drawEditor() {
   const ctx = cv.getContext('2d')!;
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(off, 0, 0, W * cw, H * ch);
-  const face = S.step === 'stamps' ? gridFace() : null;
-  if (face) { // tappable features
+  const face = S.step === 'stamps' && !isClean() ? gridFace() : null, info = S.step === 'stamps' && isClean() ? S.clean : null;
+  if (face || info) { // tappable features
     ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--ok').trim();
     ctx.setLineDash([3, 3]); ctx.lineWidth = 1;
-    const boxes = hitBoxes(face);
-    for (const k of ['eyes', 'brows', 'mouth', 'nose'] as StampKind[]) {
+    const boxes = face ? hitBoxes(face) : cleanBoxes(info!);
+    for (const k of ['eyes', 'brows', 'mouth', 'nose'] as const) {
       const b = boxes[k];
       ctx.strokeRect(Math.round(b.x0 * cw) + 0.5, Math.round(b.y0 * ch) + 0.5, Math.round((b.x1 - b.x0) * cw), Math.round((b.y1 - b.y0) * ch));
     }
@@ -568,7 +766,7 @@ function paintGallery() {
       paintCells(cv, cells, r.W, r.H); cv.style.aspectRatio = `${r.W * S.cellAspect} / ${r.H}`;
     }
     ph.style.aspectRatio = `${S.W * S.cellAspect} / ${S.H}`;
-    ph.textContent = !S.photo ? 'no photo yet' : k === 'ml' && S.mlNote ? S.mlNote : 'rendering…';
+    ph.textContent = !S.photo ? 'no photo yet' : blank() && k !== 'clean' ? 'needs a photo' : k === 'ml' && S.mlNote ? S.mlNote : 'rendering…';
   }
   for (const r of $$('#stylelist .lrow[data-style]')) {
     const k = r.dataset.style as StyleId, res = S.res.get(k);
@@ -578,12 +776,20 @@ function paintGallery() {
 }
 
 function pickStyle(k: StyleId, openPixels: boolean) {
+  if (blank() && k !== 'clean') { log('> this style is drawn from a photo · drop one in, or stay with the clean avatar'); return; }
   S.style = k;
   log(S.ed.live ? `> style ${k} · ${styleInfo(k).t.toLowerCase()}${S.ed.count ? ' · edits kept' : ''}` : '> the base is baked · tick live to follow the style again');
   if (openPixels) { S.pixelsOverStyles = true; }
-  paintGallery(); refresh();
-  if (openKind) renderOptions(); // the previews show the style picked
+  if (k === 'clean' && (!CLEAN_SIZES.includes(S.W) || S.W !== S.H)) {
+    setGrid(snapClean(S.W), null);
+    log(`> clean avatar · grid ${S.W}×${S.H}, a size the characters are drawn at`);
+  }
+  syncControls(); paintGallery(); refresh();
+  if (openKind || openPart) renderOptions(); // the previews show the style picked
 }
+
+/** The clean avatar's size nearest to n (the sizes the team's art is drawn at). */
+const snapClean = (n: number) => CLEAN_SIZES.reduce((a, b) => (Math.abs(b - n) < Math.abs(a - n) ? b : a));
 
 // ---------------------------------------------------------------- steps, views, chrome
 function currentView(): View {
@@ -600,7 +806,7 @@ function setStep(step: Step) {
   $$('#nav .lrow').forEach(r => r.classList.toggle('sel', r.dataset.step === step));
   $$('.panel').forEach(p => p.classList.toggle('on', p.dataset.panel === step));
   refresh();
-  if (step === 'stamps' && openKind) renderOptions();
+  if (step === 'stamps' && (openKind || openPart)) renderOptions();
 }
 
 function log(t: string) {
@@ -617,11 +823,10 @@ function refresh() {
   // nav values
   const bind = (k: string, v: string) => $$(`[data-bind=${k}]`).forEach(e => (e.textContent = v));
   const moved = S.frame.ox || S.frame.oy;
-  bind('photo', S.photo ? S.photo.name : '—');
+  bind('photo', blank() ? 'none · a character' : S.photo ? S.photo.name : '—');
   bind('frame', `${moved ? 'moved' : S.frame.framing === 0.5 ? 'auto' : S.frame.framing < 0.5 ? 'tight' : 'wide'} · ${S.ratio}`);
   bind('gridsize', `${S.W}×${S.H}`);
   bind('cells', `${(S.W * S.H).toLocaleString('en')} cells`);
-  bind('stylename', styleInfo(S.style).key);
   const skin = S.look.skin.toFixed(2).replace(/^0/, '');
   bind('regions', S.look.hairMode === 'auto' ? `skin ${skin}` : `${skin} · ${S.look.hairMode}`);
   const L = S.hairLum;
@@ -641,11 +846,28 @@ function refresh() {
       : v ? `${stampPos(kind)}/${n} · ${v}`
       : `auto · ${face ? autoName(kind, face) : '—'}${S.style === 'ml' && (kind === 'mouth' || kind === 'nose') ? ' (ML: model)' : ''}`;
   }
-  bind('stamps', picked ? `${picked} picked` : 'auto');
+  const cl = S.look.clean, set = CLEAN_PARTS.filter(k => cl.parts[k]).length;
+  bind('stamps', isClean() ? (cl.mode === 'prebuilt' ? `prebuilt · ${cl.character || S.clean?.character || 'closest'}` : set ? `${set} picked` : 'auto') : picked ? `${picked} picked` : 'auto');
+  bind('stylename', isClean() ? `clean · ${cl.mode}` : styleInfo(S.style).key);
+  // clean avatar parts: auto · what it picked, or position / count · nickname
+  for (const kind of CLEAN_PARTS) {
+    const names = partNames(kind), v = cleanValue(kind), i = names.indexOf(v);
+    $(`[data-part=${kind}] .stepper span`).textContent = !S.clean ? '—'
+      : v === '' ? `auto · ${S.clean.auto[kind]}` : i > 0 ? `${i}/${names.length - 1} · ${v}` : v;
+  }
+  $$('.stamprow').forEach(e => (e.hidden = isClean()));
+  $$('.partrow').forEach(e => (e.hidden = !isClean()));
+  $('#cleanbox').hidden = !isClean();
+  const shownChar = cl.mode === 'prebuilt' ? cl.character || S.clean?.character : S.clean?.head, ci = characters.findIndex(c => c.nick === shownChar);
+  bind('character', ci < 0 ? '—' : `${cl.mode === 'prebuilt' && !cl.character ? 'closest · ' : ''}${ci + 1}/${characters.length} · ${characters[ci].nick}`);
+  setSeg($('#cleanmode'), b => b.dataset.mode === cl.mode);
+  paintCharacters();
   markOptions();
   $('#glasses-note').textContent = g < 0 ? '' : found ? '· found' : '· none found';
-  $$('#nav .lrow').forEach(r => r.classList.toggle('faint', (!S.photo && r.dataset.step !== 'photo') || (pixels() && PHOTO_STEPS.includes(r.dataset.step as Step))));
+  $$('#nav .lrow').forEach(r => r.classList.toggle('faint', (!S.photo && r.dataset.step !== 'photo') || (pixels() && PHOTO_STEPS.includes(r.dataset.step as Step))
+    || (blank() && NEEDS_PHOTO.includes(r.dataset.step as Step))));
   $$('.pixnote').forEach(e => (e.hidden = !pixels()));
+  $$('.blanknote').forEach(e => (e.hidden = !blank()));
 
   // swatches
   $$('[data-sw]').forEach(e => (e.style.background = S.pal[+e.dataset.sw!]));
@@ -683,7 +905,9 @@ function refresh() {
   let ink = 0;
   if (sh) for (const v of sh.cells) ink += +(v === 0);
   const cellsInk = (c: { W: number; H: number }) => `${c.W}×${c.H} · ${(c.W * c.H).toLocaleString('en')} cells · ${Math.round(ink / (c.W * c.H) * 100)}% ink · ${plural(n, 'edit')}`;
-  $('#status').textContent = pixels() && sh
+  $('#status').textContent = blank() && sh
+    ? `no photo · clean avatar · ${S.look.clean.mode} · ${sh.W}×${sh.H} · ${Math.round(ink / (sh.W * sh.H) * 100)}% ink · ${plural(n, 'edit')}`
+    : pixels() && sh
     ? `imported · ${S.photo!.name} · ${cellsInk(sh)}`
     : r && sh
     ? `${ed.live ? 'base' : 'baked'} · ${styleInfo(S.style).t.toLowerCase()} · ${sh.W}×${sh.H} · ${(sh.W * sh.H).toLocaleString('en')} cells · ${Math.round(ink / (sh.W * sh.H) * 100)}% ink · ${plural(n, 'edit')} · ${fmtMs(r.ms + (r.style === 'ml' ? 0 : S.prepMs))}`
@@ -712,6 +936,12 @@ function lookChanged() { refresh(); scheduleRender(); }
 
 /** Change width and/or height; with the lock on, the other side follows the frame ratio. */
 function setGrid(W: number | null, H: number | null) {
+  if (isClean()) { // the clean avatar comes in the sizes the art is drawn at, square
+    const n = snapClean(W ?? H ?? S.W);
+    W = n; H = null;
+    S.ratio = '1:1';
+    S.H = n;
+  }
   const r = RATIOS[S.ratio], locked = S.lock && r;
   if (W != null) { S.W = W; if (locked) S.H = Math.max(16, Math.min(300, Math.round(W * S.cellAspect * r[1] / r[0]))); }
   if (H != null) { S.H = H; if (locked) S.W = Math.max(16, Math.min(250, Math.round(H * r[0] / (r[1] * S.cellAspect)))); }
@@ -859,8 +1089,17 @@ const selectAll = () => { if (!editBase()) return; S.ed.selectAll(); S.ed.tool =
 $$<HTMLButtonElement>('[data-sel]').forEach(b => b.addEventListener('click', () => selAct(b.dataset.sel!)));
 seg($('#behindseg'), b => { S.ed.behind = b.dataset.behind as Behind; refresh(); });
 $$<HTMLButtonElement>('[data-cycle]').forEach(b => (b.onclick = () => cycleStamp(b.closest<HTMLElement>('[data-stamp]')!.dataset.stamp as StampKind, +b.dataset.cycle!)));
-$$<HTMLButtonElement>('[data-opts]').forEach(b => (b.onclick = () => openOptions(b.closest<HTMLElement>('[data-stamp]')!.dataset.stamp as StampKind)));
+$$<HTMLButtonElement>('[data-stamp] [data-opts]').forEach(b => (b.onclick = () => openOptions(b.closest<HTMLElement>('[data-stamp]')!.dataset.stamp as StampKind)));
+$$<HTMLButtonElement>('[data-pcycle]').forEach(b => (b.onclick = () => cyclePart(b.closest<HTMLElement>('[data-part]')!.dataset.part as CleanPart, +b.dataset.pcycle!)));
+$$<HTMLButtonElement>('[data-part] [data-opts]').forEach(b => (b.onclick = () => openPartOptions(b.closest<HTMLElement>('[data-part]')!.dataset.part as CleanPart)));
+seg($('#cleanmode'), b => setCleanMode(b.dataset.mode as 'custom' | 'prebuilt'));
+$$<HTMLButtonElement>('[data-char]').forEach(b => (b.onclick = () => stepCharacter(+b.dataset.char!)));
 $('#stamps-auto').onclick = () => {
+  if (isClean()) {
+    S.look.clean = structuredClone(AUTO_CLEAN);
+    log('> all parts on auto · closest to the photo'); syncControls(); lookChanged();
+    return;
+  }
   S.look.stamps = { ...AUTO_STAMPS };
   for (const k of STAMP_KINDS) if (k !== 'glasses') S.look.features[FEATURE_OF[k]] = true;
   S.look.features.glasses = (S.photo?.glasses ?? -1) >= GLASSES_MIN_SHARE;
@@ -874,6 +1113,11 @@ $$<HTMLButtonElement>('[data-brush]').forEach(b => (b.onclick = () => { S.ed.bru
     return [Math.floor((e.clientX - r.left) / r.width * S.ed.W), Math.floor((e.clientY - r.top) / r.height * S.ed.H)];
   };
   cv.addEventListener('pointerdown', e => {
+    if (S.step === 'stamps' && !pixels() && isClean()) { // tap a part to see its options
+      const kind = cleanPartAt(...cellAt(e));
+      if (kind) { openPartOptions(kind, false); log(`> ${kind} · pick an option in the panel`); }
+      return;
+    }
     if (S.step === 'stamps' && !pixels()) { // tap a feature to cycle its stamp
       const face = gridFace(), [x, y] = cellAt(e);
       if (!face) return;
@@ -952,13 +1196,21 @@ window.addEventListener('keydown', e => {
 // ---------------------------------------------------------------- boot
 const fileInput = $('#file') as HTMLInputElement;
 $$('[data-choose]').forEach(b => (b.onclick = () => fileInput.click()));
+$$('[data-blank]').forEach(b => (b.onclick = () => { startBlank(Date.now(), null); log('> no photo · prebuilt characters · step through them in 03 style, or drop a photo for a match'); }));
 wireImport(fileInput, f => void loadPhoto(f), over => document.body.classList.toggle('dragover', over));
 window.addEventListener('resize', () => refresh());
 setInterval(() => ($('#clock').textContent = new Date().toTimeString().slice(0, 8)), 1000);
 
 buildGallery();
+// The characters' nicknames and names, for the clean avatar's picker.
+fetch(`${import.meta.env.BASE_URL}avatars/manifest.json`).then(r => r.json()).then((m: { chars: typeof characters }) => {
+  characters = m.chars.map(({ nick, name, number }) => ({ nick, name, number }));
+  refresh();
+}).catch(() => log('> could not load the clean avatar characters'));
 for (const s of PHOTO_STEPS) // shown while a pixel image is open
   $(`.panel[data-panel=${s}] .dash`).insertAdjacentHTML('afterend', '<div class="warn small pixnote" hidden>An imported pixel image is open: this step turns photos into pixels and doesn\'t change it. Edit it in 07 draw.</div>');
+for (const s of NEEDS_PHOTO) // shown while there is no photo (started from a character)
+  $(`.panel[data-panel=${s}] .dash`).insertAdjacentHTML('afterend', '<div class="warn small blanknote" hidden>No photo yet: this step works on a photo. Drop one in to match the clean avatar to it.</div>');
 syncControls();
 setStep('photo');
 paintGallery();
@@ -966,7 +1218,8 @@ paintGallery();
 store.load().then(async saved => {
   if (!saved || S.photo) return;
   const p = saved.photo;
-  if (p.kind === 'pixels') {
+  if (p.kind === 'blank') startBlank(p.id, saved.state, true);
+  else if (p.kind === 'pixels') {
     const art = pixelArtOf(await loadImage(p.png));
     if (!art) return;
     startPixels(p.id, p.name, art, saved.state, true);

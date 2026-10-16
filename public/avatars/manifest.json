@@ -1,0 +1,925 @@
+{
+ "sizes": [
+  25,
+  50,
+  72,
+  80,
+  96,
+  128
+ ],
+ "labels": [
+  "paper",
+  "head",
+  "brows",
+  "eyes",
+  "glasses",
+  "nose",
+  "mouth",
+  "facial",
+  "face",
+  "head-in-face",
+  "beard"
+ ],
+ "chars": [
+  {
+   "number": 1,
+   "nick": "sidepart",
+   "name": "Side part",
+   "tags": {
+    "glasses": {
+     "shape": "square",
+     "aspect": 1.1
+    },
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.907,
+    "width": 2.593,
+    "volume": 2.745,
+    "density": 0.928,
+    "length": 0.0,
+    "hairline": 1.093,
+    "asym": -0.103
+   }
+  },
+  {
+   "number": 2,
+   "nick": "bob",
+   "name": "Short bob",
+   "tags": {
+    "glasses": {
+     "shape": "round",
+     "aspect": 1.19
+    },
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "closed",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.845,
+    "width": 3.345,
+    "volume": 3.065,
+    "density": 0.924,
+    "length": 0.245,
+    "hairline": 1.259,
+    "asym": 0.005
+   }
+  },
+  {
+   "number": 3,
+   "nick": "flame",
+   "name": "Flame hair",
+   "tags": {
+    "glasses": {
+     "shape": "square",
+     "aspect": 1.19
+    },
+    "facial": "goatee",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "grin"
+   },
+   "hair": {
+    "top": 2.283,
+    "width": 2.755,
+    "volume": 3.319,
+    "density": 0.878,
+    "length": 0.04,
+    "hairline": 1.0,
+    "asym": 0.044
+   }
+  },
+  {
+   "number": 4,
+   "nick": "waves",
+   "name": "Long waves",
+   "tags": {
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "grin"
+   },
+   "hair": {
+    "top": 1.914,
+    "width": 3.517,
+    "volume": 3.342,
+    "density": 0.905,
+    "length": 0.774,
+    "hairline": 1.017,
+    "asym": 0.16
+   }
+  },
+  {
+   "number": 5,
+   "nick": "buzzbeard",
+   "name": "Buzz + beard",
+   "tags": {
+    "facial": "beard",
+    "headFacial": "beard",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.441,
+    "width": 2.529,
+    "volume": 1.319,
+    "density": 0.91,
+    "length": 0.034,
+    "hairline": 0.824,
+    "asym": 0.085
+   }
+  },
+  {
+   "number": 6,
+   "nick": "pixie",
+   "name": "Pixie + cat-eye",
+   "tags": {
+    "glasses": {
+     "shape": "round",
+     "aspect": 1.57
+    },
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 2.033,
+    "width": 2.867,
+    "volume": 3.481,
+    "density": 0.903,
+    "length": 0.067,
+    "hairline": 0.9,
+    "asym": -0.179
+   }
+  },
+  {
+   "number": 7,
+   "nick": "centrepart",
+   "name": "Long centre part",
+   "tags": {
+    "glasses": {
+     "shape": "round",
+     "aspect": 1.08
+    },
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "closed",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.783,
+    "width": 2.967,
+    "volume": 2.39,
+    "density": 0.932,
+    "length": 0.74,
+    "hairline": 1.283,
+    "asym": -0.088
+   }
+  },
+  {
+   "number": 8,
+   "nick": "fringe",
+   "name": "Straight fringe",
+   "tags": {
+    "glasses": {
+     "shape": "square",
+     "aspect": 1.36
+    },
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 2.035,
+    "width": 2.912,
+    "volume": 3.408,
+    "density": 0.933,
+    "length": 0.814,
+    "hairline": 1.088,
+    "asym": -0.033
+   }
+  },
+  {
+   "number": 9,
+   "nick": "curls",
+   "name": "Rounded curls",
+   "tags": {
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "closed",
+    "mouth": "grin"
+   },
+   "hair": {
+    "top": 1.966,
+    "width": 3.153,
+    "volume": 3.83,
+    "density": 0.957,
+    "length": 0.117,
+    "hairline": 1.085,
+    "asym": 0.016
+   }
+  },
+  {
+   "number": 10,
+   "nick": "curlybob",
+   "name": "Curly bob",
+   "tags": {
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.727,
+    "width": 3.424,
+    "volume": 2.935,
+    "density": 0.904,
+    "length": 0.39,
+    "hairline": 1.121,
+    "asym": -0.188
+   }
+  },
+  {
+   "number": 11,
+   "nick": "baldstache",
+   "name": "Bald + moustache",
+   "tags": {
+    "glasses": {
+     "shape": "round",
+     "aspect": 1.16
+    },
+    "facial": "moustache",
+    "headFacial": "none",
+    "eyes": "closed",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.433,
+    "width": 2.746,
+    "volume": 0.527,
+    "density": 0.865,
+    "length": 0.382,
+    "hairline": 1.343,
+    "asym": 0.025
+   }
+  },
+  {
+   "number": 12,
+   "nick": "closecrop",
+   "name": "Close crop",
+   "tags": {
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "closed",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.828,
+    "width": 2.552,
+    "volume": 1.774,
+    "density": 0.964,
+    "length": 0.074,
+    "hairline": 1.621,
+    "asym": 0.035
+   }
+  },
+  {
+   "number": 13,
+   "nick": "shag",
+   "name": "Shag + frames",
+   "tags": {
+    "glasses": {
+     "shape": "square",
+     "aspect": 1.64
+    },
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 2.107,
+    "width": 3.143,
+    "volume": 3.997,
+    "density": 0.913,
+    "length": 0.028,
+    "hairline": 1.393,
+    "asym": -0.076
+   }
+  },
+  {
+   "number": 14,
+   "nick": "roundwaves",
+   "name": "Waves + round",
+   "tags": {
+    "glasses": {
+     "shape": "round",
+     "aspect": 1.19
+    },
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.983,
+    "width": 3.467,
+    "volume": 3.453,
+    "density": 0.875,
+    "length": 0.815,
+    "hairline": 1.117,
+    "asym": 0.087
+   }
+  },
+  {
+   "number": 15,
+   "nick": "tightcurls",
+   "name": "Tight curls",
+   "tags": {
+    "glasses": {
+     "shape": "round",
+     "aspect": 1.44
+    },
+    "facial": "goatee",
+    "headFacial": "goatee",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 2.053,
+    "width": 2.772,
+    "volume": 2.738,
+    "density": 0.911,
+    "length": 0.006,
+    "hairline": 1.211,
+    "asym": 0.005
+   }
+  },
+  {
+   "number": 16,
+   "nick": "bun",
+   "name": "Bun + tendrils",
+   "tags": {
+    "glasses": {
+     "shape": "round",
+     "aspect": 1.46
+    },
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "closed",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 2.474,
+    "width": 3.018,
+    "volume": 3.717,
+    "density": 0.918,
+    "length": 0.18,
+    "hairline": 1.246,
+    "asym": -0.099
+   }
+  },
+  {
+   "number": 17,
+   "nick": "tiedback",
+   "name": "Tied-back hair",
+   "tags": {
+    "facial": "beard",
+    "headFacial": "beard",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 2.293,
+    "width": 3.261,
+    "volume": 3.227,
+    "density": 0.895,
+    "length": 0.249,
+    "hairline": 1.12,
+    "asym": -0.044
+   }
+  },
+  {
+   "number": 18,
+   "nick": "longcurls",
+   "name": "Long curls",
+   "tags": {
+    "glasses": {
+     "shape": "square",
+     "aspect": 1.29
+    },
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 2.174,
+    "width": 3.913,
+    "volume": 4.183,
+    "density": 0.901,
+    "length": 0.864,
+    "hairline": 1.217,
+    "asym": -0.045
+   }
+  },
+  {
+   "number": 19,
+   "nick": "pompadour",
+   "name": "Pompadour",
+   "tags": {
+    "facial": "moustache",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 2.244,
+    "width": 2.622,
+    "volume": 3.214,
+    "density": 0.872,
+    "length": 0.006,
+    "hairline": 1.089,
+    "asym": -0.053
+   }
+  },
+  {
+   "number": 20,
+   "nick": "asymbob",
+   "name": "Asymmetric bob",
+   "tags": {
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.696,
+    "width": 2.893,
+    "volume": 2.582,
+    "density": 0.917,
+    "length": 0.168,
+    "hairline": 1.054,
+    "asym": -0.176
+   }
+  },
+  {
+   "number": 21,
+   "nick": "quiff",
+   "name": "Silver quiff",
+   "tags": {
+    "glasses": {
+     "shape": "square",
+     "aspect": 1.2
+    },
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 2.375,
+    "width": 2.7,
+    "volume": 1.025,
+    "density": 0.917,
+    "length": 0.009,
+    "hairline": 2.275,
+    "asym": 0.02
+   }
+  },
+  {
+   "number": 22,
+   "nick": "ponytail",
+   "name": "High ponytail",
+   "tags": {
+    "glasses": {
+     "shape": "round",
+     "aspect": 1.0
+    },
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "closed",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 2.326,
+    "width": 2.957,
+    "volume": 3.892,
+    "density": 0.894,
+    "length": 0.407,
+    "hairline": 1.109,
+    "asym": 0.2
+   }
+  },
+  {
+   "number": 23,
+   "nick": "braid",
+   "name": "Long braid",
+   "tags": {
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.925,
+    "width": 3.05,
+    "volume": 2.697,
+    "density": 0.946,
+    "length": 0.294,
+    "hairline": 1.475,
+    "asym": -0.016
+   }
+  },
+  {
+   "number": 24,
+   "nick": "afro",
+   "name": "Full afro",
+   "tags": {
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "grin"
+   },
+   "hair": {
+    "top": 2.0,
+    "width": 4.089,
+    "volume": 5.181,
+    "density": 0.942,
+    "length": 0.712,
+    "hairline": 1.022,
+    "asym": 0.024
+   }
+  },
+  {
+   "number": 25,
+   "nick": "curtains",
+   "name": "Curtain cut",
+   "tags": {
+    "glasses": {
+     "shape": "round",
+     "aspect": 1.23
+    },
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.854,
+    "width": 3.042,
+    "volume": 3.387,
+    "density": 0.919,
+    "length": 0.033,
+    "hairline": 1.396,
+    "asym": -0.029
+   }
+  },
+  {
+   "number": 26,
+   "nick": "twinbraids",
+   "name": "Twin braids",
+   "tags": {
+    "glasses": {
+     "shape": "round",
+     "aspect": 1.06
+    },
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "closed",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.722,
+    "width": 2.667,
+    "volume": 2.374,
+    "density": 0.918,
+    "length": 0.407,
+    "hairline": 1.574,
+    "asym": -0.003
+   }
+  },
+  {
+   "number": 27,
+   "nick": "crewcut",
+   "name": "Crew cut",
+   "tags": {
+    "facial": "moustache",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.66,
+    "width": 3.021,
+    "volume": 1.717,
+    "density": 0.928,
+    "length": 0.014,
+    "hairline": 1.021,
+    "asym": -0.011
+   }
+  },
+  {
+   "number": 28,
+   "nick": "bluntbob",
+   "name": "Blunt bob",
+   "tags": {
+    "glasses": {
+     "shape": "round",
+     "aspect": 1.38
+    },
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.806,
+    "width": 3.143,
+    "volume": 2.93,
+    "density": 0.938,
+    "length": 0.529,
+    "hairline": 1.031,
+    "asym": 0.026
+   }
+  },
+  {
+   "number": 29,
+   "nick": "receding",
+   "name": "Receding + beard",
+   "tags": {
+    "glasses": {
+     "shape": "square",
+     "aspect": 1.27
+    },
+    "facial": "beard",
+    "headFacial": "beard",
+    "eyes": "closed",
+    "mouth": "hidden"
+   },
+   "hair": {
+    "top": 1.56,
+    "width": 2.84,
+    "volume": 1.229,
+    "density": 0.945,
+    "length": 0.181,
+    "hairline": 1.32,
+    "asym": 0.013
+   }
+  },
+  {
+   "number": 30,
+   "nick": "sidebraid",
+   "name": "Side braid",
+   "tags": {
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.784,
+    "width": 3.216,
+    "volume": 2.687,
+    "density": 0.917,
+    "length": 0.283,
+    "hairline": 1.314,
+    "asym": -0.102
+   }
+  },
+  {
+   "number": 31,
+   "nick": "flattop",
+   "name": "Flat top",
+   "tags": {
+    "glasses": {
+     "shape": "round",
+     "aspect": 1.2
+    },
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.62,
+    "width": 2.76,
+    "volume": 2.067,
+    "density": 0.956,
+    "length": 0.032,
+    "hairline": 0.98,
+    "asym": 0.0
+   }
+  },
+  {
+   "number": 32,
+   "nick": "curlycateye",
+   "name": "Curly cat-eye",
+   "tags": {
+    "glasses": {
+     "shape": "round",
+     "aspect": 1.31
+    },
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.679,
+    "width": 3.887,
+    "volume": 3.336,
+    "density": 0.91,
+    "length": 0.842,
+    "hairline": 1.0,
+    "asym": -0.057
+   }
+  },
+  {
+   "number": 33,
+   "nick": "locs",
+   "name": "Shoulder locs",
+   "tags": {
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 2.065,
+    "width": 3.435,
+    "volume": 3.316,
+    "density": 0.893,
+    "length": 0.797,
+    "hairline": 1.152,
+    "asym": -0.331
+   }
+  },
+  {
+   "number": 34,
+   "nick": "shaved",
+   "name": "Shaved head",
+   "tags": {
+    "glasses": {
+     "shape": "round",
+     "aspect": 1.09
+    },
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "closed",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.421,
+    "width": 2.491,
+    "volume": 0.457,
+    "density": 0.879,
+    "length": 0.102,
+    "hairline": 1.316,
+    "asym": 0.013
+   }
+  },
+  {
+   "number": 35,
+   "nick": "aviator",
+   "name": "Aviator + stache",
+   "tags": {
+    "glasses": {
+     "shape": "round",
+     "aspect": 1.19
+    },
+    "facial": "moustache",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.86,
+    "width": 2.64,
+    "volume": 2.195,
+    "density": 0.907,
+    "length": 0.094,
+    "hairline": 1.54,
+    "asym": -0.001
+   }
+  },
+  {
+   "number": 36,
+   "nick": "sweptpixie",
+   "name": "Swept pixie",
+   "tags": {
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.792,
+    "width": 2.906,
+    "volume": 3.013,
+    "density": 0.87,
+    "length": 0.076,
+    "hairline": 1.0,
+    "asym": -0.262
+   }
+  },
+  {
+   "number": 37,
+   "nick": "topknot",
+   "name": "Undercut knot",
+   "tags": {
+    "glasses": {
+     "shape": "round",
+     "aspect": 0.96
+    },
+    "facial": "goatee",
+    "headFacial": "goatee",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 2.488,
+    "width": 2.927,
+    "volume": 2.391,
+    "density": 0.872,
+    "length": 0.062,
+    "hairline": 1.22,
+    "asym": 0.081
+   }
+  },
+  {
+   "number": 38,
+   "nick": "buns",
+   "name": "Double buns",
+   "tags": {
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.891,
+    "width": 2.609,
+    "volume": 4.078,
+    "density": 0.872,
+    "length": 0.1,
+    "hairline": 1.065,
+    "asym": -0.008
+   }
+  },
+  {
+   "number": 39,
+   "nick": "longbeard",
+   "name": "Long beard",
+   "tags": {
+    "glasses": {
+     "shape": "round",
+     "aspect": 1.17
+    },
+    "facial": "beard",
+    "headFacial": "beard",
+    "eyes": "closed",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.977,
+    "width": 3.721,
+    "volume": 3.189,
+    "density": 0.9,
+    "length": 0.891,
+    "hairline": 1.233,
+    "asym": -0.011
+   }
+  },
+  {
+   "number": 40,
+   "nick": "sidefringe",
+   "name": "Side fringe",
+   "tags": {
+    "glasses": {
+     "shape": "square",
+     "aspect": 1.4
+    },
+    "facial": "none",
+    "headFacial": "none",
+    "eyes": "open",
+    "mouth": "smile"
+   },
+   "hair": {
+    "top": 1.867,
+    "width": 2.978,
+    "volume": 3.004,
+    "density": 0.953,
+    "length": 0.823,
+    "hairline": 1.2,
+    "asym": -0.097
+   }
+  }
+ ]
+}

@@ -216,6 +216,20 @@ function goatee(f: Face): Pt[] {
   return [[c[0] - w * 0.28, top], [c[0] + w * 0.28, top], [c[0] + w * 0.08, bot], [c[0] - w * 0.08, bot]];
 }
 
+/**
+ * Facial hair for the clean avatar's matching: none, a moustache, a goatee (chin only) or a beard (the jaw sides
+ * dark too), from the same lower-face cue and zones as the moustache and goatee drawn here.
+ */
+export function facialHairKind(p: Prepared): 'none' | 'moustache' | 'goatee' | 'beard' {
+  const lm = p.lm;
+  if (!lm || p.facialHair < FACIAL_HAIR_MIN) return 'none';
+  const f: Face = { lm, W: p.W, H: p.H }, ref = cheekTone(p, lm);
+  // below the mouth corners, out to the jaw line, on both sides
+  const jaw = [pts(lm, [61, 136, 150, 149, 176]), pts(lm, [291, 365, 379, 378, 400])].map(z => darkShare(p, z, ref));
+  if (Math.min(...jaw) >= 0.5) return 'beard';
+  return darkShare(p, goatee(f), ref) >= 0.3 && darkShare(p, moustache(f), ref) < 0.6 ? 'goatee' : 'moustache';
+}
+
 // ---------------------------------------------------------------- the style
 const neighbours = (m: Mask, W: number, H: number, x: number, y: number) => {
   let n = 0;

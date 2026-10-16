@@ -35,7 +35,7 @@
     <div class="spaced dim navsec">EDIT</div>
     <div class="list">
       <div class="lrow" data-step="draw" tabindex="0"><span class="lnum">07</span><span class="left">draw</span><span class="right" data-bind="edits">—</span></div>
-      <div class="lrow" data-step="stamps" tabindex="0"><span class="lnum">08</span><span class="left">stamps</span><span class="right" data-bind="stamps">auto</span></div>
+      <div class="lrow" data-step="stamps" tabindex="0"><span class="lnum">08</span><span class="left">parts</span><span class="right" data-bind="stamps">auto</span></div>
       <div class="lrow" data-step="colours" tabindex="0"><span class="lnum">09</span><span class="left">colours</span><span class="right"><span class="mini" data-sw="0"></span><span class="mini" data-sw="1"></span></span></div>
     </div>
     <div class="spaced dim navsec">MAKE</div>
@@ -69,6 +69,7 @@
           <div class="big">drop a portrait here</div>
           <div>paste · <button class="btn" data-choose>choose file</button></div>
           <div class="small faint" style="margin-top:14px">one person · or a pixel image (PNG / BMP) to edit · it never leaves this device</div>
+          <div class="small" style="margin-top:14px">no photo? <button class="btn" data-blank>start from a character</button></div>
         </div>
       </div>
       <div id="editor"><canvas id="cv" aria-label="pixel portrait"></canvas></div>
@@ -149,7 +150,7 @@
       <div class="dash"></div>
       <div class="note">One cell is one stitch.</div>
       <div class="subhead">SIZE<i></i></div>
-      <div class="seg" id="sizeseg"><button>32</button><button>50</button><button>64</button><button>96</button><button>128</button></div>
+      <div class="seg" id="sizeseg"><button>25</button><button>50</button><button>72</button><button>80</button><button>96</button><button>128</button></div>
       <div class="row" style="margin-top:8px"><label>width</label><div class="bar" id="bar-w"></div><span class="barval"></span></div>
       <div class="row"><label>height</label><div class="bar" id="bar-h"></div><span class="barval"></span></div>
       <button class="check" id="lockcheck"><span class="box">[ ]</span> lock to frame ratio</button>
@@ -163,12 +164,19 @@
       <div class="kicker">03 · START</div>
       <div class="title">Style</div>
       <div class="dash"></div>
-      <div class="note">Every style is rendered from your photo. Pick one to start from; your edits will stay on their own layer.</div>
+      <div class="note">The clean avatar is put together from the team's characters; every other style is rendered from your photo. Pick one to start from; your edits will stay on their own layer.</div>
       <div class="list" id="stylelist"></div>
+      <div id="cleanbox">
+        <div class="subhead">CLEAN AVATAR<i></i></div>
+        <div class="row"><label>mode</label><div class="seg" id="cleanmode"><button data-mode="custom" title="parts closest to the photo, each changeable in 08 parts">custom</button><button data-mode="prebuilt" title="one of the team's characters, exactly as drawn">prebuilt</button></div></div>
+        <div class="row"><label>character</label><div class="val"><div class="stepper"><button data-char="-1" aria-label="previous character">‹</button><span data-bind="character">—</span><button data-char="1" aria-label="next character">›</button></div></div></div>
+        <div class="opts chars" id="charopts"></div>
+        <div class="explain small">Clean avatar is put together from the team's 40 characters, never traced from the photo. Custom (the default) takes the hair (with its head, ears and shoulders) closest to the photo's hair and keeps that character's face, swapping in glasses, a beard or moustache, closed eyes or a grin when the photo shows them; change any part in 08 parts. Prebuilt shows one character exactly as drawn: "auto" is the closest to your photo (dashed); step through them or pick one. Changing a part of a prebuilt character makes it custom, starting from that character. The characters exist at 25, 50, 72, 80, 96 and 128 stitches square, so the grid snaps to those sizes while this style is selected.</div>
+      </div>
       <div class="subhead">PARAMETERS<i></i></div>
       <div class="row"><label>line weight</label><div class="bar" id="bar-lineweight"></div><span class="barval"></span></div>
       <div class="row"><label>cleanup</label><div class="bar" id="bar-cleanup"></div><span class="barval"></span></div>
-      <div class="explain small">Clean avatar keeps the face paper with a one-cell contour, makes dark hair one solid mass (light or curly hair becomes strands) and draws every feature as a small shape: pupils, lids or dashes for narrowed eyes, continuous glasses rims, a moustache bar and goatee when the photo has them. Line weight thickens or thins the model's lines (ML lines). Cleanup removes lone cells that disagree with almost all of their neighbours (in the avatar: specks in curly hair); drawn features are protected. ML lines downloads a 15 MB line model once, then runs on this device.</div>
+      <div class="explain small">Image-driven avatar keeps the face paper with a one-cell contour, makes dark hair one solid mass (light or curly hair becomes strands) and draws every feature as a small shape: pupils, lids or dashes for narrowed eyes, continuous glasses rims, a moustache bar and goatee when the photo has them. Line weight thickens or thins the model's lines (ML lines). Cleanup removes lone cells that disagree with almost all of their neighbours (in the avatar: specks in curly hair); drawn features are protected. ML lines downloads a 15 MB line model once, then runs on this device.</div>
     </section>
 
     <section class="panel" data-panel="regions">
@@ -239,17 +247,25 @@
 
     <section class="panel" data-panel="stamps">
       <div class="kicker">08 · EDIT</div>
-      <div class="title">Stamps</div>
+      <div class="title">Parts</div>
       <div class="dash"></div>
-      <div class="note">Designed features, placed from the face points. Tap a feature in the view, or its name here, to see every option on your portrait.</div>
-      <div class="row" data-stamp="eyes"><label><button class="optlink" data-opts aria-expanded="false">eyes</button></label><div class="val"><div class="stepper"><button data-cycle="-1" aria-label="previous eyes">‹</button><span></span><button data-cycle="1" aria-label="next eyes">›</button></div></div></div>
-      <div class="row" data-stamp="brows"><label><button class="optlink" data-opts aria-expanded="false">brows</button></label><div class="val"><div class="stepper"><button data-cycle="-1" aria-label="previous brows">‹</button><span></span><button data-cycle="1" aria-label="next brows">›</button></div></div></div>
-      <div class="row" data-stamp="mouth"><label><button class="optlink" data-opts aria-expanded="false">mouth</button></label><div class="val"><div class="stepper"><button data-cycle="-1" aria-label="previous mouth">‹</button><span></span><button data-cycle="1" aria-label="next mouth">›</button></div></div></div>
-      <div class="row" data-stamp="nose"><label><button class="optlink" data-opts aria-expanded="false">nose</button></label><div class="val"><div class="stepper"><button data-cycle="-1" aria-label="previous nose">‹</button><span></span><button data-cycle="1" aria-label="next nose">›</button></div></div></div>
-      <div class="row" data-stamp="glasses"><label><button class="optlink" data-opts aria-expanded="false">glasses</button></label><div class="val"><div class="stepper"><button data-cycle="-1" aria-label="previous glasses">‹</button><span></span><button data-cycle="1" aria-label="next glasses">›</button></div></div></div>
+      <div class="note">The face's parts, one row each. Tap a part in the view, or its name here, to see every option on your portrait.</div>
+      <div class="row stamprow" data-stamp="eyes"><label><button class="optlink" data-opts aria-expanded="false">eyes</button></label><div class="val"><div class="stepper"><button data-cycle="-1" aria-label="previous eyes">‹</button><span></span><button data-cycle="1" aria-label="next eyes">›</button></div></div></div>
+      <div class="row stamprow" data-stamp="brows"><label><button class="optlink" data-opts aria-expanded="false">brows</button></label><div class="val"><div class="stepper"><button data-cycle="-1" aria-label="previous brows">‹</button><span></span><button data-cycle="1" aria-label="next brows">›</button></div></div></div>
+      <div class="row stamprow" data-stamp="mouth"><label><button class="optlink" data-opts aria-expanded="false">mouth</button></label><div class="val"><div class="stepper"><button data-cycle="-1" aria-label="previous mouth">‹</button><span></span><button data-cycle="1" aria-label="next mouth">›</button></div></div></div>
+      <div class="row stamprow" data-stamp="nose"><label><button class="optlink" data-opts aria-expanded="false">nose</button></label><div class="val"><div class="stepper"><button data-cycle="-1" aria-label="previous nose">‹</button><span></span><button data-cycle="1" aria-label="next nose">›</button></div></div></div>
+      <div class="row stamprow" data-stamp="glasses"><label><button class="optlink" data-opts aria-expanded="false">glasses</button></label><div class="val"><div class="stepper"><button data-cycle="-1" aria-label="previous glasses">‹</button><span></span><button data-cycle="1" aria-label="next glasses">›</button></div></div></div>
+      <div class="row partrow" data-part="hair" hidden><label><button class="optlink" data-opts aria-expanded="false">hair</button></label><div class="val"><div class="stepper"><button data-pcycle="-1" aria-label="previous hair">‹</button><span></span><button data-pcycle="1" aria-label="next hair">›</button></div></div></div>
+      <div class="row partrow" data-part="eyes" hidden><label><button class="optlink" data-opts aria-expanded="false">eyes</button></label><div class="val"><div class="stepper"><button data-pcycle="-1" aria-label="previous eyes">‹</button><span></span><button data-pcycle="1" aria-label="next eyes">›</button></div></div></div>
+      <div class="row partrow" data-part="brows" hidden><label><button class="optlink" data-opts aria-expanded="false">brows</button></label><div class="val"><div class="stepper"><button data-pcycle="-1" aria-label="previous brows">‹</button><span></span><button data-pcycle="1" aria-label="next brows">›</button></div></div></div>
+      <div class="row partrow" data-part="nose" hidden><label><button class="optlink" data-opts aria-expanded="false">nose</button></label><div class="val"><div class="stepper"><button data-pcycle="-1" aria-label="previous nose">‹</button><span></span><button data-pcycle="1" aria-label="next nose">›</button></div></div></div>
+      <div class="row partrow" data-part="mouth" hidden><label><button class="optlink" data-opts aria-expanded="false">mouth</button></label><div class="val"><div class="stepper"><button data-pcycle="-1" aria-label="previous mouth">‹</button><span></span><button data-pcycle="1" aria-label="next mouth">›</button></div></div></div>
+      <div class="row partrow" data-part="glasses" hidden><label><button class="optlink" data-opts aria-expanded="false">glasses</button></label><div class="val"><div class="stepper"><button data-pcycle="-1" aria-label="previous glasses">‹</button><span></span><button data-pcycle="1" aria-label="next glasses">›</button></div></div></div>
+      <div class="row partrow" data-part="facial" hidden><label><button class="optlink" data-opts aria-expanded="false">facial hair</button></label><div class="val"><div class="stepper"><button data-pcycle="-1" aria-label="previous facial hair">‹</button><span></span><button data-pcycle="1" aria-label="next facial hair">›</button></div></div></div>
       <div class="opts" id="stampopts" hidden></div>
       <div class="inline"><button class="btn" id="stamps-auto">all auto</button></div>
-      <div class="explain small">Every option is shown as your portrait would look with it, in the selected style; pick one to use it, "auto" to let the style decide, "off" to leave the feature out. Auto, clean avatar: pupils behind glasses, lid + pupil without, dashes for narrowed eyes; one-row brows (two where the real brow is that thick), lifted above glasses rims; a D-shaped grin for an open smile, a smile or a line otherwise, and the moustache standing in for a closed mouth; a small nose except behind glasses; glasses shaped and sized like the frames when the photo shows them all round. The options were drawn as about twenty candidates each and the awkward ones taken out.</div>
+      <div class="explain small stamprow">Image-driven avatar and the other photo styles draw each part from the face points. Every option is shown as your portrait would look with it, in the selected style; pick one to use it, "auto" to let the style decide, "off" to leave the feature out. Auto, image-driven avatar: pupils behind glasses, lid + pupil without, dashes for narrowed eyes; one-row brows (two where the real brow is that thick), lifted above glasses rims; a D-shaped grin for an open smile, a smile or a line otherwise, and the moustache standing in for a closed mouth; a small nose except behind glasses; glasses shaped and sized like the frames when the photo shows them all round. The options were drawn as about twenty candidates each and the awkward ones taken out.</div>
+      <div class="explain small partrow" hidden>Clean avatar: every option is a part of one of the team's characters, named after it, placed on your hair's face at its eyes, nose and mouth and fitted to what is around it (brows kept off the hair and the frames, a gap around the mouth in a beard). Hair comes with its head, ears and shoulders. Only parts that fit this face are offered, and parts that look alike at this size are shown once. Auto keeps the hair's own parts and swaps in what the photo shows: glasses, a beard, goatee or moustache, closed eyes, a grin. A beard drawn into a character's jaw stays with that hair.</div>
     </section>
 
     <section class="panel" data-panel="colours">

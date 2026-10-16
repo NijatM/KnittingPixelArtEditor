@@ -77,7 +77,7 @@ Portrait palette defaults: ink `#000000`, paper `#ffffff` — binary black and w
 | 05 | START | features | auto | pixels |
 | 06 | START | background | white | pixels |
 | 07 | EDIT | draw | 18 edits | pixels |
-| 08 | EDIT | stamps | auto | pixels |
+| 08 | EDIT | parts | auto / `n picked` / `prebuilt · bob` | pixels |
 | 09 | EDIT | colours | two mini swatches | pixels |
 | 10 | MAKE | export | png | pixels |
 | 11 | MAKE | reset | start over (faint) | — opens the reset dialog: "Reset everything?" · cancel · **yes, reset everything** (filled `--accent` #2b5076, the focus-ring blue a shade darker; `--accent-hi` #325d86 on hover / focus); yes forgets the saved project and reloads |
@@ -109,15 +109,15 @@ Selected row: `bg2` + `> ` prefix. Rows that aren't usable yet (no photo loaded)
 
 ## Inspector panels (content per step)
 
-- **00 Photo**: drop zone (dashed, thumbnail, "drop · paste · choose file"); DETECTED rows: face, regions, glasses; okline timing. A pixel image opens straight on 07 Draw; the photo steps (01, 03–06, 08) turn faint and show a warn line saying they don't change it.
+- **00 Photo**: drop zone (dashed, thumbnail, "drop · paste · choose file"); the empty stage also offers **start from a character** (no photo: clean avatar, prebuilt; 01 and 04–06 faint with a note); DETECTED rows: face, regions, glasses; okline timing. A pixel image opens straight on 07 Draw; the photo steps (01, 03–06, 08) turn faint and show a warn line saying they don't change it.
 - **01 Frame**: RATIO seg 1:1 · 4:5 · 3:4 · 2:3 · free; CROP framing (tight↔wide), vertical; reset to auto.
-- **02 Grid**: SIZE seg 32 · 50 · 64 · 96 · 128; width, height bars; `[x] lock to frame ratio`; CELL aspect w:h (1.00).
-- **03 Style**: style list A–F (A clean avatar first, + faint G v2) with ms; letters follow the order; PARAMETERS threshold, line weight, cleanup (per style).
+- **02 Grid**: SIZE seg 25 · 50 · 72 · 80 · 96 · 128 (the clean avatar's sizes; the grid snaps to them while it is selected); width, height bars; `[x] lock to frame ratio`; CELL aspect w:h (1.00).
+- **03 Style**: style list A–G (A clean avatar, B image-driven avatar, + faint H v2) with ms; letters follow the order; with A selected a CLEAN AVATAR block: mode seg custom · prebuilt, character stepper (`closest · 24/40 · afro`, `2/40 · bob`), a 4-column picker of the 40 characters at the grid's size (auto tile first, the closest dashed, the one in use lit); PARAMETERS line weight, cleanup (per style).
 - **04 Regions**: SKIN density + even light; HAIR mode seg auto · solid · tone · texture + density + "measured" lightness (dark / medium / light); CLOTHES density.
 - **05 Features**: checks redraw eyes (auto), brows, mouth, nostrils, jaw line, silhouette; GLASSES status.
 - **06 Background**: seg white · black · pattern · photo; pattern density; `[x] outline the person`.
 - **07 Draw**: tool seg (own line), colour, brush stepper, mirror axis; SELECTION size/position, left behind seg around · paper, flip ↔ · flip ↕ · mirror copy · deselect; EDITS summary, clear edits.
-- **08 Stamps**: eyes / brows / mouth / nose / glasses steppers (`auto · dashes`, `7/14 · happy`, … `off`), "all auto". The feature names are dotted links: one opens an **option grid** under its row — three tiles per row, each the portrait in the selected style with that option, cropped to the feature, name under it; auto first, off last, the one in use with a `hi` border. Tapping a feature in the view (dashed hit boxes) opens its grid too.
+- **08 Parts** (was Stamps): with the clean avatar, rows hair / eyes / brows / nose / mouth / glasses / facial hair (`auto · afro`, `12/31 · curls`, `none`), each a dotted link to an option grid of your avatar with each option (hair: the whole avatar; the rest: the face); tapping a part in the view opens its row. With the other styles, as before: eyes / brows / mouth / nose / glasses steppers (`auto · dashes`, `7/14 · happy`, … `off`), "all auto". The feature names are dotted links: one opens an **option grid** under its row — three tiles per row, each the portrait in the selected style with that option, cropped to the feature, name under it; auto first, off last, the one in use with a `hi` border. Tapping a feature in the view (dashed hit boxes) opens its grid too.
 - **09 Colours**: ink and paper swatch + hex field; swap, reset.
 - **10 Export**: FILE format seg PNG · BMP · SVG; when BMP, bit depth seg 1 · 4 · 8 · 24 (default: smallest depth that holds the palette; depths too small for it disabled); name field, **export png**; SESSION note + forget this project.
 

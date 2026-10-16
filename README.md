@@ -1,8 +1,9 @@
 # KnittingPixelArtEditor
 
-Photo portraits into knittable pixel art. A free, browser-only editor: drop in a portrait, pick one of several
-two-colour styles rendered from your photo, then refine it. The photo never leaves your device — face detection
-(MediaPipe) and all image processing run locally.
+Photo portraits into knittable pixel art. A free, browser-only editor: drop in a portrait, start from a clean avatar
+put together from the team's 40 characters (the parts closest to you), or from one of several two-colour styles
+rendered from your photo, then refine it. The photo never leaves your device — face detection (MediaPipe) and all
+image processing run locally.
 
 Nijat Mahamaliyev · Tailored Materiality Research
 
@@ -27,8 +28,9 @@ Pages source to "GitHub Actions" once).
 | Face points (478) + hair / skin / clothes / accessories regions, once per photo | `src/detect.ts` (MediaPipe, CPU) |
 | Auto-framing from the face oval, tight↔wide, drag | `src/frame.ts` |
 | Crop → work image (≈10× grid) → grey, bilateral, CLAHE → grid tone + regions | `src/pipeline/prep.ts` |
-| Drawn features: 61 named stamps for eyes, brows, mouth, nose, glasses (+ jaw line), measured glasses lenses | `src/pipeline/stamps.ts`, `src/pipeline/features.ts`, `src/pipeline/prep.ts` |
-| Styles A clean avatar · B region poster · C line portrait · D tone patterns · E Atkinson tonal · F ML lines (ids `avatar` … `ml`; the letter is the gallery position) | `src/pipeline/styles.ts`, `src/pipeline/avatar.ts` |
+| Clean avatar: the team's 40 characters cut into parts (hair with head, eyes, brows, nose, mouth, glasses, facial hair) at 25–128 px; custom = parts closest to the photo, prebuilt = a character as drawn | `scripts/build-avatar-library.py` → `public/avatars/`, `src/pipeline/clean.ts` |
+| Drawn parts for the photo styles: 61 named shapes for eyes, brows, mouth, nose, glasses (+ jaw line), measured glasses lenses | `src/pipeline/stamps.ts`, `src/pipeline/features.ts`, `src/pipeline/prep.ts` |
+| Styles A clean avatar · B image-driven avatar · C region poster · D line portrait · E tone patterns · F Atkinson tonal · G ML lines (ids `clean`, `avatar` … `ml`; the letter is the gallery position) | `src/pipeline/clean.ts`, `src/pipeline/styles.ts`, `src/pipeline/avatar.ts` |
 | ML lines model (Informative Drawings, ONNX Runtime Web, WebGPU or CPU) | `src/pipeline/ml.ts`, `scripts/convert-informative-drawings.py` |
 | Processing off the main thread in two workers (instant styles, ML lines); prep and line map cached | `src/worker.ts` |
 | Edits layer, pencil / erase / fill / line, select (move / flip / mirror copy), mirror, undo, live / bake | `src/editor.ts` |
