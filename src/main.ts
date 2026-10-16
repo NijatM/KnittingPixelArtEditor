@@ -333,6 +333,23 @@ function stepCharacter(dir: number) {
   if (characters.length) setCharacter(characters[(i + dir + characters.length) % characters.length].nick);
 }
 
+/**
+ * Steppers keep their arrows still while you click through: each label is as wide as the longest text it can show
+ * (the font is monospace, so in ch), centred between the arrows.
+ */
+function fixStepperWidths() {
+  const fit = (el: HTMLElement | null, texts: string[]) => { if (el) el.style.width = `${Math.max(...texts.map(t => t.length))}ch`; };
+  const n = characters.length || 40, nicks = [...characters.map(c => c.nick), 'none', '—'];
+  for (const kind of CLEAN_PARTS) fit($(`[data-part=${kind}] .stepper span`), nicks.flatMap(v => [`auto · ${v}`, `${n}/${n} · ${v}`]));
+  fit($('[data-bind=character]'), nicks.flatMap(v => [`auto · ${v}`, `${n}/${n} · ${v}`]));
+  // the photo styles' rows share one width, so their arrows line up too
+  const stamp = STAMP_KINDS.flatMap(kind => {
+    const k = STAMPS[kind].length, names = [...STAMPS[kind].map(v => v.name), 'traced', 'none', '—'];
+    return [...names.map(v => `auto · ${v}`), ...names.map(v => `${k}/${k} · ${v}`), 'off'];
+  });
+  for (const kind of STAMP_KINDS) fit($(`[data-stamp=${kind}] .stepper span`), stamp);
+}
+
 /** The character picker: every character at the grid's size; the one in use (or the closest) marked. */
 function paintCharacters() {
   const box = $('#charopts'), size = cleanSize(S.W, S.H);
@@ -844,7 +861,7 @@ function refresh() {
     if (on && v) picked++;
     $(`[data-stamp=${kind}] .stepper span`).textContent = !on ? 'off'
       : v ? `${stampPos(kind)}/${n} · ${v}`
-      : `auto · ${face ? autoName(kind, face) : '—'}${S.style === 'ml' && (kind === 'mouth' || kind === 'nose') ? ' (ML: model)' : ''}`;
+      : `auto · ${face ? autoName(kind, face) : '—'}${S.style === 'ml' && (kind === 'mouth' || kind === 'nose') ? ' · model' : ''}`;
   }
   const cl = S.look.clean, set = CLEAN_PARTS.filter(k => cl.parts[k]).length;
   bind('stamps', isClean() ? (cl.mode === 'prebuilt' ? `prebuilt · ${cl.character || S.clean?.character || 'closest'}` : set ? `${set} picked` : 'auto') : picked ? `${picked} picked` : 'auto');
@@ -859,7 +876,7 @@ function refresh() {
   $$('.partrow').forEach(e => (e.hidden = !isClean()));
   $('#cleanbox').hidden = !isClean();
   const shownChar = cl.mode === 'prebuilt' ? cl.character || S.clean?.character : S.clean?.head, ci = characters.findIndex(c => c.nick === shownChar);
-  bind('character', ci < 0 ? '—' : `${cl.mode === 'prebuilt' && !cl.character ? 'closest · ' : ''}${ci + 1}/${characters.length} · ${characters[ci].nick}`);
+  bind('character', ci < 0 ? '—' : `${cl.mode === 'prebuilt' && !cl.character ? 'auto' : `${ci + 1}/${characters.length}`} · ${characters[ci].nick}`);
   setSeg($('#cleanmode'), b => b.dataset.mode === cl.mode);
   paintCharacters();
   markOptions();
@@ -1202,9 +1219,11 @@ window.addEventListener('resize', () => refresh());
 setInterval(() => ($('#clock').textContent = new Date().toTimeString().slice(0, 8)), 1000);
 
 buildGallery();
+fixStepperWidths();
 // The characters' nicknames and names, for the clean avatar's picker.
 fetch(`${import.meta.env.BASE_URL}avatars/manifest.json`).then(r => r.json()).then((m: { chars: typeof characters }) => {
   characters = m.chars.map(({ nick, name, number }) => ({ nick, name, number }));
+  fixStepperWidths();
   refresh();
 }).catch(() => log('> could not load the clean avatar characters'));
 for (const s of PHOTO_STEPS) // shown while a pixel image is open

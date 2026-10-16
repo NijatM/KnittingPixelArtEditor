@@ -418,12 +418,29 @@ export function cleanAvatar(lib: Library, look: CleanLook, m: Match | null, W: n
   } else {
     const autoHead = m ? best(lib.chars, c => headScore(lib, c, m)) : lib.chars[0];
     A = byNick(look.parts.hair) ?? autoHead;
-    auto = { hair: autoHead.nick, ...autoParts(lib, A, m) };
+    // A part on head A: itself, or its look-alike that fits A; null when none fits.
+    const onA = (k: FacePart, nick: string) => {
+      const opts = partOptions(lib, k, A), rep = groupRep(lib, k, nick, A);
+      return nick === 'none' || opts.includes(nick) ? nick : opts.includes(rep) ? rep : null;
+    };
+    // Auto parts come from the closest character, whatever hair is picked: changing one part leaves the others
+    // as they are. Only a part that doesn't fit the picked hair falls back to that hair's own (adjusted) part.
+    // The fallback is the fitting part most like it: the same kind (open / closed eyes, grin / smile, glasses,
+    // moustache / beard), the closest in size.
+    const similar = (k: FacePart, nick: string) => {
+      const c = byNick(nick);
+      if (!c) return null;
+      const tag = (x: Character) => (k === 'eyes' ? x.tags.eyes : k === 'mouth' ? x.tags.mouth === 'grin' : k === 'facial' ? x.tags.facial : true);
+      const opts = partOptions(lib, k, A).map(byNick).filter((x): x is Character => !!x && tag(x) === tag(c));
+      return opts.length ? best(opts, x => Math.abs(Math.log(x.at.d / c.at.d))).nick : null;
+    };
+    const base = autoParts(lib, autoHead, m), own = A === autoHead ? base : autoParts(lib, A, m);
+    auto = { hair: autoHead.nick } as Record<CleanPart, string>;
+    for (const k of ORDER) auto[k] = onA(k, base[k]) ?? similar(k, base[k]) ?? own[k];
     parts = { hair: A.nick } as Record<CleanPart, string>;
     for (const k of ORDER) {
-      const want = look.parts[k] || auto[k], opts = partOptions(lib, k, A), rep = groupRep(lib, k, want, A);
       // a picked part stands for its look-alike group; one that doesn't fit this head falls back to auto
-      const nick = want === 'none' || opts.includes(want) ? want : opts.includes(rep) ? rep : auto[k];
+      const nick = (look.parts[k] && (onA(k, look.parts[k]) ?? similar(k, look.parts[k]))) || auto[k];
       parts[k] = nick;
       pick[k] = resolve(lib, k, nick, A);
     }
