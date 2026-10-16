@@ -11,7 +11,7 @@ The look is borrowed from **nijatmahamaliyev.com / HTMAA site / SubdivisionEngin
 | Where | Text |
 |---|---|
 | Sidebar name | **Nijat Mahamaliyev** |
-| Under the name (one sentence) | Photo portraits into knittable pixel art. |
+| Under the name (one sentence) | Portraits into knittable pixel art. |
 | Lab line | Tailored Materiality Research |
 | Terminal prompt (toolbar) | `root@nijat:~$ ./KnittingPixelArtEditor▌` (blinking block cursor) |
 | Sidebar footer | `nijatmahamaliyev.com` only — no citation line |
@@ -103,7 +103,8 @@ Selected row: `bg2` + `> ` prefix. Rows that aren't usable yet (no photo loaded)
 
 - **styles view**: gallery grid `minmax(190px, 1fr)`, label `STYLES · RENDERED FROM YOUR PHOTO AT 64×80`. Clicking a tile picks the style and opens the pixels view.
 - **pixels view**: crisp nearest-neighbour canvas, integer cell size that fits the stage, 1px `line2` outline offset 6px. Optional grid: thin lines every cell, stronger every 10.
-- Toolbar line 2: `[styles|pixels]` · `[pencil|erase|fill|line|select]` · `[ink|paper]` · `[x] mirror` · `[ ] grid` · zoom `‹ fit ›`. With select on, `[ink|paper]` and mirror give way to `[flip ↔|flip ↕|mirror copy]`.
+- Toolbar line 2: `[styles|pixels]` · `[pencil|erase|fill|line|select]` · `[ ] grid` · zoom `‹ fit ›` · `[ink|paper]` · `[x] mirror`. With select on, `[ink|paper]` and mirror give way to `[flip ↔|flip ↕|mirror copy]` — they come last, so switching tools never moves grid or zoom.
+- **Nothing moves under the pointer** (2026-10-16): stepper labels have a fixed width (longest text, centred), the options box sits under the last row, the BMP bit-depth row stays (dimmed) for PNG / SVG, bar values have a fixed column, the inspector keeps its scrollbar gutter.
 - Selection: 1px paper rectangle with ink dashes (visible on both colours), drawn over the cells; `move` cursor inside it.
 - Statusbar: `‹ undo` `redo ›` `[x] live` **bake** / `base · line portrait · 64×80 · 5,120 cells · 36% ink · 18 edits · 88 ms` / `> log message   21:50:27`.
 
@@ -118,9 +119,9 @@ Selected row: `bg2` + `> ` prefix. Rows that aren't usable yet (no photo loaded)
 - **06 Background**: seg white · black · pattern · photo; pattern density; `[x] outline the person`.
 - **07 Draw**: tool seg (own line), colour, brush stepper, mirror axis; SELECTION size/position, left behind seg around · paper, flip ↔ · flip ↕ · mirror copy · deselect; EDITS summary, clear edits.
 - Steppers (every panel): the label is as wide as the longest text it can show, centred, so the arrows never move while clicking through; rows of one panel share the width, so their arrows line up; the inspector keeps its scrollbar gutter.
-- **08 Parts** (was Stamps): with the clean avatar, rows hair + head / eyes / brows / nose / mouth / glasses / facial hair (`auto · afro`, `12/31 · curls`, `none`), each a dotted link to an option grid of your avatar with each option (hair: the whole avatar; the rest: the face); tapping a part in the view opens its row. With the other styles, as before: eyes / brows / mouth / nose / glasses steppers (`auto · dashes`, `7/14 · happy`, … `off`), "all auto". The feature names are dotted links: one opens an **option grid** under its row — three tiles per row, each the portrait in the selected style with that option, cropped to the feature, name under it; auto first, off last, the one in use with a `hi` border. Tapping a feature in the view (dashed hit boxes) opens its grid too.
+- **08 Parts** (was Stamps): with the clean avatar, rows hair + head / eyes / brows / nose / mouth / glasses / facial hair (`auto · afro`, `12/31 · curls`, `none`), each a dotted link to an option grid of your avatar with each option (hair: the whole avatar; the rest: the face); tapping a part in the view opens its row. With the other styles, as before: eyes / brows / mouth / nose / glasses steppers (`auto · dashes`, `7/14 · happy`, … `off`), "all auto". The feature names are dotted links: one opens an **option grid** under the last row (titled `eyes · 15 options`; under the last row so no row moves when another opens) — three tiles per row, each the portrait in the selected style with that option, cropped to the feature, name under it; auto first, off last, the one in use with a `hi` border. Tapping a feature in the view (dashed hit boxes) opens its grid too.
 - **09 Colours**: ink and paper swatch + hex field; swap, reset.
-- **10 Export**: FILE format seg PNG · BMP · SVG; when BMP, bit depth seg 1 · 4 · 8 · 24 (default: smallest depth that holds the palette; depths too small for it disabled); name field, **export png**; SESSION note + forget this project.
+- **10 Export**: FILE format seg PNG · BMP · SVG; bit depth seg 1 · 4 · 8 · 24 (dimmed unless BMP, kept in place) (default: smallest depth that holds the palette; depths too small for it disabled); name field, **export png**; SESSION note + forget this project.
 
 ## Voice
 

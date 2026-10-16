@@ -224,10 +224,10 @@ function renderOptions() {
   const kind = openKind, face = gridFace();
   if (!kind || !face || pixels()) { box.hidden = true; markOptions(); return; }
   const names = optionNames(kind);
-  $(`[data-stamp=${kind}]`).insertAdjacentElement('afterend', box);
+  $('[data-stamp=glasses]').insertAdjacentElement('afterend', box); // under the rows, so opening one never moves another
   if (box.dataset.kind !== kind) {
     box.dataset.kind = kind;
-    box.innerHTML = names.map(n => `<button class="opt" title="${kind} · ${n === '' ? 'auto' : n ?? 'off'}"><canvas width="1" height="1"></canvas><span>${n === '' ? 'auto' : n ?? 'off'}</span></button>`).join('');
+    box.innerHTML = `<div class="optstitle">${kind} · ${names.length - 2} options</div>` + names.map(n => `<button class="opt" title="${kind} · ${n === '' ? 'auto' : n ?? 'off'}"><canvas width="1" height="1"></canvas><span>${n === '' ? 'auto' : n ?? 'off'}</span></button>`).join('');
     $$<HTMLButtonElement>('.opt', box).forEach((b, i) => (b.onclick = () => setStamp(kind, names[i])));
   }
   box.hidden = false;
@@ -252,11 +252,11 @@ function renderPartOptions(box: HTMLElement) {
   const kind = openPart, info = S.clean;
   if (!kind || !info || pixels()) { box.hidden = true; markOptions(); return; }
   const names = partNames(kind), key = `part:${kind}:${names.join(',')}`;
-  $(`[data-part=${kind}]`).insertAdjacentElement('afterend', box);
+  $('[data-part=facial]').insertAdjacentElement('afterend', box);
   if (box.dataset.kind !== key) {
     box.dataset.kind = key;
     const label = (n: string) => (n === '' ? `auto · ${info.auto[kind]}` : n);
-    box.innerHTML = names.map(n => `<button class="opt" title="${PART_NAME[kind]} · ${label(n)}"><canvas width="1" height="1"></canvas><span>${n === '' ? 'auto' : n}</span></button>`).join('');
+    box.innerHTML = `<div class="optstitle">${PART_NAME[kind]} · ${names.length - 1} options</div>` + names.map(n => `<button class="opt" title="${PART_NAME[kind]} · ${label(n)}"><canvas width="1" height="1"></canvas><span>${n === '' ? 'auto' : n}</span></button>`).join('');
     $$<HTMLButtonElement>('.opt', box).forEach((b, i) => (b.onclick = () => setPart(kind, names[i])));
   }
   box.hidden = false;
@@ -915,7 +915,7 @@ function refresh() {
   setSeg($('#fmtseg'), b => b.dataset.fmt === S.fmt);
   $$<HTMLButtonElement>('#depthseg button').forEach(b => { b.disabled = !depthFits(+b.dataset.depth! as BmpDepth, S.pal.length); });
   setSeg($('#depthseg'), b => +b.dataset.depth! === S.depth);
-  $('#bmprow').hidden = S.fmt !== 'bmp';
+  $('#bmprow').classList.toggle('off', S.fmt !== 'bmp'); // stays in place (dimmed) so the rows below never jump
   $('#exportbtn').textContent = `export ${S.fmt}`;
   scheduleSave();
 

@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>KnittingPixelArtEditor</title>
-  <meta name="description" content="Photo portraits into knittable pixel art. Nijat Mahamaliyev, Tailored Materiality Research.">
+  <meta name="description" content="Portraits into knittable pixel art. Nijat Mahamaliyev, Tailored Materiality Research.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230b0b0b'/%3E%3Crect x='3' y='3' width='4' height='4' fill='%23f4f4f4'/%3E%3Crect x='9' y='3' width='4' height='4' fill='none' stroke='%23f4f4f4'/%3E%3Crect x='3' y='9' width='4' height='4' fill='none' stroke='%23f4f4f4'/%3E%3Crect x='9' y='9' width='4' height='4' fill='%23f4f4f4'/%3E%3C/svg%3E">
   <script>try { const t = localStorage.getItem('kpae.theme'); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
 </head>
@@ -15,7 +15,7 @@
   <nav id="nav" aria-label="steps">
     <div class="navhead">
       <div class="name">Nijat Mahamaliyev</div>
-      <div class="what">Photo portraits into knittable pixel art.</div>
+      <div class="what">Portraits into knittable pixel art.</div>
       <div class="lab">Tailored Materiality Research</div>
     </div>
 
@@ -92,11 +92,11 @@
         <div class="seg" id="viewseg"><button data-view="styles">styles</button><button data-view="pixels">pixels</button></div>
         <span class="sep hide-narrow"></span>
         <div class="seg tools"><button data-tool="pencil" title="pencil (B)">pencil</button><button data-tool="erase" title="erase back to the style (E)">erase</button><button data-tool="fill" title="fill (G)">fill</button><button data-tool="line" title="line (L)">line</button><button data-tool="select" title="select an area, drag inside it to move (S)">select</button></div>
+        <button class="check" id="gridcheck"><span class="box">[ ]</span> grid</button>
+        <div class="stepper hide-narrow"><button data-zoom="-1" aria-label="zoom out">‹</button><span id="zoomval">fit</span><button data-zoom="1" aria-label="zoom in">›</button></div>
         <div class="seg tb-draw"><button data-ink="0" title="draw with ink (X swaps)">ink</button><button data-ink="1" title="draw with paper (X swaps)">paper</button></div>
         <button class="check mirrorcheck tb-draw" title="mirror around the face centre (M)"><span class="box">[ ]</span> mirror</button>
         <div class="seg tb-select" hidden><button data-sel="flip-h" title="flip the selection left–right (H)">flip ↔</button><button data-sel="flip-v" title="flip the selection upside down (V)">flip ↕</button><button data-sel="mirror" title="flipped copy on the other side of the face centre">mirror copy</button></div>
-        <button class="check" id="gridcheck"><span class="box">[ ]</span> grid</button>
-        <div class="stepper hide-narrow"><button data-zoom="-1" aria-label="zoom out">‹</button><span id="zoomval">fit</span><button data-zoom="1" aria-label="zoom in">›</button></div>
       </div>
     </div>
 

@@ -66,6 +66,8 @@ Fifteenth batch (2026-10-16) — **a new clean avatar from the team's 40 charact
 
 Sixteenth batch (2026-10-16) — two fixes the user asked for: (1) changing the hair changed every part on auto (auto followed the picked hair's own face) — auto face parts now come from the closest character whatever hair is picked; a part that doesn't fit the picked face becomes the most similar fitting one (same kind: open / closed eyes, grin / smile, moustache / beard; closest size); about 80 % stay exactly. (2) stepper arrows moved with the label length — each label is now as wide as its longest possible text (`ch`, monospace), centred, one width per panel, and the inspector reserves its scrollbar gutter (the panel shifted 19 px when the picker made it scroll). The character stepper reads `auto · afro` (closest) or `2/40 · bob`. `research/private_tests/steppers.mjs` checks both.
 
+Seventeenth batch (2026-10-16) — "nothing moves under the pointer", after the user found the stepper arrows moving (the fix was live; their browser had cached the old build — incognito showed it). Audit of the same problem elsewhere, all fixed: the options box now opens under the last row (opening another row made the clicked row jump), the BMP bit-depth row stays in place dimmed for PNG / SVG (the name field and export button jumped), and grid + zoom come before the tool's own options in the toolbar (they slid when switching to select). Bars were already stable (fixed value column). The hair row is called **hair + head**. `steppers.mjs` checks all of it.
+
 Next (tuning / polish, no fixed plan left):
 1. Optional: fp16 weights to halve the 15 MB model download.
 2. More portraits from the team to tune on (only 5 test photos so far; 2 bearded, 2 with glasses, 1 side-lit).
