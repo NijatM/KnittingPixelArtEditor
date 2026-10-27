@@ -1,7 +1,4 @@
-import '@fontsource/ibm-plex-mono/400.css';
-import '@fontsource/ibm-plex-mono/500.css';
-import '@fontsource/ibm-plex-mono/600.css';
-import './style.css';
+// Knitting Pixel Portrait. Loaded by app.ts the first time the portrait section opens.
 import { detect, loadDetectors } from './detect';
 import { Editor, type Behind, type Tool } from './editor';
 import { download, encodeBmp, encodePng, encodeSvg, depthFits, smallestDepth, type BmpDepth } from './export';
@@ -985,7 +982,6 @@ function syncControls() {
   ($('#lockcheck') as HTMLButtonElement).disabled = S.ratio === 'free';
   $$('[data-feature]').forEach(b => setCheck(b, S.look.features[b.dataset.feature as keyof Features]));
   setCheck($('#gridcheck'), S.grid);
-  setSeg($('#theme'), b => b.dataset.themeSet === (document.documentElement.dataset.theme ?? 'dark'));
   const p = S.photo;
   $('#det-face').textContent = !p ? '—' : p.lm ? `found · ${p.lm.length / 2} points` : 'not found';
   $('#det-face').className = `val ${p?.lm ? 'ok' : p ? 'dim' : ''}`;
@@ -1014,11 +1010,6 @@ $$<HTMLButtonElement>('#viewseg button').forEach(b => (b.onclick = () => {
 }));
 const zoomBy = (d: number) => { S.zoom = d ? Math.max(-3, Math.min(12, S.zoom + d)) : 0; refresh(); };
 $$<HTMLButtonElement>('[data-zoom]').forEach(b => (b.onclick = () => zoomBy(+b.dataset.zoom!)));
-$$<HTMLButtonElement>('#theme button').forEach(b => (b.onclick = () => {
-  document.documentElement.dataset.theme = b.dataset.themeSet;
-  try { localStorage.setItem('kpae.theme', b.dataset.themeSet!); } catch { /* private mode */ }
-  syncControls(); refresh();
-}));
 $('#helpbtn').onclick = () => { const on = document.body.classList.toggle('help'); $('#helpbtn').classList.toggle('on', on); $('#helpbtn').setAttribute('aria-pressed', String(on)); };
 
 // colours
@@ -1044,9 +1035,20 @@ $('#exportbtn').onclick = () => {
   }
 };
 seg($('#fmtseg'), b => { S.fmt = b.dataset.fmt as typeof S.fmt; refresh(); });
+// Portrait → Knit Grammar: the final cells (0 = ink, 1 = paper) travel in sessionStorage; Knit Grammar asks which
+// operation each colour becomes.
+$('#togrammar').onclick = () => {
+  const r = final();
+  if (!r) { log(S.photo ? '> this style is still rendering' : '> nothing to send yet · load a portrait first'); return; }
+  let bin = '';
+  for (let i = 0; i < r.cells.length; i += 0x8000) bin += String.fromCharCode(...r.cells.subarray(i, i + 0x8000));
+  try { sessionStorage.setItem('kpae.toGrammar', JSON.stringify({ name: exportBase(), w: r.W, h: r.H, cells: btoa(bin) })); }
+  catch { log('> could not hand the portrait over (storage blocked)'); return; }
+  location.hash = '#grammar/editor/draw';
+};
 seg($('#depthseg'), b => { S.depth = +b.dataset.depth! as BmpDepth; refresh(); });
 // Reset (11 reset in the nav, "forget this project" in export): asks first, then forgets the saved project and
-// reloads, so every setting starts from its default. The theme is a browser preference and stays.
+// reloads, so every setting starts from its default.
 {
   const dlg = $('#resetdlg') as HTMLDialogElement, ask = () => { if (!dlg.open) dlg.showModal(); };
   $('#forget').onclick = ask;
@@ -1164,7 +1166,9 @@ $$<HTMLButtonElement>('[data-brush]').forEach(b => (b.onclick = () => { S.ed.bru
     e.preventDefault(); zoomBy(e.deltaY < 0 ? 1 : -1);
   }, { passive: false });
 }
+const portraitOn = () => document.body.dataset.section === 'portrait';
 window.addEventListener('keydown', e => {
+  if (!portraitOn()) return; // the other sections have their own keys
   const t = e.target as HTMLElement;
   if (t.closest('input, textarea, .bar, dialog') || e.altKey) return; // typing, sliders and the reset dialog keep their keys
   const mod = e.metaKey || e.ctrlKey, k = e.key.toLowerCase();
@@ -1216,8 +1220,8 @@ window.addEventListener('keydown', e => {
 const fileInput = $('#file') as HTMLInputElement;
 $$('[data-choose]').forEach(b => (b.onclick = () => fileInput.click()));
 $$('[data-blank]').forEach(b => (b.onclick = () => { startBlank(Date.now(), null); log('> no photo · prebuilt characters · step through them in 03 style, or drop a photo for a match'); }));
-wireImport(fileInput, f => void loadPhoto(f), over => document.body.classList.toggle('dragover', over));
-window.addEventListener('resize', () => refresh());
+wireImport(fileInput, f => void loadPhoto(f), over => document.body.classList.toggle('dragover', over), portraitOn);
+window.addEventListener('resize', () => { if (portraitOn()) refresh(); });
 setInterval(() => ($('#clock').textContent = new Date().toTimeString().slice(0, 8)), 1000);
 
 buildGallery();

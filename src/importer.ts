@@ -30,11 +30,12 @@ export const decodeImage = async (file: Blob) => photoCanvas(await loadImage(fil
 
 const imageIn = (items: Iterable<File>) => [...items].find(f => f.type.startsWith('image/')) ?? null;
 
-/** Calls onFile for images picked, dropped anywhere on the page, or pasted. */
-export function wireImport(input: HTMLInputElement, onFile: (f: File) => void, onDragState: (over: boolean) => void) {
+/** Calls onFile for images picked, dropped anywhere on the page, or pasted, while `active()` says the importer's
+ *  section is the one on screen. */
+export function wireImport(input: HTMLInputElement, onFile: (f: File) => void, onDragState: (over: boolean) => void, active: () => boolean = () => true) {
   input.addEventListener('change', () => { const f = imageIn(input.files ?? []); if (f) onFile(f); input.value = ''; });
   let depth = 0;
-  const hasFiles = (e: DragEvent) => e.dataTransfer?.types.includes('Files');
+  const hasFiles = (e: DragEvent) => active() && e.dataTransfer?.types.includes('Files');
   window.addEventListener('dragenter', e => { if (hasFiles(e)) { depth++; onDragState(true); } });
   window.addEventListener('dragleave', e => { if (hasFiles(e) && --depth <= 0) { depth = 0; onDragState(false); } });
   window.addEventListener('dragover', e => { if (hasFiles(e)) e.preventDefault(); });
@@ -44,6 +45,7 @@ export function wireImport(input: HTMLInputElement, onFile: (f: File) => void, o
     const f = imageIn(e.dataTransfer!.files); if (f) onFile(f);
   });
   window.addEventListener('paste', e => {
+    if (!active()) return;
     const f = imageIn([...(e.clipboardData?.items ?? [])].filter(i => i.kind === 'file').map(i => i.getAsFile()!).filter(Boolean));
     if (f) { e.preventDefault(); onFile(f); }
   });

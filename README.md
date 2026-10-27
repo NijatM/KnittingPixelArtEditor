@@ -1,13 +1,17 @@
 # KnittingPixelArtEditor
 
-Turn a portrait into two-colour pixel art for knitting. One cell is one stitch.
+Two tools for machine knitting, chosen on the first page:
 
-It is a free editor that runs entirely in the browser. Your photo never leaves your device: face detection
+- **Knitting Pixel Portrait** (`#portrait`): turn a portrait into two-colour pixel art for knitting. One cell is one stitch.
+- **Knit Grammar** (`#grammar`): learn how a V-bed flat knitting machine works, and write knit programs as bitmaps:
+  one pixel is one needle, one row is one carriage pass, each colour is an operation.
+
+It is free and runs entirely in the browser. Your photos and patterns never leave your device: face detection
 (MediaPipe) and all image processing happen locally.
 
 Nijat Mahamaliyev · Tailored Materiality Research
 
-## What you can do
+## Knitting Pixel Portrait
 
 - **Start from a photo**: drop, paste or choose one. The face is found, framed and turned into every style at once.
 - **Start without a photo**: pick one of the team's 40 characters.
@@ -17,6 +21,22 @@ Nijat Mahamaliyev · Tailored Materiality Research
 - **Export**: PNG (1-bit), BMP (1/4/8/24-bit) or SVG. The file holds exactly what the editor shows: one pixel
   per stitch, no margin.
 - **Autosave**: the last project is kept in the browser, and 11 reset starts over.
+- **Send to Knit Grammar**: the finished portrait becomes a knit pattern; you choose what ink and paper do.
+
+## Knit Grammar
+
+- **Learn**: the V-bed machine, the latch needle's knitting cycle, the operations (knit, tuck, float, transfer,
+  racking), reading the grammar, two yarn guides, structures and shaping. Interactive line figures and small 3D
+  yarn swatches; every page lists its sources. Pages are drafts until reviewed.
+- **Editor**: paint operations, not colours. Tools: needle, run, flood, pass, wale, motif (select, move, flip,
+  repeat with a shift), pick, mirror, undo. Views: colours, symbols, and a guides view that splits each
+  two-guide pass into a YG1 and a YG2 row. Pass numbers and directions, needle numbers.
+- **Keys**: the class presets (one and two yarn guides; colour key from Computational Textiles, MIT 4.S52/6.S895,
+  Spring 2026, Mariana Popescu) and custom keys built from known operations.
+- **Open**: BMP / PNG (near colours snap to the key and are listed; others stay and are flagged) and project files.
+- **Check**: unknown colours, transfers off the edge, long floats, long-held loops, stacked tucks (limits you set).
+- **Export**: 24-bit BMP with the key's exact colours, the grammar key as PDF and TXT, a symbol chart as PNG and
+  SVG, and a project file. Patterns are kept in a library in the browser.
 
 ## Styles
 
@@ -63,12 +83,20 @@ python3 scripts/build-avatar-library.py <portrait-40-multi-resolution folder>
 | Export | `src/export.ts` |
 | Autosave | `src/store.ts` |
 | Interface | `index.html`, `src/main.ts`, `src/style.css`, `src/ui/` |
+| Chooser and routing | `src/app.ts` |
+| Knit Grammar: operations, keys, symbols | `src/grammar/ops.ts` |
+| Knit Grammar: patterns, editor, rendering, checks | `src/grammar/pattern.ts`, `editor.ts`, `render.ts`, `checks.ts` |
+| Knit Grammar: files and library | `src/grammar/io.ts`, `src/grammar/library.ts` |
+| Knit Grammar: Learn pages, figures, 3D swatches | `src/grammar/learn.ts`, `figures.ts`, `swatch3d.ts`, `src/hl.ts` |
+| Knit Grammar: interface | `src/grammar/ui.ts`, `src/grammar/main.ts` |
 
 Planning notes: `SPEC.md`, `design/DESIGN.md`, `HANDOFF.md`, `RESEARCH.md`.
 
 ## License
 
 Code: MIT (`LICENSE`). Models and other third-party files keep their own licenses — see `MODELS.md`.
+The line figures use the hairline kernel by Lucas Marques (MIT, vendored in `src/vendor/hairline/` with its
+license); the 3D swatches use three.js (MIT).
 
 ## AI usage
 

@@ -4,20 +4,22 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>KnittingPixelArtEditor</title>
-  <meta name="description" content="Portraits into knittable pixel art. Nijat Mahamaliyev, Tailored Materiality Research.">
+  <meta name="description" content="Portraits into knittable pixel art, and a knit grammar: one pixel per needle, one row per pass. Nijat Mahamaliyev, Tailored Materiality Research.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230b0b0b'/%3E%3Crect x='3' y='3' width='4' height='4' fill='%23f4f4f4'/%3E%3Crect x='9' y='3' width='4' height='4' fill='none' stroke='%23f4f4f4'/%3E%3Crect x='3' y='9' width='4' height='4' fill='none' stroke='%23f4f4f4'/%3E%3Crect x='9' y='9' width='4' height='4' fill='%23f4f4f4'/%3E%3C/svg%3E">
-  <script>try { const t = localStorage.getItem('kpae.theme'); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
 </head>
 <body>
+<!-- Sections: the chooser (#home), the portrait editor (#app) and Knit Grammar (#kg, built by src/grammar). The hash picks one. -->
+<div id="home"></div>
 <div id="app">
 
   <!-- ============================================================ nav -->
   <nav id="nav" aria-label="steps">
     <div class="navhead">
-      <div class="name">Nijat Mahamaliyev</div>
+      <div class="name"><a href="#" class="homelink">Nijat Mahamaliyev</a></div>
       <div class="what">Portraits into knittable pixel art.</div>
       <div class="lab">Tailored Materiality Research</div>
     </div>
+    <div class="seg secseg" aria-label="section"><a href="#portrait" class="on" aria-current="page">portrait</a><a href="#grammar">grammar</a></div>
 
     <div class="spaced dim navsec">SOURCE</div>
     <div class="list">
@@ -85,7 +87,6 @@
         <span class="prompt"><b>root@nijat:~$</b> ./KnittingPixelArtEditor<span class="cursor"></span></span>
         <div class="tbright">
           <button class="btn" id="helpbtn" title="explain controls" aria-pressed="false">?</button>
-          <div class="seg" id="theme"><button data-theme-set="light">light</button><button data-theme-set="dark">dark</button></div>
         </div>
       </div>
       <div class="tbline">
@@ -288,6 +289,9 @@
       <div class="row" id="bmprow"><label>bit depth</label><div class="seg" id="depthseg"><button data-depth="1">1</button><button data-depth="4">4</button><button data-depth="8">8</button><button data-depth="24">24</button></div></div>
       <div class="row"><label>name</label><input class="txt" id="exportname" aria-label="file name"></div>
       <div class="inline"><button class="btn primary" id="exportbtn">export png</button></div>
+      <div class="subhead">KNIT GRAMMAR<i></i></div>
+      <div class="inline"><button class="btn" id="togrammar">send to knit grammar ›</button></div>
+      <div class="explain small">Opens the portrait in Knit Grammar as a new pattern, one needle per stitch and one pass per row; you choose which operation ink and paper become (for example knit front and knit back).</div>
       <div class="subhead">SESSION<i></i></div>
       <div class="note small" data-bind="saved">Saved in this browser. Only the last project is kept.</div>
       <div class="inline"><button class="btn" id="forget" aria-haspopup="dialog">forget this project</button></div>
@@ -296,6 +300,7 @@
 
   </aside>
 </div>
-<script type="module" src="/src/main.ts"></script>
+<div id="kg"></div>
+<script type="module" src="/src/app.ts"></script>
 </body>
 </html>
