@@ -6,6 +6,7 @@ No packages needed: the serial port is opened with termios (macOS / Linux).
 
   python3 taxonomy_reader.py                 wait for tags, open each one's address in the default browser
   python3 taxonomy_reader.py check           print the PN532's firmware version and exit
+  python3 taxonomy_reader.py info            print the next tag's UID, chip version, first pages and address (reads only)
   python3 taxonomy_reader.py write <url>     write <url> to the next NTAG21x tag laid on the reader
   options: --port /dev/cu.usbserial-10 (default: the first /dev/cu.usbserial* or /dev/ttyUSB*)
 
@@ -31,6 +32,7 @@ class PN532:
         time.sleep(0.05)
         self.call(0x14, [0x01, 0x14, 0x01])                                  # SAMConfiguration: normal mode
         self.call(0x32, [0x05, 0xFF, 0x01, 0x05])                            # retries: answer "no tag" quickly
+        self.call(0x32, [0x01, 0x00]); time.sleep(0.05); self.call(0x32, [0x01, 0x01])  # field off and on: tags start fresh
 
     def read(self, n, timeout):
         out, end = b'', time.time() + timeout
@@ -70,6 +72,10 @@ class PN532:
     def page4(self, page):
         r = self.call(0x40, [0x01, 0x30, page])                              # InDataExchange: NTAG READ (16 bytes)
         return bytes(r[1:17]) if r and r[0] == 0 and len(r) >= 17 else None
+
+    def version(self):
+        r = self.call(0x42, [0x60])                                          # InCommunicateThru: NTAG GET_VERSION
+        return bytes(r[1:]) if r and r[0] == 0 else None
 
     def write_page(self, page, four):
         r = self.call(0x40, [0x01, 0xA2, page] + list(four))                 # NTAG WRITE (4 bytes)
@@ -115,7 +121,11 @@ def write_url(nfc, url):
     rec = bytes([0xD1, 0x01, len(payload)]) + b'U' + payload                 # one short well-known URI record
     tlv = bytes([0x03, len(rec)]) + rec + b'\xfe'
     tlv += b'\x00' * (-len(tlv) % 4)
-    if len(tlv) > 140: sys.exit('address too long for an NTAG213')
+    cc = nfc.page4(3)
+    if not cc or cc[0] != 0xE1: sys.exit(f'no NDEF capability container on page 3 ({cc[:4].hex(" ") if cc else "unreadable"}); not writing')
+    if cc[3] & 0xF0: sys.exit(f'the tag is write-protected (CC {cc[:4].hex(" ")})')
+    if len(tlv) > cc[2] * 8: sys.exit(f'address needs {len(tlv)} bytes, the tag holds {cc[2] * 8}')
+    print(f'CC {cc[:4].hex(" ")} ({cc[2] * 8} bytes); address on it now: {read_url(nfc)}')
     for k in range(0, len(tlv), 4):
         if not nfc.write_page(4 + k // 4, tlv[k:k + 4]): return False
     return True
@@ -132,6 +142,17 @@ def main():
     if args[:1] == ['check']:
         v = nfc.call(0x02)
         print(f'{port}: PN5{v[0]:x} firmware {v[1]}.{v[2]}' if v else f'{port}: no answer from a PN532 (HSU mode? wiring?)')
+        return
+    if args[:1] == ['info']:
+        print('lay the tag on the reader')
+        while not (uid := nfc.tag()): time.sleep(0.2)
+        print(f'UID {uid.hex(" ")}')
+        for page in (0, 4, 8, 12):
+            c = nfc.page4(page)
+            print(f'pages {page:2}-{page + 3:2}: {c.hex(" ") if c else "unreadable"}')
+        print(f'address: {read_url(nfc)}')
+        v = nfc.version()                                                    # last: a chip without it stops answering
+        print(f'GET_VERSION {v.hex(" ") if v else "no answer"}')
         return
     if args[:1] == ['write']:
         url = args[1]
