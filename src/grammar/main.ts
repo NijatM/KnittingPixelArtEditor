@@ -150,6 +150,7 @@ function renderLearn(id: string, anchor?: string) {
   $$<HTMLCanvasElement>('[data-keytable] canvas[data-op]', art).forEach(c => paintOpTile(c, (PRESETS.find(k => k.id === c.closest<HTMLElement>('[data-keytable]')!.dataset.keytable)!).ops[+c.dataset.op!], 26));
   $$<HTMLElement>('[data-mini]', art).forEach(el => renderMini(el, el.dataset.mini!));
   $$<HTMLElement>('[data-glyphs]', art).forEach(el => renderGlyphs(el));
+  $$<HTMLElement>('[data-frame3d]', art).forEach(el => mountFrame3d(el));
   art.scrollTop = 0;
   // a link to a part of the page (a tag on a framed sample, a source) scrolls to it and marks it for a moment
   if (anchor) requestAnimationFrame(() => { const el = art.querySelector(`#${CSS.escape(anchor)}`); el?.scrollIntoView({ block: 'start' }); el?.classList.add('hit'); });
@@ -158,6 +159,20 @@ function renderLearn(id: string, anchor?: string) {
 function srcText(n: number) {
   const s = SOURCES[n];
   return esc(s.text) + (s.url ? ` <a href="${s.url}" target="_blank" rel="noopener">${s.url.replace(/^https?:\/\//, '')}</a>` : '');
+}
+
+/** A framed sample in 3D, in place of its flat drawing; the drawing stays if WebGL or the module is missing. */
+function mountFrame3d(el: HTMLElement) {
+  let alive = true, handle: import('./frame3d').FrameHandle | null = null;
+  learnDisposers.push(() => { alive = false; handle?.destroy(); });
+  import('./frame3d').then(({ mountFrame }) => {
+    if (!alive) return;
+    const view = document.createElement('div'); view.className = 'frame3d';
+    const flat = el.querySelector('svg');
+    el.append(view);
+    try { handle = mountFrame(view); flat?.remove(); el.nextElementSibling?.removeAttribute('hidden'); }
+    catch { view.remove(); }
+  }).catch(() => {});
 }
 
 function mountSwatchFigure(f: HTMLElement) {

@@ -1,6 +1,7 @@
 // Knitting Taxonomy: knitted samples in frames, each with an NFC tag holding the address of its entry here
 // (#grammar/learn/taxonomy/<id>; tools/nfc/ reads a tag at the desk and opens the same address on the laptop).
-// For now one placeholder frame, drawn: a white frame with a plain jersey sample inside.
+// For now one placeholder frame, drawn: a white frame with a plain jersey sample inside (in 3D by frame3d.ts where
+// WebGL works, this flat drawing otherwise).
 
 export interface Frame { id: string; num: string; title: string; text: string; mini?: string }
 
@@ -41,7 +42,8 @@ export function taxonomyHtml(): string {
   return `<p class="lead">Knitted samples in frames. Each frame carries an NFC tag: touch it with a phone, or lay it on the reader at the desk, and its entry opens here.</p>
 ${FRAMES.map(f => `<section class="frame" id="${f.id}">
   <h3>${f.num} · ${esc(f.title)}</h3>
-  <div class="frameview">${frameSvg()}</div>
+  <div class="frameview" data-frame3d>${frameSvg()}</div>
+  <p class="dim small frame3dnote" hidden>Drawn, not computed: a stand-in frame and jersey. Drag to turn it.</p>
   <p>${esc(f.text)}</p>
   ${f.mini ? `<div data-mini="${f.mini}"></div>` : ''}
   <p class="dim small">tag address: <code>${esc(frameUrl(f))}</code></p>

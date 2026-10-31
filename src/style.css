@@ -305,6 +305,10 @@ input.opname:hover, input.opname:focus { border-color: var(--line2); background:
 .article section.frame > * { max-width: 760px; }
 .article .frameview { display: flex; justify-content: center; margin: 14px 0; }
 .article .framesvg { width: min(300px, 70vw); height: auto; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .35)); }
+.article .frame3d { width: min(360px, 82vw); aspect-ratio: 1 / 1.08; cursor: grab; touch-action: none; filter: drop-shadow(0 8px 16px rgba(0, 0, 0, .4)); }
+.article .frame3d:active { cursor: grabbing; }
+.article .frame3d canvas { display: block; }
+.article .frame3dnote { text-align: center; margin-top: -6px; }
 .article code { font-size: 11px; word-break: break-all; }
 .article .hit { animation: hit 2.6s ease-out; }
 @keyframes hit { 0%, 30% { box-shadow: 0 0 0 1px var(--hi), 0 0 0 7px rgba(255, 255, 255, .06); } 100% { box-shadow: 0 0 0 1px transparent; } }
