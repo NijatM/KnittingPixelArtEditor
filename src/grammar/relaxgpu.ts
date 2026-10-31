@@ -3,10 +3,16 @@
 // This one works in single precision, so it settles to the same kind of shape, not bit for bit the same one:
 //   · the line search compares energy differences, each term's change worked out on its own (its old value and its
 //     new one), so rounding in a sum of millions of terms doesn't decide which step is taken;
-//   · node positions are fixed point (2^-21 of a pitch, up to ±1024 pitches): GPU compilers may reorder float arithmetic, which would turn
-//     "difference of two nearby coordinates" into rounding at the coordinates' size; integer differences are exact,
+//   · node positions are fixed point (2^-21 of a pitch, up to ±1024 pitches): GPU compilers may reorder float
+//     arithmetic, which would turn "difference of two nearby coordinates" into rounding at the coordinates' size;
+//     integer differences are exact,
 //     so every float left in the energy is small (differences and offsets);
-//   · gradients are summed with atomic adds, so their last bits vary from run to run;
+//   · each loop's length is summed in fixed point, each segment rounded on its own, so its stretch is exact and a
+//     step that moves nothing changes nothing (compilers may fuse a difference of two lengths into one rounding);
+//   · where a step's energy change is below what single precision resolves, the slope along the step decides
+//     instead (Hager & Zhang's approximate Wolfe condition), down to steps of one fixed-point unit;
+//   · gradients are summed with atomic adds, so their last bits vary from run to run, and so does where it settles
+//     (a 30 × 30 jersey: energy 636.0–636.4 against the CPU's 634.9; the CPU continued from one lowers it by 0.015);
 //   · the pairs of segments close enough to touch are found on the GPU, with the same hashed grid (each pair once,
 //     in the cell holding the low corner of the two boxes' overlap), rebuilt when any point has moved half the margin.
 // Falls back to relax.ts (returns null) where WebGPU or the limits it needs aren't there.
@@ -18,16 +24,23 @@ const ST = GPUBufferUsage.STORAGE, CS = GPUBufferUsage.COPY_SRC, CD = GPUBufferU
 
 export interface GpuRelax {
   iter: number; moved: number; force: number;
-  /** energy change since the start (the absolute energy isn't summed on the GPU) */
-  dE: number;
+  /** energy change since the start, summed from the steps' changes; and the energy now, summed in single precision */
+  dE: number; energy: number;
+  /** steps taken on the slope test because their energy change was below what single precision resolves */
+  approx: number;
   /** pair-list rebuilds so far, and the current number of pairs */
   rebuilds: number; pairs: number;
+  /** no step lowers the energy, even along the gradient: as settled as single precision can tell */
+  stuck: boolean;
+  /** takes up to n steps; returns the largest move of a node among them (0 once stuck) */
   steps(n: number): Promise<number>;
   read(): Promise<{ pos: Float32Array; nrm: Float32Array }>;
+  /** the positions exactly (fixed point to double; single precision rounds them above 8 pitches), for checks */
+  exact(): Promise<Float64Array>;
   /** the gradient at the current state (for checks against relax.ts) */
   gradient(): Promise<Float32Array>;
   /** the energy change the line search would see for a step a along −gradient, and the positions there (checks) */
-  probe(a: number): Promise<{ dE: number; pos: Float32Array; terms: Record<string, number> }>;
+  probe(a: number): Promise<{ dE: number; pos: Float64Array; terms: Record<string, number> }>;
   destroy(): void;
 }
 
@@ -123,7 +136,7 @@ export async function gpuRelaxStart(s: YarnSys, warm?: Float32Array): Promise<Gp
     const parts = { contact: Math.ceil(PCAP / WG), len: Math.ceil(NL / WG), flt: Math.ceil(NF / WG), minsp: Math.ceil(NS / WG), bend: Math.ceil(NB / WG), edge: Math.ceil(NE / WG), gap: Math.ceil(NG / WG) };
     OFF = {}; NPE = 0;
     for (const [k, v] of Object.entries(parts)) { OFF[k] = NPE; NPE += v; }
-    B.PAB = mk(PCAP * 8); B.ENT = mk(ECAP * 12); B.HEAD = mk(H * 4); B.PE = mk(NPE * 4);
+    B.PAB = mk(PCAP * 8); B.ENT = mk(ECAP * 12); B.HEAD = mk(H * 4); B.PE = mk(NPE * 8);
     groups.clear();
     pipes = new Map(kernels().map(k => [k.name, { kern: k, pipe: dev.createComputePipeline({ layout: 'auto', compute: { module: dev.createShaderModule({ code: wgsl(k, H) }), entryPoint: 'main' } }) }]));
   }
@@ -148,25 +161,25 @@ fn p_${n}(a: u32) -> vec3f { return vec3f(f32(${n}[a * 3u]), f32(${n}[a * 3u + 1
     const consts = `const NL = ${NL}u; const NN = ${NN}u; const NP = ${NP}u; const NS = ${NS}u; const NF = ${NF}u; const NB = ${NB}u; const NE = ${NE}u; const NG = ${NG}u;
 const L3 = ${L3}u; const NPD = ${NPD}u; const NPE = ${NPE}u; const PCAP = ${PCAP}u; const ECAP = ${ECAP}u; const HM = ${H - 1}u;
 const D = ${f(d)}; const KH = ${f(K.hard)}; const KL = ${f(K.len)}; const KB = ${f(kb)}; const EPS2 = ${f(EPS2)}; const R = ${f(R)}; const CELL = ${f(CELL)};
-const LIM = ${f((MARGIN / 2) ** 2)}; const CAP = ${f(CAP)}; const NONE = ${NONE}u; const FIX = ${f(FIX)}; const IFIX = ${f(1 / FIX)};`;
-    const red = `var<workgroup> red: array<f32, ${k.wg ?? WG}>;
-fn reduce_to(l: u32, v: f32, base: u32, g: u32, n: u32) {
+const LIM = ${f((MARGIN / 2) ** 2)}; const CAP = ${f(CAP)}; const NONE = ${NONE}u; const FIX = ${f(FIX)}; const IFIX = ${f(1 / FIX)}; const LQ = 67108864.0;`;
+    const red = `var<workgroup> red: array<vec2f, ${k.wg ?? WG}>;
+fn reduce_to(l: u32, v: vec2f, base: u32, g: u32, n: u32) {
   red[l] = v; workgroupBarrier();
   for (var s = ${(k.wg ?? WG) / 2}u; s > 0u; s >>= 1u) { if (l < s) { red[l] += red[l + s]; } workgroupBarrier(); }
-  if (l == 0u && g * ${k.wg ?? WG}u < n) { PE[base + g] = red[0]; }
+  if (l == 0u && g * ${k.wg ?? WG}u < n) { PE[base + g] = red[0].x; PE[NPE + base + g] = red[0].y; }
 }`;
     return `${consts}\n${decl}\n${LIN}\n${helpers}\n${k.binds.some(b => b[0] === 'PE') ? red : ''}\n${k.body}`;
   }
   const head = (wg = WG) => `@compute @workgroup_size(${wg}) fn main(@builtin(workgroup_id) w: vec3u, @builtin(num_workgroups) nw: vec3u, @builtin(local_invocation_index) l: u32)`;
-  // energy-term kernels end with the workgroup's sum of the terms' changes, into its slot of PE
+  // energy-term kernels end with the workgroup's sums of the terms' changes (de) and new values (en), into its slots of PE
   const term = (name: string, binds: Bind[], count: string, off: string, body: string): Kern => ({
     name, binds: [...binds, ['PE', 'rw']], body: `${head()} {
   let i = lin(w, nw, l, ${WG}u);
-  var de = 0.0;
+  var de = 0.0; var en = 0.0;
   if (i < ${count}) {
 ${body}
   }
-  reduce_to(l, de, ${off}, w.x + w.y * nw.x, ${count});
+  reduce_to(l, vec2f(de, en), ${off}, w.x + w.y * nw.x, ${count});
 }`,
   });
   // closest points of two segments, as relax.ts (Ericson, Real-Time Collision Detection, 5.1.9), from the vectors u, v
@@ -294,7 +307,7 @@ ${head()} {
     let co = closest(dO(p0 + 1u, p0), dO(q0 + 1u, q0), dO(p0, q0));
     let ln = length(cn.v); let lo = length(co.v);
     let Cn = select(0.0, D - ln, ln < D); let Co = select(0.0, D - lo, lo < D);
-    de = 0.5 * KH * (Cn - Co) * (Cn + Co);
+    de = 0.5 * KH * (Cn - Co) * (Cn + Co); en = 0.5 * KH * Cn * Cn;
     if (Cn > 0.0 && ln >= 1e-9) {
       let g = (-KH * Cn / ln) * cn.v;
       add3_GP(p0, (1.0 - cn.s) * g); add3_GP(p0 + 1u, cn.s * g); add3_GP(q0, -(1.0 - cn.t) * g); add3_GP(q0 + 1u, -cn.t * g);
@@ -302,10 +315,16 @@ ${head()} {
       // every stitch keeps its length of yarn
       term('len', [['XN', 'r', 'i32'], ['X', 'r', 'i32'], ['OFN', 'r'], ['OFNO', 'r'], ['LC', 'r', 'u32'], ['LT', 'r'], ['GP', 'a']], 'NL', 'OFFL', `
     let a = LC[i]; let b = LC[i + 1u];
-    var Ln = 0.0; var Lo = 0.0;
-    for (var j = a; j + 1u < b; j++) { let p = LC[NL + 1u + j]; let q = LC[NL + 2u + j]; Ln += length(dN(q, p)); Lo += length(dO(q, p)); }
-    let Cn = Ln - LT[i]; let Co = Lo - LT[i];
-    de = 0.5 * KL * (Cn - Co) * (Cn + Co);
+    // the stretch, old and new, as fixed-point sums of the segments' lengths each rounded on its own (2^-26 of a
+    // pitch): a float sum rounds at the loop's whole length, and the compiler may fuse a difference of two lengths
+    // into one rounding, so equal positions wouldn't give exactly no change
+    let t = i32(round(LT[i] * LQ)); var qn = -t; var qo = -t;
+    for (var j = a; j + 1u < b; j++) {
+      let p = LC[NL + 1u + j]; let q = LC[NL + 2u + j];
+      qn += i32(round(length(dN(q, p)) * LQ)); qo += i32(round(length(dO(q, p)) * LQ));
+    }
+    let Cn = f32(qn) / LQ; let Co = f32(qo) / LQ;
+    de = 0.5 * KL * (f32(qn - qo) / LQ) * (Cn + Co); en = 0.5 * KL * Cn * Cn;
     let fl = KL * Cn;
     for (var j = a; j + 1u < b; j++) {
       let p = LC[NL + 1u + j]; let q = LC[NL + 2u + j];
@@ -317,19 +336,19 @@ ${head()} {
     let fa = FAB[i * 2u]; let fb = FAB[i * 2u + 1u];
     let v = dN(fb, fa); let ln = length(v); let lo = length(dO(fb, fa));
     let Cn = max(0.0, ln - FM[i]); let Co = max(0.0, lo - FM[i]);
-    de = 0.5 * KH * (Cn - Co) * (Cn + Co);
+    de = 0.5 * KH * (Cn - Co) * (Cn + Co); en = 0.5 * KH * Cn * Cn;
     if (Cn > 0.0) { let h = KH * Cn / ln; add3_GP(fb, h * v); add3_GP(fa, -h * v); }`),
       // yarn doesn't fold back on itself: consecutive points at least half a thickness apart
       term('minsp', [['XN', 'r', 'i32'], ['X', 'r', 'i32'], ['OFN', 'r'], ['OFNO', 'r'], ['SEG', 'r', 'u32'], ['GP', 'a']], 'NS', 'OFFM', `
     let p = SEG[i]; let v = dN(p + 1u, p); let ln = length(v); let lo = length(dO(p + 1u, p));
     let Cn = select(0.0, D / 2.0 - ln, ln < D / 2.0 && ln >= 1e-12); let Co = select(0.0, D / 2.0 - lo, lo < D / 2.0 && lo >= 1e-12);
-    de = 0.5 * KH * (Cn - Co) * (Cn + Co);
+    de = 0.5 * KH * (Cn - Co) * (Cn + Co); en = 0.5 * KH * Cn * Cn;
     if (Cn > 0.0) { let k = KH * Cn / ln; add3_GP(p, k * v); add3_GP(p + 1u, -k * v); }`),
       // bending: θ² / l at every point along a yarn, θ the angle between its two segments, l their mean length
       term('bend', [['XN', 'r', 'i32'], ['X', 'r', 'i32'], ['OFN', 'r'], ['OFNO', 'r'], ['BT', 'r', 'u32'], ['GP', 'a']], 'NB', 'OFFB', `
     let ia = BT[i * 3u]; let im = BT[i * 3u + 1u]; let ib = BT[i * 3u + 2u];
     let e1 = dN(im, ia); let e2 = dN(ib, im);
-    de = bendE(e1, e2) - bendE(dO(im, ia), dO(ib, im));
+    en = bendE(e1, e2); de = en - bendE(dO(im, ia), dO(ib, im));
     let q1 = dot(e1, e1); let q2 = dot(e2, e2);
     if (q1 >= 1e-18 && q2 >= 1e-18) {
       let l1 = sqrt(q1); let l2 = sqrt(q2); let lm = (l1 + l2) / 2.0; let c = cross(e1, e2); let cl = length(c);
@@ -343,7 +362,7 @@ ${head()} {
       term('edge', [['XN', 'r', 'i32'], ['X', 'r', 'i32'], ['EA', 'r', 'u32'], ['EB', 'r', 'u32'], ['EM', 'r'], ['GA', 'a']], 'NE', 'OFFE', `
     let v = d_XN(EB[i], EA[i]); let ln = length(v); let lo = length(d_X(EB[i], EA[i]));
     let Cn = max(0.0, ln - EM[i]); let Co = max(0.0, lo - EM[i]);
-    de = 0.5 * KH * (Cn - Co) * (Cn + Co);
+    de = 0.5 * KH * (Cn - Co) * (Cn + Co); en = 0.5 * KH * Cn * Cn;
     if (Cn > 0.0) { let h = KH * Cn / ln; add3_GA(EB[i], h * v); add3_GA(EA[i], -h * v); }`),
       // a float stays on the gap side of the loop in the hook it passes
       term('gap', [['XN', 'r', 'i32'], ['X', 'r', 'i32'], ['NRM', 'r'], ['NRMO', 'r'], ['LN', 'r', 'u32'], ['GI', 'r', 'u32'], ['GA', 'a']], 'NG', 'OFFG', `
@@ -351,7 +370,7 @@ ${head()} {
     let rn = (d_XN(fn0, a) + d_XN(fn0, b)) / 2.0; let ro = (d_X(fn0, a) + d_X(fn0, b)) / 2.0;
     let n = v3_NRM(h);
     let Cn = max(0.0, dot(rn, n) * sd + D * 0.5); let Co = max(0.0, dot(ro, v3_NRMO(h)) * sd + D * 0.5);
-    de = 0.5 * KH * (Cn - Co) * (Cn + Co);
+    de = 0.5 * KH * (Cn - Co) * (Cn + Co); en = 0.5 * KH * Cn * Cn;
     if (Cn > 0.0) { let k = KH * Cn * sd; add3_GA(fn0, k * n); add3_GA(a, -0.5 * k * n); add3_GA(b, -0.5 * k * n); add3_GA(NN + h, k * rn); }`),
       // points back to their loops' normals, normals back to the loops' four nodes
       { name: 'loopback', binds: [['GP', 'a'], ['GA', 'a'], ['SPC', 'r', 'u32'], ['PI', 'r', 'u32'], ['NRM', 'r'], ['XN', 'r', 'i32'], ['LN', 'r', 'u32'], ['LG', 'rw']], body: `${head()} {
@@ -372,12 +391,12 @@ ${head()} {
   set3_GN(n, g);
   atomicMax(&CNT[5], bitcast<u32>(max(abs(g.x), max(abs(g.y), abs(g.z)))));
 }` },
-      { name: 'reduceE', wg: RW, binds: [['PE', 'rw'], ['SC', 'rw']], body: `var<workgroup> rs: array<f32, ${RW}>;
+      { name: 'reduceE', wg: RW, binds: [['PE', 'rw'], ['SC', 'rw']], body: `var<workgroup> rs: array<vec2f, ${RW}>;
 @compute @workgroup_size(${RW}) fn main(@builtin(local_invocation_index) l: u32) {
-  var v = 0.0; for (var i = l; i < NPE; i += ${RW}u) { v += PE[i]; }
+  var v = vec2f(0.0); for (var i = l; i < NPE; i += ${RW}u) { v += vec2f(PE[i], PE[NPE + i]); }
   rs[l] = v; workgroupBarrier();
   for (var s = ${RW / 2}u; s > 0u; s >>= 1u) { if (l < s) { rs[l] += rs[l + s]; } workgroupBarrier(); }
-  if (l == 0u) { SC[0] = rs[0]; }
+  if (l == 0u) { SC[0] = rs[0].x; SC[4] = rs[0].y; }
 }` },
       // ---- L-BFGS, on vectors of all node coordinates
       { name: 'neg', binds: [['G', 'r'], ['Q', 'rw']], body: `${head()} { let i = lin(w, nw, l, ${WG}u); if (i < L3) { Q[i] = -G[i]; } }` },
@@ -508,8 +527,9 @@ ${head()} {
 
   let k = 0, stopped = false;
   const st: GpuRelax = {
-    iter: 0, moved: Infinity, force: Infinity, dE: 0, rebuilds: 0, pairs: 0,
+    iter: 0, moved: Infinity, force: Infinity, dE: 0, energy: NaN, approx: 0, rebuilds: 0, pairs: 0, stuck: false,
     async steps(n: number) {
+      let most = 0;
       for (let it = 0; it < n && !stopped; it++) {
         // direction: the L-BFGS two-loop recursion
         const enc = dev.createCommandEncoder(), h = Math.min(k, HIST), ix = (t2: number) => (k - 1 - t2) % HIST;
@@ -535,17 +555,23 @@ ${head()} {
           setScalar(5, 0.5 ** tries);
           const e2 = dev.createCommandEncoder();
           run(e2, 'trial', L3); evalAt(e2);
+          run(e2, 'dotp', L3, { A: { buffer: B.Q }, B2: { buffer: G2[1 - par] } }, 'QG'); run(e2, 'dotf', 1, { P: { buffer: uniOf([0, 40]) } }, '0,40');
           ({ sc, cnt } = await readScalars(e2));
           if (cnt[2] || cnt[3]) { await grow(cnt); tries--; continue; }
           if (tries === 0 && sc[9] === 1) fell = true;
           a = sc[3] * 0.5 ** tries;
           if (sc[0] <= 1e-4 * a * sc[1]) ok = true;
+          // where the energy change is within single precision's reach of nothing, the slope decides instead (Hager &
+          // Zhang's approximate Wolfe condition): the slope along the step, at its end, hasn't risen past 0.8 of its
+          // start mirrored, so the change estimated from the two slopes is at least a tenth of the first-order drop
+          // (and must move a node by at least one fixed-point unit: a step rounded to nothing changes nothing)
+          else if (Math.abs(sc[0]) <= 1e-7 * sc[4] && sc[40] <= -0.8 * sc[1] && a * sc[2] * FIX >= 1) { ok = true; st.approx++; }
         }
         st.rebuilds = cnt[6]; st.pairs = cnt[9];
         if (fell) k = 0;
         if (!ok) { // no step lowers the energy along this direction: forget the history; stuck even from the gradient: done
           st.iter++;
-          if (k === 0) { st.moved = 0; stopped = true; break; }
+          if (k === 0) { st.moved = 0; st.stuck = stopped = true; break; }
           k = 0; continue;
         }
         const i = k % HIST, e3 = dev.createCommandEncoder();
@@ -554,9 +580,10 @@ ${head()} {
         run(e3, 'dotp', L3, { A: hslot(B.YH, i), B2: hslot(B.YH, i) }, `YY${i}`); run(e3, 'dotf', 1, { P: { buffer: uniOf([4, i]) } }, `4,${i}`);
         dev.queue.submit([e3.finish()]);
         k++; par ^= 1;
-        st.dE += sc[0]; st.moved = a * sc[2]; st.force = new Float32Array(Uint32Array.of(cnt[5]).buffer)[0]; st.iter++;
+        st.dE += sc[0]; st.energy = sc[4]; st.moved = a * sc[2]; st.force = new Float32Array(Uint32Array.of(cnt[5]).buffer)[0]; st.iter++;
+        most = Math.max(most, st.moved);
       }
-      return st.moved;
+      return most;
     },
     async read() {
       const r = dev.createBuffer({ size: L3 * 4 + NL * 12, usage: GPUBufferUsage.MAP_READ | CD }), enc = dev.createCommandEncoder();
@@ -567,6 +594,13 @@ ${head()} {
       for (let j = 0; j < L3; j++) pos[j] = xi[j] / FIX;
       r.unmap(); r.destroy();
       return { pos, nrm };
+    },
+    async exact() {
+      const r = dev.createBuffer({ size: L3 * 4, usage: GPUBufferUsage.MAP_READ | CD }), enc = dev.createCommandEncoder();
+      enc.copyBufferToBuffer(X2[par], 0, r, 0, L3 * 4); dev.queue.submit([enc.finish()]);
+      await r.mapAsync(GPUMapMode.READ);
+      const xi = new Int32Array(r.getMappedRange().slice(0)); r.unmap(); r.destroy();
+      return Float64Array.from(xi, v => v / FIX);
     },
     async gradient() {
       const r = dev.createBuffer({ size: L3 * 4, usage: GPUBufferUsage.MAP_READ | CD }), enc = dev.createCommandEncoder();
@@ -584,7 +618,7 @@ ${head()} {
       const r = dev.createBuffer({ size: L3 * 4, usage: GPUBufferUsage.MAP_READ | CD }), e3 = dev.createCommandEncoder();
       e3.copyBufferToBuffer(X2[1 - par], 0, r, 0, L3 * 4); dev.queue.submit([e3.finish()]);
       await r.mapAsync(GPUMapMode.READ); const xi = new Int32Array(r.getMappedRange().slice(0)); r.unmap(); r.destroy();
-      const pos = new Float32Array(L3); for (let j = 0; j < L3; j++) pos[j] = xi[j] / FIX;
+      const pos = Float64Array.from(xi, v => v / FIX);
       const pe = dev.createBuffer({ size: NPE * 4, usage: GPUBufferUsage.MAP_READ | CD }), e4 = dev.createCommandEncoder();
       e4.copyBufferToBuffer(B.PE, 0, pe, 0, NPE * 4); dev.queue.submit([e4.finish()]);
       await pe.mapAsync(GPUMapMode.READ); const P = new Float32Array(pe.getMappedRange().slice(0)); pe.unmap(); pe.destroy();

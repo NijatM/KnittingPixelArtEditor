@@ -13,8 +13,10 @@ export interface RelaxPost {
   on: 'GPU' | 'CPU'; limited: boolean;
 }
 
-/** The GPU's budget: enough steps to settle a small fabric (a 30 × 30 jersey takes about 28000), within a time cap. */
-const GPU_STEPS = 30000, GPU_MS = 120000;
+/** The GPU's budget: enough steps to settle a small fabric (a 30 × 30 jersey stops by itself after 20000–31000),
+ * within a time cap; and settled means no node moved more than relaxBudget's distance in any of the last WINDOW steps
+ * (one small step alone doesn't: L-BFGS takes small steps between big ones). */
+const GPU_STEPS = 60000, GPU_MS = 120000, WINDOW = 50;
 
 let current = 0;
 let last: { topo: Topo; pos: Float32Array } | null = null;
@@ -25,7 +27,10 @@ self.onmessage = async (e: MessageEvent<RelaxJob>) => {
   current = id;
   const t0 = performance.now();
   const s = buildYarn(topo, prm), from = warm && last && last.topo.n === topo.n ? last.pos : undefined, settled = relaxBudget(s).settled;
+  // progress a few times a second; less often for big fabrics, where reading the state back and redrawing it
+  // (300 × 300: ~10 MB and a million-point tube) slowed the steps between to less than half speed
   let chunk = 4, posted = t0, stepMs = 0;
+  const every = Math.max(220, s.nn / 500);
   const g = await gpuRelaxStart(s, from).catch(() => null);
   if (current !== id) { g?.destroy(); return; }
   if (g) {
@@ -34,18 +39,20 @@ self.onmessage = async (e: MessageEvent<RelaxJob>) => {
       if (done) last = { topo, pos: pos.slice() };
       send({ id, pos, nrm, iter: g.iter, max: GPU_STEPS, moved: g.moved, done, ms: performance.now() - t0, stepMs, on: 'GPU', limited });
     };
+    let most = 0, since = g.iter, calm = false;
     try {
       await post(false);
       while (g.iter < GPU_STEPS && performance.now() - t0 < GPU_MS) {
         const a = performance.now(), before = g.iter;
-        await g.steps(chunk);
+        most = Math.max(most, await g.steps(chunk));
         stepMs = (performance.now() - a) / Math.max(1, g.iter - before);
         chunk = Math.max(1, Math.min(200, Math.round(45 / Math.max(0.01, stepMs))));
         if (current !== id) return;
-        if (g.moved < settled) break;
-        if (performance.now() - posted > 220) { posted = performance.now(); await post(false); }
+        if (g.stuck) { calm = true; break; }
+        if (g.iter - since >= WINDOW) { if (most < settled) { calm = true; break; } most = 0; since = g.iter; }
+        if (performance.now() - posted > every) { posted = performance.now(); await post(false); }
       }
-      if (current === id) await post(true, g.moved >= settled);
+      if (current === id) await post(true, !calm);
     } finally { g.destroy(); }
     return;
   }
@@ -63,7 +70,7 @@ self.onmessage = async (e: MessageEvent<RelaxJob>) => {
     await new Promise(r => setTimeout(r, 0));
     if (current !== id) return; // replaced
     if (st.moved < budget.settled) break;
-    if (performance.now() - posted > 220) { posted = performance.now(); post(false); }
+    if (performance.now() - posted > every) { posted = performance.now(); post(false); }
   }
   last = { topo, pos: st.pos };
   post(true);
