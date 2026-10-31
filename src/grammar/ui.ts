@@ -17,15 +17,15 @@ export const SHELL = `
   <div class="list">${PAGES.map((p, i) => `<div class="lrow" data-learn="${p.id}" tabindex="0"><span class="lnum">${String(i).padStart(2, '0')}</span><span class="left">${p.nav}</span><span class="right">${p.draft ? 'draft' : ''}</span></div>`).join('')}</div>
   <div class="spaced dim navsec">EDITOR</div>
   <div class="list">
-    ${row('experiments', '08', 'experiments')}
-    ${row('library', '09', 'library')}
-    ${row('pattern', '10', 'pattern')}
-    ${row('key', '11', 'key')}
-    ${row('grammar', '12', 'grammar')}
-    ${row('draw', '13', 'draw')}
-    ${row('view', '14', 'view')}
-    ${row('check', '15', 'check')}
-    ${row('export', '16', 'export')}
+    ${row('experiments', '09', 'experiments')}
+    ${row('library', '10', 'library')}
+    ${row('pattern', '11', 'pattern')}
+    ${row('key', '12', 'key')}
+    ${row('grammar', '13', 'grammar')}
+    ${row('draw', '14', 'draw')}
+    ${row('view', '15', 'view')}
+    ${row('check', '16', 'check')}
+    ${row('export', '17', 'export')}
   </div>
   <div class="navfoot small faint"><a href="https://nijatmahamaliyev.com">nijatmahamaliyev.com</a></div>
 </nav>
@@ -92,7 +92,7 @@ export const SHELL = `
   <input type="file" accept=".bmp,.png,.json,image/bmp,image/png,application/json" id="kgfile" class="vh" tabindex="-1">
 
   <section class="panel" data-kpanel="experiments">
-    <div class="kicker">08 · EDITOR</div>
+    <div class="kicker">09 · EDITOR</div>
     <div class="title">Experiments</div>
     <div class="dash"></div>
     <div class="note">Small tests of how a grammar becomes a shape. Each one opens as a new pattern with its signs drawn, next to its yarn in 3D.</div>
@@ -101,7 +101,7 @@ export const SHELL = `
   </section>
 
   <section class="panel" data-kpanel="library">
-    <div class="kicker">09 · EDITOR</div>
+    <div class="kicker">10 · EDITOR</div>
     <div class="title">Library</div>
     <div class="dash"></div>
     <div class="note">Your patterns, kept in this browser. Nothing is uploaded.</div>
@@ -112,7 +112,7 @@ export const SHELL = `
   </section>
 
   <section class="panel" data-kpanel="pattern">
-    <div class="kicker">10 · EDITOR</div>
+    <div class="kicker">11 · EDITOR</div>
     <div class="title">Pattern</div>
     <div class="dash"></div>
     <div class="row"><label>name</label><input class="txt" id="kgname" aria-label="pattern name"></div>
@@ -128,7 +128,7 @@ export const SHELL = `
   </section>
 
   <section class="panel" data-kpanel="key">
-    <div class="kicker">11 · EDITOR</div>
+    <div class="kicker">12 · EDITOR</div>
     <div class="title">Key</div>
     <div class="dash"></div>
     <div class="note" id="kgkeynote"></div>
@@ -142,7 +142,7 @@ export const SHELL = `
   </section>
 
   <section class="panel" data-kpanel="grammar">
-    <div class="kicker">12 · EDITOR</div>
+    <div class="kicker">13 · EDITOR</div>
     <div class="title">Grammar</div>
     <div class="dash"></div>
     <div id="kggram"></div>
@@ -150,7 +150,7 @@ export const SHELL = `
   </section>
 
   <section class="panel" data-kpanel="draw">
-    <div class="kicker">13 · EDITOR</div>
+    <div class="kicker">14 · EDITOR</div>
     <div class="title">Draw</div>
     <div class="dash"></div>
     <div class="row"><label>layer</label><span class="val" data-kbind="layer"></span></div>
@@ -168,7 +168,7 @@ export const SHELL = `
   </section>
 
   <section class="panel" data-kpanel="view">
-    <div class="kicker">14 · EDITOR</div>
+    <div class="kicker">15 · EDITOR</div>
     <div class="title">View</div>
     <div class="dash"></div>
     <div class="list">
@@ -193,7 +193,7 @@ export const SHELL = `
   </section>
 
   <section class="panel" data-kpanel="check">
-    <div class="kicker">15 · EDITOR</div>
+    <div class="kicker">16 · EDITOR</div>
     <div class="title">Check</div>
     <div class="dash"></div>
     <div class="note">Warnings only. Nothing is blocked.</div>
@@ -207,7 +207,7 @@ export const SHELL = `
   </section>
 
   <section class="panel" data-kpanel="export">
-    <div class="kicker">16 · EDITOR</div>
+    <div class="kicker">17 · EDITOR</div>
     <div class="title">Export</div>
     <div class="dash"></div>
     <div class="note">One pixel per needle, one row per pass, the key's exact colours.</div>

@@ -7,6 +7,8 @@
 //   <div data-keytable="4s52-basic|4s52-two">              a key table drawn from the preset
 //   <div data-mini="id">                                   a small grammar example from MINIS, with "open in editor"
 
+import { taxonomyHtml } from './taxonomy';
+
 export interface Source { id: string; text: string; url?: string }
 export interface Page { id: string; nav: string; kicker: string; title: string; html: string; sources: string[]; draft: boolean }
 
@@ -187,7 +189,11 @@ export const PAGES: Page[] = [
 <p class="dim">Held loops stretch; the editor's check flags needles that hold a loop longer than the limit you set.</p>`,
   },
   {
-    id: 'sources', nav: 'sources', kicker: '07 · LEARN', title: 'Sources', draft: false, sources: [],
+    id: 'taxonomy', nav: 'knitting taxonomy', kicker: '07 · LEARN', title: 'Knitting Taxonomy', draft: true, sources: [],
+    html: taxonomyHtml(),
+  },
+  {
+    id: 'sources', nav: 'sources', kicker: '08 · LEARN', title: 'Sources', draft: false, sources: [],
     html: `<p class="lead">Everything in Learn comes from these. Simulation of slip and tuck patterns at the yarn level: see KnitScape ${cite('knitscape')}.</p><ol class="sources" data-sources></ol>`,
   },
 ];

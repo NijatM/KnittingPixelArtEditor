@@ -151,7 +151,8 @@ function renderLearn(id: string, anchor?: string) {
   $$<HTMLElement>('[data-mini]', art).forEach(el => renderMini(el, el.dataset.mini!));
   $$<HTMLElement>('[data-glyphs]', art).forEach(el => renderGlyphs(el));
   art.scrollTop = 0;
-  if (anchor) requestAnimationFrame(() => art.querySelector(`#${CSS.escape(anchor)}`)?.scrollIntoView({ block: 'start' }));
+  // a link to a part of the page (a tag on a framed sample, a source) scrolls to it and marks it for a moment
+  if (anchor) requestAnimationFrame(() => { const el = art.querySelector(`#${CSS.escape(anchor)}`); el?.scrollIntoView({ block: 'start' }); el?.classList.add('hit'); });
 }
 
 function srcText(n: number) {

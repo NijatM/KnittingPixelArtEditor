@@ -300,6 +300,14 @@ input.opname:hover, input.opname:focus { border-color: var(--line2); background:
 .article a { color: var(--hi); text-decoration: underline dotted var(--line2); text-underline-offset: 3px; }
 .article .dim, .article p.dim { color: var(--dim); }
 .article .cite { color: var(--dim); font-size: 11px; white-space: nowrap; }
+/* Knitting Taxonomy: framed samples, each reached from its NFC tag */
+.article section.frame { scroll-margin-top: 80px; padding: 4px 16px 10px; border-radius: 2px; }
+.article section.frame > * { max-width: 760px; }
+.article .frameview { display: flex; justify-content: center; margin: 14px 0; }
+.article .framesvg { width: min(300px, 70vw); height: auto; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .35)); }
+.article code { font-size: 11px; word-break: break-all; }
+.article .hit { animation: hit 2.6s ease-out; }
+@keyframes hit { 0%, 30% { box-shadow: 0 0 0 1px var(--hi), 0 0 0 7px rgba(255, 255, 255, .06); } 100% { box-shadow: 0 0 0 1px transparent; } }
 .article .cite a { color: var(--dim); }
 .article dl.parts { display: grid; grid-template-columns: 140px 1fr; gap: 6px 14px; }
 .article dl.parts dt { color: var(--dim); }
