@@ -31,6 +31,19 @@ Nijat Mahamaliyev · Tailored Materiality Research
 - **Editor**: paint operations, not colours. Tools: needle, run, flood, pass, wale, motif (select, move, flip,
   repeat with a shift), pick, mirror, undo. Views: colours, symbols, and a guides view that splits each
   two-guide pass into a YG1 and a YG2 row. Pass numbers and directions, needle numbers.
+- **Shape grammar**: paint regions with signs (A, B, C … on a design layer), give each sign a structure (rib,
+  garter, tuck moss, eyelets, hold for short rows, double knit …) and an optional outline structure, and the knit
+  program is written from the signs as you draw. Any motif you draw can be saved as a new structure.
+- **Experiments**: eight ready-made tests (accordion, bubble, cup, ridges, pleats, window, two-yarn picture, your
+  own grammar), each with what to look for and what to try.
+- **3D yarn**: the program run on a model V-bed, next to the chart. The machine tracks every needle's loops on both
+  beds, the yarn guides, knits, tucks, misses and transfers, which loop is drawn through which, and each guide's
+  continuous yarn. *Machine* steps through it pass by pass or action by action (needle beds flat or folded into
+  the V, held loops on their hooks, transfers as arrows, the fabric made so far). *Fabric* shows the same yarn
+  relaxed off the machine, in a background worker: an uncalibrated estimate (yarn length per stitch, bending,
+  floats that can't stretch, strands that can't overlap side by side). Picking a stitch in 3D marks its cell, and
+  hovering a cell lights its loops. Two rules the class key doesn't state (when transfers happen, how two guides
+  travel) are switches marked "to confirm".
 - **Keys**: the class presets (one and two yarn guides; colour key from Computational Textiles, MIT 4.S52/6.S895,
   Spring 2026, Mariana Popescu) and custom keys built from known operations.
 - **Open**: BMP / PNG (near colours snap to the key and are listed; others stay and are flagged) and project files.
@@ -87,6 +100,8 @@ python3 scripts/build-avatar-library.py <portrait-40-multi-resolution folder>
 | Knit Grammar: operations, keys, symbols | `src/grammar/ops.ts` |
 | Knit Grammar: patterns, editor, rendering, checks | `src/grammar/pattern.ts`, `editor.ts`, `render.ts`, `checks.ts` |
 | Knit Grammar: files and library | `src/grammar/io.ts`, `src/grammar/library.ts` |
+| Knit Grammar: shape grammar, structures, experiments | `src/grammar/structures.ts` |
+| Knit Grammar: machine, yarn, relaxation, 3D view | `src/grammar/machine.ts`, `yarn.ts`, `relax.ts`, `knit.worker.ts`, `view3d.ts` |
 | Knit Grammar: Learn pages, figures, 3D swatches | `src/grammar/learn.ts`, `figures.ts`, `swatch3d.ts`, `src/hl.ts` |
 | Knit Grammar: interface | `src/grammar/ui.ts`, `src/grammar/main.ts` |
 
@@ -96,7 +111,7 @@ Planning notes: `SPEC.md`, `design/DESIGN.md`, `HANDOFF.md`, `RESEARCH.md`.
 
 Code: MIT (`LICENSE`). Models and other third-party files keep their own licenses — see `MODELS.md`.
 The line figures use the hairline kernel by Lucas Marques (MIT, vendored in `src/vendor/hairline/` with its
-license); the 3D swatches use three.js (MIT).
+license); the 3D views use three.js (MIT).
 
 ## AI usage
 

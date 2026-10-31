@@ -1,12 +1,12 @@
 // Knit grammar editor model: the tools and undo/redo over a pattern's cells. No DOM here.
-import { floatIndex, type Pattern } from './pattern';
+import { floatIndex, type Design, type Pattern } from './pattern';
 import type { Key, RGB } from './ops';
 
 export type GTool = 'needle' | 'run' | 'flood' | 'pass' | 'wale' | 'motif' | 'pick';
 export interface Rect { x: number; y: number; w: number; h: number }
 export type RepeatMode = 'across' | 'up' | 'all';
 
-interface Snapshot { w: number; h: number; cells: Uint8Array; unknown: RGB[]; key: Key }
+interface Snapshot { w: number; h: number; cells: Uint8Array; unknown: RGB[]; key: Key; design?: Design }
 type Change =
   | { kind: 'cells'; idx: Uint32Array; before: Uint8Array; after: Uint8Array; sel: Rect | null }
   | { kind: 'whole'; before: Snapshot; after: Snapshot };
@@ -190,8 +190,8 @@ export class GEditor {
   }
 
   // ---------------------------------------------------------------- whole-pattern changes (resize, key)
-  private snap(): Snapshot { return { w: this.p.w, h: this.p.h, cells: this.p.cells.slice(), unknown: structuredClone(this.p.unknown), key: structuredClone(this.p.key) }; }
-  private restore(s: Snapshot) { Object.assign(this.p, { w: s.w, h: s.h, cells: s.cells.slice(), unknown: structuredClone(s.unknown), key: structuredClone(s.key) }); }
+  private snap(): Snapshot { return { w: this.p.w, h: this.p.h, cells: this.p.cells.slice(), unknown: structuredClone(this.p.unknown), key: structuredClone(this.p.key), design: this.p.design && structuredClone(this.p.design) }; }
+  private restore(s: Snapshot) { Object.assign(this.p, { w: s.w, h: s.h, cells: s.cells.slice(), unknown: structuredClone(s.unknown), key: structuredClone(s.key), design: s.design && structuredClone(s.design) }); }
 
   /** Applies a change to size / cells / key as one undo step. */
   whole(apply: () => void) {
@@ -200,6 +200,12 @@ export class GEditor {
     this.sel = null;
     this.push({ kind: 'whole', before, after: this.snap() });
   }
+
+  /** For changes made elsewhere over time (a stroke on the design layer): remember the state now, and later
+   *  commit everything since as one undo step. */
+  private pending: Snapshot | null = null;
+  checkpoint() { this.pending = this.snap(); }
+  commit() { if (!this.pending) return; this.push({ kind: 'whole', before: this.pending, after: this.snap() }); this.pending = null; }
 
   undo() { const ch = this.undos.pop(); if (!ch) return false; this.apply(ch, true); this.redos.push(ch); return true; }
   redo() { const ch = this.redos.pop(); if (!ch) return false; this.apply(ch, false); this.undos.push(ch); return true; }

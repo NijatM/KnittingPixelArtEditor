@@ -19,9 +19,21 @@ export interface Pattern {
   firstDir: 1 | -1;
   /** What the pattern is meant to do (the intention written next to the key). */
   note?: string;
+  /** The pattern's own shape grammar: a layer of signs, each knitted as a structure (see structures.ts). */
+  design?: Design;
+  /** The experiment this pattern was started from, if any. */
+  exp?: string;
   created: number;
   updated: number;
 }
+
+/** A structure: a small tile of operations (op ids), rows top (last pass) to bottom, repeated from needle 1 and
+ *  pass 1 so that neighbouring regions mesh. */
+export interface Structure { id: string; name: string; w: number; h: number; rows: string[][]; note?: string }
+/** A sign: a name and a colour on the design layer, the structure it is knitted as, and the structure of its
+ *  outline (cells touching another sign), or none. */
+export interface Sign { name: string; letter: string; rgb: RGB; fill: string; edge: string | null }
+export interface Design { cells: Uint8Array; signs: Sign[]; custom: Structure[]; live: boolean }
 
 export const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
@@ -51,12 +63,12 @@ export const passOf = (p: Pattern, y: number) => p.h - y;
 export const dirOf = (p: Pattern, y: number) => ((p.h - 1 - y) % 2 === 0 ? p.firstDir : -p.firstDir) as 1 | -1;
 
 /** Resize keeping the bottom-left corner (pass 1, needle 1) in place; new cells get `fill`. */
-export function resized(p: Pattern, w: number, h: number, fill: number): Uint8Array {
+export function resized(p: Pattern, w: number, h: number, fill: number, cells = p.cells): Uint8Array {
   const out = new Uint8Array(w * h).fill(fill);
   for (let y = 0; y < h; y++) {
     const sy = p.h - h + y; // same distance from the bottom
     if (sy < 0 || sy >= p.h) continue;
-    for (let x = 0; x < Math.min(w, p.w); x++) out[y * w + x] = p.cells[sy * p.w + x];
+    for (let x = 0; x < Math.min(w, p.w); x++) out[y * w + x] = cells[sy * p.w + x];
   }
   return out;
 }
@@ -78,6 +90,7 @@ export function toJSON(p: Pattern): string {
     note: p.note ?? '',
     rowsTopToBottom: 'cells are op indices, row 0 = last pass (as in the image)',
     cells: b64(p.cells),
+    design: p.design && { signs: p.design.signs, structures: p.design.custom, live: p.design.live, cells: b64(p.design.cells) },
   }, null, 1);
 }
 
@@ -90,5 +103,7 @@ export function fromJSON(text: string): Pattern {
   if (cells.length !== w * h) throw new Error('cells don\'t match the size');
   const key: Key = { id: j.key.id ?? 'custom', name: j.key.name ?? 'imported key', mode: j.key.mode === 2 ? 2 : 1, ops: j.key.ops, credit: j.key.credit, notes: j.key.notes };
   const now = Date.now();
-  return { v: 1, id: newId(), name: j.name ?? 'imported', w, h, key, cells, unknown: j.unknownColours ?? [], firstDir: j.firstPass === 'right-to-left' ? -1 : 1, note: j.note ?? '', created: now, updated: now };
+  const d = j.design, dcells = d ? unb64(d.cells) : null;
+  const design: Design | undefined = d && dcells && dcells.length === w * h ? { cells: dcells, signs: d.signs ?? [], custom: d.structures ?? [], live: !!d.live } : undefined;
+  return { v: 1, id: newId(), name: j.name ?? 'imported', w, h, key, cells, unknown: j.unknownColours ?? [], firstDir: j.firstPass === 'right-to-left' ? -1 : 1, note: j.note ?? '', design, created: now, updated: now };
 }

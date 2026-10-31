@@ -17,6 +17,8 @@ export interface Overlay {
   sel?: Rect | null;
   preview?: { cells: [number, number][]; v: number } | null;
   marks?: Set<number> | null; // cell indices flagged by a check
+  row?: number | null;        // a pass shown in 3D (image row)
+  pin?: { x: number; y: number } | null; // a cell picked in 3D
 }
 
 export interface Layout { ml: number; mt: number; mr: number; mb: number; rowH: number; sub: number; W: number; H: number }
@@ -60,8 +62,8 @@ export class Tiles {
   version = 0;
   bump() { this.version++; this.cache.clear(); }
 
-  tile(op: Op | null, rgb: string, cs: number, glyph: string[] | null, dpr: number): HTMLCanvasElement {
-    const k = `${rgb}|${glyph ? glyph.join('') : ''}|${cs}|${dpr}`;
+  tile(op: Op | null, rgb: string, cs: number, glyph: string[] | null, dpr: number, letter = ''): HTMLCanvasElement {
+    const k = `${rgb}|${glyph ? glyph.join('') : ''}|${letter}|${cs}|${dpr}`;
     let c = this.cache.get(k);
     if (c) return c;
     c = document.createElement('canvas');
@@ -70,6 +72,11 @@ export class Tiles {
     const ctx = c.getContext('2d')!;
     ctx.fillStyle = rgb; ctx.fillRect(0, 0, s, s);
     if (glyph) paintGlyph(ctx, glyph, 0, 0, s, '#000');
+    if (letter) { // a design sign: its letter
+      ctx.fillStyle = 'rgba(0,0,0,.62)'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = `600 ${Math.round(s * 0.62)}px "IBM Plex Mono", ui-monospace, monospace`;
+      ctx.fillText(letter, s / 2, s * 0.54);
+    }
     if (!op) { // an unknown colour: hatched, so it can't be mistaken for an operation
       ctx.strokeStyle = 'rgba(0,0,0,.55)'; ctx.lineWidth = Math.max(1, s / 12);
       for (let t = -s; t < s; t += Math.max(3, s / 4)) { ctx.beginPath(); ctx.moveTo(t, s); ctx.lineTo(t + s, 0); ctx.stroke(); }
@@ -110,7 +117,8 @@ export function drawPattern(ctx: CanvasRenderingContext2D, p: Pattern, v: ViewOp
       const col = hex(cellRGB(p, val)), X = L.ml + x * cs, Y = L.mt + y * L.rowH;
       if (guides && op) {
         for (let g = 0; g < 2; g++) ctx.drawImage(tiles.tile(op, col, cs, sym ? stepGlyph(op.steps[g]) : null, dpr), X, Y + g * cs, cs, cs);
-      } else ctx.drawImage(tiles.tile(op, col, cs, sym && op ? glyphs[val] : null, dpr), X, Y, cs, L.rowH);
+      } else if (op?.letter) ctx.drawImage(tiles.tile(op, col, cs, null, dpr, op.letter), X, Y, cs, L.rowH);
+      else ctx.drawImage(tiles.tile(op, col, cs, sym && op ? glyphs[val] : null, dpr), X, Y, cs, L.rowH);
     }
   }
   const x0 = L.ml, y0 = L.mt, x1 = L.ml + p.w * cs, y1 = L.mt + p.h * L.rowH;
@@ -137,6 +145,18 @@ export function drawOverlay(ctx: CanvasRenderingContext2D, p: Pattern, v: ViewOp
   const L = layout(p, v), cs = v.cs, x0 = L.ml, y0 = L.mt, y1 = L.mt + p.h * L.rowH;
   ctx.save();
   ctx.scale(dpr, dpr);
+  if (o.row !== undefined && o.row !== null) { // the pass shown in 3D: brackets on both sides
+    const Y = y0 + o.row * L.rowH, x1 = x0 + p.w * cs;
+    ctx.fillStyle = theme.hi;
+    ctx.fillRect(x0 - 7, Y, 3, L.rowH); ctx.fillRect(x1 + 4, Y, 3, L.rowH);
+    ctx.strokeStyle = 'rgba(244,244,244,.55)'; ctx.lineWidth = 1;
+    ctx.strokeRect(x0 - 0.5, Y - 0.5, x1 - x0 + 1, L.rowH + 1);
+  }
+  if (o.pin) {
+    const X = x0 + o.pin.x * cs, Y = y0 + o.pin.y * L.rowH;
+    ctx.lineWidth = 2; ctx.strokeStyle = '#000'; ctx.strokeRect(X - 1, Y - 1, cs + 2, L.rowH + 2);
+    ctx.lineWidth = 1; ctx.strokeStyle = theme.hi; ctx.strokeRect(X - 2.5, Y - 2.5, cs + 5, L.rowH + 5);
+  }
   if (o.marks?.size) {
     ctx.strokeStyle = theme.warn; ctx.lineWidth = Math.max(1, Math.min(2, cs / 8));
     for (const i of o.marks) { const x = i % p.w, y = (i / p.w) | 0; ctx.strokeRect(x0 + x * cs + 0.5, y0 + y * L.rowH + 0.5, Math.max(1, cs - 1), Math.max(1, L.rowH - 1)); }

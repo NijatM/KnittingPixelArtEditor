@@ -300,3 +300,66 @@ export const stitchPlate: FigureMount = ({ stage, svg, read }, value) => {
   bag.add(() => svg.replaceChildren());
   return { set: () => {}, destroy: bag.dispose };
 };
+
+// ---------------------------------------------------------------- the V seen from the end
+/** A short length of the two beds seen from the end: an upside-down V. One needle in each bed slides up its slope
+ *  toward the top, where the sinkers hold the fabric down; the fabric hangs through the gap to the take-down
+ *  rollers, and the yarn comes down from the tensioner through the carrier. The pointer's height raises the needles. */
+export const vSection: FigureMount = ({ stage, svg, read }) => {
+  const bag = disposer();
+  const XL = 26, E = 3, L = 44, A = Math.SQRT1_2, T = 5, RZ = -58, RR = 4.2;
+  const C = Cam(68, 0.42, 2.6);
+  fit(C, [[0, -E - L * A - 2, -L * A - T], [XL, E + L * A + 2, -L * A - T], [0, 0, RZ - RR], [XL, 0, RZ - RR], [XL + 6, 0, 30], [0, 0, 30]], 200, 160);
+  const P = proj(C), front = facing(C);
+  const g = mk('g', {}, svg);
+  /** A point on a bed's top surface, s along the slope from the top edge (negative: past the top). */
+  const onBed = (back: boolean, s: number, lift = 0): [number, number] => [(back ? -1 : 1) * (E + s * A), -s * A + lift];
+
+  const bed = (back: boolean) => { const [y0, z0] = onBed(back, 0), [y1, z1] = onBed(back, L); const el = solid(g); put(el, slab(P, 0, XL, y0, y1, z0, z1, T, 3, 1.2)); return el; };
+  const sinkers = (back: boolean, xs: number[]) => xs.forEach(x => { const y = back ? -E - 1.4 : E + 1.4, [r, ri] = rings(x - 0.7, y - 1.6, x + 0.7, y + 1.6, 0.5, 0.25); put(solid(g), prism(P, front, r, ri, -1, 3.2)); });
+  interface N { back: boolean; x: number; el: ReturnType<typeof solid>; hook: SVGPathElement }
+  const needle = (back: boolean, x: number): N => { const el = solid(g); return { back, x, el, hook: mk('path', { class: 'nf' }, el.g) }; };
+
+  bed(true); sinkers(true, [XL / 2 - 6.5, XL / 2 + 1.5]); const nb = needle(true, XL / 2 - 2.5);
+  // the fabric hangs from the top of the V to the rollers, with a few courses on it
+  const fab = solid(g);
+  put(fab, prism(P, front, rrect(1, -0.5, XL - 1, 0.5, 0.4), null, RZ + RR - 1, -1));
+  mk('path', { d: [-10, -20, -30, -40].map(z => seg(P(2, 0.5, z), P(XL - 2, 0.5, z))).join(''), class: 'nf lo' }, g);
+  // take-down rollers, side by side under the gap
+  const roller = (y: number) => {
+    const circle = (x: number) => Array.from({ length: 33 }, (_, k) => { const a = (k / 32) * Math.PI * 2; return P(x, y + RR * Math.cos(a), RZ + RR * Math.sin(a)); });
+    const a = circle(-2), b = circle(XL + 2);
+    mk('path', { d: poly(hull(a.concat(b))), class: 'sil' }, g);
+    mk('path', { d: open(b), class: 'nf lo' }, g);
+  };
+  roller(-RR - 0.6); roller(RR + 0.6);
+  bed(false); sinkers(false, [XL / 2 - 1.5, XL / 2 + 6.5]); const nf = needle(false, XL / 2 + 2.5);
+  // yarn: from the tensioner above, through the carrier, down into the hooks at the top of the V
+  const [tr, ti] = rings(XL + 2, -2.2, XL + 6, 2.2, 2, 0.6);
+  put(solid(g), prism(P, front, tr, ti, 22, 24));
+  const [cr, ci] = rings(XL / 2 - 1.5, -1.5, XL / 2 + 1.5, 1.5, 0.8, 0.4);
+  const carrier = solid(g); put(carrier, prism(P, front, cr, ci, 8, 14));
+  const yarn = mk('path', { class: 'nf' }, g);
+  mk('path', { d: seg(P(XL + 4, 0, 30), P(XL + 4, 0, 24)), class: 'nf' }, g);
+
+  const lift = spring(0, { eps: 0.01 });
+  let state = '';
+  function draw() {
+    const t = lift.x;
+    for (const n of [nb, nf]) {
+      const sTip = 3 - t * 9, [yT, zT] = onBed(n.back, sTip, 1), [yE, zE] = onBed(n.back, sTip + 30, 1);
+      put(n.el, slab(P, n.x - 0.9, n.x + 0.9, yT, yE, zT, zE, 1.3, 0.8));
+      const toward = n.back ? 1 : -1;
+      n.hook.setAttribute('d', open([P(n.x, yT, zT), P(n.x, yT + toward * 0.9, zT + 1.8), P(n.x, yT + toward * 2.2, zT + 1.2)]));
+      n.el.sil.classList.toggle('hi', t > 0.85);
+    }
+    yarn.setAttribute('d', open([P(XL + 4, 0, 22), P(XL / 2, 0, 14), P(XL / 2, 0, 8), P(XL / 2, 0, 1.5 + t * 4)]));
+    const s = t > 0.85 ? 'clearing height' : t > 0.45 ? 'tuck height' : 'rest';
+    if (s !== state) { state = s; read.textContent = s; }
+  }
+  const B = register(stage, (dt: number) => { const m = stepS(lift, dt); draw(); return m; });
+  bag.add(B.unregister);
+  bag.add(pointer(stage, { move: (p: Pt) => { lift.t = clamp(1.1 - (p[1] - 60) / 180, 0, 1); B.wake(); }, leave: () => { lift.t = 0; B.wake(); } }));
+  bag.add(() => svg.replaceChildren());
+  return { set: () => {}, destroy: bag.dispose };
+};

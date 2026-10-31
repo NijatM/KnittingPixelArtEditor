@@ -287,7 +287,7 @@ input.opname:hover, input.opname:focus { border-color: var(--line2); background:
 .dlg, #resetdlg { background: var(--bg2); color: var(--fg); border: 1px solid var(--line2); padding: 20px 22px 18px; width: min(520px, calc(100vw - 32px)); }
 .dlg::backdrop { background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(3px); }
 .dlg .note { margin: 8px 0 16px; }
-.dlg .row { grid-template-columns: 80px 1fr; }
+.dlg .row { grid-template-columns: 104px 1fr; }
 
 /* ---------------------------------------------------------------- learn */
 .article { position: absolute; inset: 0; overflow-y: auto; padding: 96px 40px 80px; outline: none; }
@@ -312,7 +312,8 @@ input.opname:hover, input.opname:focus { border-color: var(--line2); background:
 .article .pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .article .pair figure, .article .pair .kmini { margin: 12px 0; }
 .swbox { width: 100%; min-height: 120px; }
-.swbox canvas { display: block; width: 100% !important; cursor: grab; }
+.swbox canvas { display: block; cursor: grab; }
+.swview { position: relative; width: 100%; aspect-ratio: 1.6; }
 .swbox .ph { border: 1px dashed var(--line2); color: var(--faint); aspect-ratio: 1.6; display: flex; align-items: center; justify-content: center; font-size: 11.5px; }
 .swbar { margin: 8px 0 0; gap: 10px; }
 .note-box { border: 1px dashed var(--line2); padding: 12px 14px; margin: 24px auto; }
@@ -326,6 +327,59 @@ input.opname:hover, input.opname:focus { border-color: var(--line2); background:
 .kmini { border: 1px solid var(--line); padding: 10px 12px; margin: 14px auto; overflow-x: auto; }
 .kmini canvas { display: block; image-rendering: pixelated; }
 .minibar { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.passread { display: flex; align-items: baseline; gap: 12px; margin-top: 8px; flex-wrap: wrap; min-height: 2.9em; }
+.passread .stepper span { min-width: 6.5em; }
+.optable td:first-child a { white-space: nowrap; }
+.glyphs { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px 14px; margin: 12px auto; }
+.glyph { display: flex; align-items: center; gap: 10px; }
+.glyph canvas { flex: none; border: 1px solid var(--line2); image-rendering: pixelated; }
+.glyph span { color: var(--dim); line-height: 1.4; }
+
+/* ---------------------------------------------------------------- knit grammar: 3D, experiments, signs, structures */
+#kg3dview { position: absolute; inset: 0; display: none; }
+#kg[data-mode="editor"][data-v3="1"]:not(.noproject) #kg3dview { display: block; }
+#kg[data-v3="1"][data-split="0"] #kgview { display: none; }
+/* split: the chart on the left, 3D on the right, a divider between */
+#kg[data-v3="1"][data-split="1"] #kgview { right: var(--k3w); }
+#kg[data-v3="1"][data-split="1"] #kg3dview { left: auto; width: var(--k3w); border-left: 1px solid var(--line); }
+#kgsplit { position: absolute; right: var(--k3w); width: 9px; margin-right: -5px; z-index: 3; cursor: col-resize; display: none; touch-action: none; }
+#kgsplit:hover { background: linear-gradient(to right, transparent 4px, var(--line2) 4px, var(--line2) 5px, transparent 5px); }
+#kg[data-mode="editor"][data-v3="1"][data-split="1"]:not(.noproject) #kgsplit { display: block; }
+#kg3dbox { position: relative; width: 100%; height: 100%; overflow: hidden; }
+#kg3dbox canvas { display: block; cursor: grab; touch-action: none; }
+.v3dbar { position: absolute; left: 10px; right: 10px; bottom: 0; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 6px 8px; background: color-mix(in srgb, var(--bg) 86%, transparent); border: 1px solid var(--line); backdrop-filter: blur(4px); }
+.v3fold { display: inline-flex; align-items: center; gap: 6px; }
+.v3fold .bar { width: 96px; height: 18px; }
+#kg:not([data-m3="machine"]) .v3fold { display: none; }
+.v3dnote { position: absolute; left: 10px; right: 10px; top: 0; margin-top: 8px; color: var(--fg); pointer-events: none; text-shadow: 0 0 4px var(--bg); }
+#kg3dview .v3dnote { top: var(--tb, 0); }
+.k3labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.k3label { position: absolute; left: 0; top: 0; font-size: 11px; color: var(--fg); background: color-mix(in srgb, var(--bg) 78%, transparent); padding: 0 4px; white-space: nowrap; }
+/* the pass scrubber under the chart and 3D */
+.kgplay { position: absolute; left: 0; right: 0; z-index: 2; display: none; align-items: center; gap: 10px; padding: 7px 16px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--bg) 92%, transparent); }
+#kg[data-mode="editor"][data-v3="1"]:not(.noproject) .kgplay { display: flex; }
+.kgplay .bar { flex: 1 1 160px; min-width: 120px; height: 18px; }
+.kgplay .stepper span { min-width: 5.5em; text-align: center; }
+.kgplay #kgactn { min-width: 7.5em; }
+.kgacttext { flex: 2 1 220px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.faintbtn { opacity: .45; }
+.exp { border: 1px solid var(--line); margin: 6px 0; }
+.exp.on { border-color: var(--hi); }
+.exphead { display: grid; grid-template-columns: auto 1fr; gap: 0 10px; width: 100%; text-align: left; background: none; border: none; color: var(--fg); padding: 8px 10px; cursor: pointer; }
+.exphead .lnum { grid-row: span 2; color: var(--faint); }
+.exphead .t { color: var(--hi); }
+.exphead:hover { background: var(--bg2); }
+.expbody { padding: 2px 12px 10px 38px; color: var(--fg); }
+.expbody p { margin: 4px 0 8px; line-height: 1.55; }
+.expbody ul { margin: 4px 0 8px; padding-left: 18px; color: var(--dim); }
+.expbody li { margin: 2px 0; }
+.signrow .opmain { display: flex; flex-direction: column; gap: 3px; }
+.srow { display: grid; grid-template-columns: 56px 1fr; gap: 6px; align-items: center; }
+.srow select { width: 100%; }
+.structs { display: flex; flex-direction: column; gap: 6px; margin: 6px 0; }
+.struct { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; border: 1px solid var(--line); padding: 6px; }
+.struct canvas { display: block; image-rendering: pixelated; }
+.struct .smain { min-width: 0; }
 ol.sources li { margin: 6px 0; color: var(--fg); }
 ol.sources a { word-break: break-all; }
 .pager { display: flex; justify-content: space-between; border-top: 1px dashed var(--line2); margin-top: 36px !important; padding-top: 14px; }
@@ -347,7 +401,9 @@ ol.sources a { word-break: break-all; }
   .snav .lrow.sel .left::before { content: ""; }
   .sstage { order: 2; display: flex; flex-direction: column; overflow: visible; }
   .stoolbar, .sstatus { position: static; }
-  .stoolbar { order: 1; } #kgview, #kgempty { order: 2; } .sstatus { order: 3; } #kglearn { order: 2; }
+  .stoolbar { order: 1; } #kgview, #kgempty { order: 2; } .sstatus { order: 4; } #kglearn { order: 2; }
+  #kg3dview { position: relative; height: 64vh; min-height: 360px; order: 2; padding: 0 !important; width: auto !important; }
+  .kgplay { position: static; order: 3; flex-wrap: wrap; }
   #kgview { position: relative; height: 64vh; min-height: 360px; padding-top: 12px !important; padding-bottom: 12px !important; }
   #kgempty { position: relative; padding: 16px; }
   .article { position: static; padding: 18px 16px 40px; overflow: visible; }

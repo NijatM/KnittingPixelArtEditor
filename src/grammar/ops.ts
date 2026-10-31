@@ -23,6 +23,8 @@ export interface Op {
   /** Value not yet confirmed (shown as "provisional" wherever the op is listed). */
   provisional?: boolean;
   note?: string;
+  /** Design signs (shape grammar) are drawn as a letter instead of an operation symbol. */
+  letter?: string;
 }
 
 export interface Key {
