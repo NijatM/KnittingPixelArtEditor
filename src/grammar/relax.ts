@@ -20,14 +20,14 @@
 import type { YarnSys } from './yarn';
 
 /** Penalty stiffnesses, and the bending scale. Uncalibrated. */
-const K = { len: 200, hard: 200 };
-const bendOf = (stiff: number) => (0.04 + 0.4 * stiff * stiff) / 6;
+export const K = { len: 200, hard: 200 };
+export const bendOf = (stiff: number) => (0.04 + 0.4 * stiff * stiff) / 6;
 /** Regularises the normal of a loop squeezed flat. */
-const EPS2 = 1e-3;
+export const EPS2 = 1e-3;
 /** Extra reach of the yarn-on-yarn pairs list; the list is rebuilt when any point has moved half of it. */
-const MARGIN = 0.2;
+export const MARGIN = 0.2;
 /** L-BFGS history. */
-const HIST = 5;
+export const HIST = 5;
 
 interface Work {
   pts: Float64Array; gp: Float64Array; nrm: Float64Array; vl: Float64Array; gn: Float64Array;
