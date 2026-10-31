@@ -527,8 +527,9 @@ export class KnitView {
       for (let i = 0; i < t.n; i++) {
         if (t.act[i] > this.act || t.childAct[i] > this.act) continue;
         let x = 0, y = 0, z = 0;
-        for (let q = 0; q < 5; q++) { const p = (s.loopPt[i] + q) * 3; x += m[p]; y += m[p + 1]; z += m[p + 2]; }
-        test(i, x / 5 + fr.shift[0], y / 5 + fr.shift[1], z / 5 + fr.shift[2]);
+        const a = s.loopPt[i], b = s.loopEnd[i], n = b - a;
+        for (let q = a; q < b; q++) { x += m[q * 3]; y += m[q * 3 + 1]; z += m[q * 3 + 2]; }
+        test(i, x / n + fr.shift[0], y / n + fr.shift[1], z / n + fr.shift[2]);
       }
       for (const h of this.dynCentres) test(h.loop, h.x, h.y, h.z);
     }
