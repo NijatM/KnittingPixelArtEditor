@@ -86,34 +86,42 @@ class PN532:
         return bool(r) and r[0] == 0
 
 
-def read_url(nfc):
-    """The first URI record of the tag's NDEF message, or None."""
-    mem = b''
-    for page in range(4, 40, 4):
-        chunk = nfc.page4(page)
-        if chunk is None: break
-        mem += chunk
-        if b'\xfe' in mem: break
+def parse(mem):
+    """(whole, url): whole is False while the NDEF message runs past the bytes read so far; url is its first URI or None."""
     i = 0
     while i < len(mem):
         t = mem[i]
         if t == 0x00: i += 1; continue
-        if t == 0xFE: return None
-        if i + 1 >= len(mem): return None
+        if t == 0xFE: return True, None
+        if i + 4 > len(mem): return False, None
         n, h = (mem[i + 1], 2) if mem[i + 1] != 0xFF else (int.from_bytes(mem[i + 2:i + 4], 'big'), 4)
+        if i + h + n > len(mem): return False, None
         if t == 0x03:
             rec = mem[i + h:i + h + n]
-            if len(rec) < 4: return None
+            if len(rec) < 4: return True, None
             flags, tl = rec[0], rec[1]
             short = flags & 0x10
             pl = rec[2] if short else int.from_bytes(rec[2:6], 'big')
             j = 3 if short else 6
             if flags & 0x08: j += 1                                          # ID length present
             typ = rec[j:j + tl]; payload = rec[j + tl:j + tl + pl]
-            if typ == b'U' and payload:
-                return PREFIX.get(payload[0], '') + payload[1:].decode('utf-8', 'replace')
-            return None
+            if typ == b'U' and payload and len(payload) == pl:
+                return True, PREFIX.get(payload[0], '') + payload[1:].decode('utf-8', 'replace')
+            return True, None
         i += h + n
+    return False, None
+
+
+def read_url(nfc):
+    """The first URI record of the tag's NDEF message, None if it has none, or False if the tag went away before its
+    message was read whole (a frame lifted or slid mid-read): a cut-off address is never returned."""
+    mem = b''
+    for page in range(4, 228, 4):                                            # up to an NTAG216's last user page
+        chunk = nfc.page4(page)
+        if chunk is None: return False
+        mem += chunk
+        whole, url = parse(mem)
+        if whole: return url
     return None
 
 
@@ -189,7 +197,8 @@ def main():
         for page in (0, 4, 8, 12):
             c = nfc.page4(page)
             print(f'pages {page:2}-{page + 3:2}: {c.hex(" ") if c else "unreadable"}')
-        print(f'address: {read_url(nfc)}')
+        u = read_url(nfc)
+        print(f'address: {"not read whole (the tag moved?)" if u is False else u}')
         v = nfc.version()                                                    # last: a chip without it stops answering
         print(f'GET_VERSION {v.hex(" ") if v else "no answer"}')
         return
@@ -206,7 +215,9 @@ def main():
     while True:
         uid = nfc.tag()
         if uid and uid != last:
-            url = read_url(nfc) or table.get(uid.hex())
+            url = read_url(nfc)
+            if url is False: time.sleep(0.1); continue                       # not read whole: try again, not yet seen
+            url = url or table.get(uid.hex())
             print(f'tag {uid.hex()}: {url or "no address on it and not in tags.json"}')
             if url: show(url, tab, browser)
         last = uid                                                           # the same tag lying there opens once
