@@ -4,11 +4,15 @@
 Lay a framed sample on the reader and the laptop opens the address on its tag (the same page a phone opens).
 No packages needed: the serial port is opened with termios (macOS / Linux).
 
-  python3 taxonomy_reader.py                 wait for tags, open each one's address in the default browser
+  python3 taxonomy_reader.py                 wait for tags; each one's address opens in one Chrome window kept for
+                                             the reader, filling the screen (macOS; first time, allow the terminal
+                                             to control Chrome); elsewhere, or with --tab, in the default browser
   python3 taxonomy_reader.py check           print the PN532's firmware version and exit
   python3 taxonomy_reader.py info            print the next tag's UID, chip version, first pages and address (reads only)
   python3 taxonomy_reader.py write <url>     write <url> to the next NTAG21x tag laid on the reader
-  options: --port /dev/cu.usbserial-10 (default: the first /dev/cu.usbserial* or /dev/ttyUSB*)
+  options: --port /dev/cu.usbserial-10 (default: the first /dev/cu.usbserial* or /dev/ttyUSB*), --tab,
+           --browser "Brave Browser" (any Chromium browser on macOS; default Google Chrome)
+  start_reader.command (next to this file) starts it from Finder with a double-click.
 
 A tag without an address is looked up by its UID in tags.json next to this file ({"04a1b2c3d4e5f6": "https://..."});
 an unknown tag's UID is printed so it can be added there.
@@ -131,11 +135,46 @@ def write_url(nfc, url):
     return True
 
 
+# Chrome (or another Chromium browser), through JavaScript for Automation: the reader's own window (else one already on the site, else a new one),
+# sized to the screen above the Dock and brought to the front; the same address again reloads, so the page scrolls
+# back to the frame.
+SHOW = r'''
+function run(argv) {
+  const url = argv[0], want = argv[1] || '', chrome = Application(argv[2]);
+  const site = url.split('#')[0];
+  let win = chrome.windows().find(w => String(w.id()) === want) || chrome.windows().find(w => w.activeTab().url().startsWith(site));
+  if (!win) { chrome.Window().make(); win = chrome.windows[0]; }
+  const tab = win.activeTab();
+  if (tab.url() === url) tab.reload(); else tab.url = url;
+  ObjC.import('AppKit');
+  const f = $.NSScreen.mainScreen.frame, v = $.NSScreen.mainScreen.visibleFrame;
+  win.bounds = { x: v.origin.x, y: f.size.height - v.origin.y - v.size.height, width: v.size.width, height: v.size.height };
+  win.index = 1;
+  chrome.activate();
+  return String(win.id());
+}'''
+shown = {}
+
+
+def show(url, tab=False, browser='Google Chrome'):
+    if sys.platform == 'darwin' and not tab and os.path.isdir(f'/Applications/{browser}.app'):
+        r = subprocess.run(['osascript', '-l', 'JavaScript', '-e', SHOW, url, shown.get('win', ''), browser], capture_output=True, text=True)
+        if r.returncode == 0: shown['win'] = r.stdout.strip(); return
+        print(f'could not drive {browser} ({r.stderr.strip()}); allow it in System Settings → Privacy & Security → Automation')
+    if sys.platform == 'darwin': subprocess.run(['open', url])
+    else: webbrowser.open(url)
+
+
 def main():
     args = sys.argv[1:]
     port = None
     if '--port' in args:
         i = args.index('--port'); port = args[i + 1]; del args[i:i + 2]
+    tab = '--tab' in args
+    if tab: args.remove('--tab')
+    browser = 'Google Chrome'
+    if '--browser' in args:
+        i = args.index('--browser'); browser = args[i + 1]; del args[i:i + 2]
     port = port or next(iter(sorted(glob.glob('/dev/cu.usbserial*') + glob.glob('/dev/ttyUSB*'))), None)
     if not port: sys.exit('no USB-serial adapter found (use --port)')
     nfc = PN532(port)
@@ -169,9 +208,7 @@ def main():
         if uid and uid != last:
             url = read_url(nfc) or table.get(uid.hex())
             print(f'tag {uid.hex()}: {url or "no address on it and not in tags.json"}')
-            if url:
-                if sys.platform == 'darwin': subprocess.run(['open', url])
-                else: webbrowser.open(url)
+            if url: show(url, tab, browser)
         last = uid                                                           # the same tag lying there opens once
         time.sleep(0.3)
 
