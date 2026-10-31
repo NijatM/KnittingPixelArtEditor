@@ -653,8 +653,8 @@ function relaxWorker() {
     if (r.id !== jobId || !view || !sys) return;
     view.setFabric(r.pos, r.nrm);
     relaxStatus = r.done
-      ? `relaxed in ${(r.ms / 1000).toFixed(1)} s (${r.iter} sweeps${r.iter >= r.max ? ', stopped at the limit' : ''}) · ${sizeText(r.pos)} · uncalibrated estimate, free, no gravity`
-      : `relaxing · ${r.iter} / ${r.max} sweeps · ${(r.ms / 1000).toFixed(1)} s · ${r.sweepMs.toFixed(1)} ms a sweep`;
+      ? `relaxed in ${(r.ms / 1000).toFixed(1)} s (${r.iter} steps${r.iter >= r.max ? ', stopped at the limit' : ''}) · ${sizeText(r.pos)} · uncalibrated estimate, free, no gravity`
+      : `relaxing · ${r.iter} / ${r.max} steps · ${(r.ms / 1000).toFixed(1)} s · ${r.stepMs.toFixed(1)} ms a step`;
     if (G.m3 === 'fabric') status3(relaxStatus);
   };
   return worker;

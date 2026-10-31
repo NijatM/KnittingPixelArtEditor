@@ -1,10 +1,12 @@
 // Relaxing the fabric once it comes off the machine: free, no gravity, nothing holding it. The yarn (yarn.ts) takes
 // the shape with the least energy it can reach, where the energy is:
-//   · bending: the yarn resists curving, by the stiffness (the square of the angle at each point);
+//   · bending: the yarn resists curving, by the stiffness (curvature squared along the yarn: at each point the square
+//     of the angle there, over the length of yarn around it, as for a discrete elastic rod);
 //   · and, as stiff penalties for what the yarn can't do:
 //     every stitch keeps its length of yarn (loop + sinker), set by the loop length;
 //     floats and turns can't get longer than the machine laid them;
 //     yarn can't pass through yarn: no two stretches of yarn come closer than the yarn's thickness, anywhere;
+//     and it can't fold back on itself: consecutive points along it stay half a thickness apart;
 //     a float stays on the gap side of the loops it passes;
 //     the program has no cast-on or bind-off: pass 1's loops are held together as if cast on, and the loops left on
 //     the needles as if bound off (each no further from its neighbour than the needles it was made on).
@@ -19,7 +21,7 @@ import type { YarnSys } from './yarn';
 
 /** Penalty stiffnesses, and the bending scale. Uncalibrated. */
 const K = { len: 200, hard: 200 };
-const bendOf = (stiff: number) => 0.5 * (0.04 + 0.4 * stiff * stiff);
+const bendOf = (stiff: number) => (0.04 + 0.4 * stiff * stiff) / 6;
 /** Regularises the normal of a loop squeezed flat. */
 const EPS2 = 1e-3;
 /** Extra reach of the yarn-on-yarn pairs list; the list is rebuilt when any point has moved half of it. */
@@ -54,8 +56,9 @@ function work(s: YarnSys): Work {
 }
 
 /** Pairs of yarn segments whose boxes, grown by half the thickness and margin, overlap: each segment is entered in
- *  every grid cell its box touches (hashed, counting-sorted); a pair is kept only in the cell holding the low corner
- *  of the two boxes' overlap, so each pair is found once. Neighbours along a yarn share a point and are left out. */
+ *  every grid cell its box touches (hashed into buckets, counting-sorted); two entries pair only if they are in the
+ *  same cell (cells can share a bucket), and a pair is kept only in the cell holding the low corner of the two boxes'
+ *  overlap, so each pair is found exactly once. Neighbours along a yarn share a point and are left out. */
 function findPairs(s: YarnSys, w: Work) {
   const P = w.pts, seg = w.seg, ns = seg.length, r = (s.prm.d + MARGIN) / 2, cs = Math.max(0.45, 2 * r), box = w.box;
   let entries = 0;
@@ -68,28 +71,29 @@ function findPairs(s: YarnSys, w: Work) {
   let H = 1;
   while (H < entries * 2) H <<= 1;
   const hash = (i: number, j: number, k: number) => (Math.imul(i, 73856093) ^ Math.imul(j, 19349663) ^ Math.imul(k, 83492791)) & (H - 1);
-  const start = new Int32Array(H + 1), eh = new Int32Array(entries), es = new Int32Array(entries);
+  const start = new Int32Array(H + 1), eh = new Int32Array(entries), es = new Int32Array(entries), ec = new Int32Array(entries * 3);
   let e = 0;
   for (let q = 0; q < ns; q++) {
     const o = q * 6;
     for (let i = Math.floor(box[o] / cs); i <= Math.floor(box[o + 3] / cs); i++) for (let j = Math.floor(box[o + 1] / cs); j <= Math.floor(box[o + 4] / cs); j++) for (let k = Math.floor(box[o + 2] / cs); k <= Math.floor(box[o + 5] / cs); k++) {
-      const h = hash(i, j, k); eh[e] = h; es[e++] = q; start[h + 1]++;
+      const h = hash(i, j, k); eh[e] = h; es[e] = q; ec[e * 3] = i; ec[e * 3 + 1] = j; ec[e * 3 + 2] = k; e++; start[h + 1]++;
     }
   }
   for (let h = 0; h < H; h++) start[h + 1] += start[h];
-  const fill = start.slice(0, H), cell = new Int32Array(entries);
-  for (let x = 0; x < entries; x++) cell[fill[eh[x]]++] = es[x];
+  const fill = start.slice(0, H), cell = new Int32Array(entries), ci = new Int32Array(entries * 3);
+  for (let x = 0; x < entries; x++) { const y = fill[eh[x]]++; cell[y] = es[x]; ci[y * 3] = ec[x * 3]; ci[y * 3 + 1] = ec[x * 3 + 1]; ci[y * 3 + 2] = ec[x * 3 + 2]; }
   let pa = w.pa, pb = w.pb, n = 0;
   for (let h = 0; h < H; h++) {
     const a1 = start[h + 1];
     for (let x = start[h]; x < a1; x++) {
-      const qa = cell[x], A = qa * 6, sa = seg[qa];
+      const qa = cell[x], A = qa * 6, sa = seg[qa], i = ci[x * 3], j = ci[x * 3 + 1], k = ci[x * 3 + 2];
       for (let y = x + 1; y < a1; y++) {
         const qb = cell[y], B = qb * 6, sb = seg[qb];
         if (sa - sb <= 1 && sb - sa <= 1) continue;
+        if (ci[y * 3] !== i || ci[y * 3 + 1] !== j || ci[y * 3 + 2] !== k) continue;
         const lx = Math.max(box[A], box[B]), ly = Math.max(box[A + 1], box[B + 1]), lz = Math.max(box[A + 2], box[B + 2]);
         if (lx > Math.min(box[A + 3], box[B + 3]) || ly > Math.min(box[A + 4], box[B + 4]) || lz > Math.min(box[A + 5], box[B + 5])) continue;
-        if (hash(Math.floor(lx / cs), Math.floor(ly / cs), Math.floor(lz / cs)) !== h) continue;
+        if (Math.floor(lx / cs) !== i || Math.floor(ly / cs) !== j || Math.floor(lz / cs) !== k) continue;
         if (n === pa.length) { const na = new Int32Array(n * 2), nb = new Int32Array(n * 2); na.set(pa); nb.set(pb); pa = na; pb = nb; }
         pa[n] = sa; pb[n++] = sb;
       }
@@ -181,22 +185,36 @@ function energy(s: YarnSys, x: Float64Array, g: Float64Array, w: Work): number {
     const h = kh * C / l;
     gp[q] += h * dx; gp[q + 1] += h * dy; gp[q + 2] += h * dz; gp[p] -= h * dx; gp[p + 1] -= h * dy; gp[p + 2] -= h * dz;
   }
-  // bending: θ² at every point along a yarn, θ the angle between its two segments
+  // yarn doesn't fold back on itself: consecutive points at least half a thickness apart
+  const h2 = d / 2;
+  for (let q = 0; q < w.seg.length; q++) {
+    const p = w.seg[q] * 3, r = p + 3, dx = pts[r] - pts[p], dy = pts[r + 1] - pts[p + 1], dz = pts[r + 2] - pts[p + 2], l = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (l >= h2 || l < 1e-12) continue;
+    const C = h2 - l;
+    E += 0.5 * kh * C * C;
+    const k = kh * C / l;
+    gp[p] += k * dx; gp[p + 1] += k * dy; gp[p + 2] += k * dz; gp[r] -= k * dx; gp[r + 1] -= k * dy; gp[r + 2] -= k * dz;
+  }
+  // bending: θ² / l at every point along a yarn, θ the angle between its two segments, l their mean length
   const B = s.bend;
   for (let c = 0; c < B.length; c += 3) {
     const a = B[c] * 3, m = B[c + 1] * 3, b = B[c + 2] * 3;
     const e1x = pts[m] - pts[a], e1y = pts[m + 1] - pts[a + 1], e1z = pts[m + 2] - pts[a + 2];
     const e2x = pts[b] - pts[m], e2y = pts[b + 1] - pts[m + 1], e2z = pts[b + 2] - pts[m + 2];
-    const l1 = e1x * e1x + e1y * e1y + e1z * e1z, l2 = e2x * e2x + e2y * e2y + e2z * e2z;
-    if (l1 < 1e-18 || l2 < 1e-18) continue;
+    const q1 = e1x * e1x + e1y * e1y + e1z * e1z, q2 = e2x * e2x + e2y * e2y + e2z * e2z;
+    if (q1 < 1e-18 || q2 < 1e-18) continue;
+    const l1 = Math.sqrt(q1), l2 = Math.sqrt(q2), lm = (l1 + l2) / 2;
     const cx = e1y * e2z - e1z * e2y, cy = e1z * e2x - e1x * e2z, cz = e1x * e2y - e1y * e2x, cl = Math.sqrt(cx * cx + cy * cy + cz * cz);
     const th = Math.atan2(cl, e1x * e2x + e1y * e2y + e1z * e2z);
-    E += kb * th * th;
-    if (cl < 1e-12) continue;
-    // dθ/de1 = -(β × e1)/|e1|², dθ/de2 = (β × e2)/|e2|², β the binormal
-    const bx = cx / cl, by = cy / cl, bz = cz / cl, i1 = 2 * kb * th / l1, i2 = 2 * kb * th / l2;
-    const g1x = -(by * e1z - bz * e1y) * i1, g1y = -(bz * e1x - bx * e1z) * i1, g1z = -(bx * e1y - by * e1x) * i1;
-    const g2x = (by * e2z - bz * e2y) * i2, g2y = (bz * e2x - bx * e2z) * i2, g2z = (bx * e2y - by * e2x) * i2;
+    E += kb * th * th / lm;
+    // through the length: -θ²/l² · ½ ê; through the angle: dθ/de1 = -(β × e1)/|e1|², dθ/de2 = (β × e2)/|e2|², β the binormal
+    const r = -kb * th * th / (lm * lm) / 2, r1 = r / l1, r2 = r / l2;
+    let g1x = r1 * e1x, g1y = r1 * e1y, g1z = r1 * e1z, g2x = r2 * e2x, g2y = r2 * e2y, g2z = r2 * e2z;
+    if (cl >= 1e-12) {
+      const bx = cx / cl, by = cy / cl, bz = cz / cl, i1 = 2 * kb * th / lm / q1, i2 = 2 * kb * th / lm / q2;
+      g1x -= (by * e1z - bz * e1y) * i1; g1y -= (bz * e1x - bx * e1z) * i1; g1z -= (bx * e1y - by * e1x) * i1;
+      g2x += (by * e2z - bz * e2y) * i2; g2y += (bz * e2x - bx * e2z) * i2; g2z += (bx * e2y - by * e2x) * i2;
+    }
     gp[a] -= g1x; gp[a + 1] -= g1y; gp[a + 2] -= g1z;
     gp[m] += g1x - g2x; gp[m + 1] += g1y - g2y; gp[m + 2] += g1z - g2z;
     gp[b] += g2x; gp[b + 1] += g2y; gp[b + 2] += g2z;
@@ -297,12 +315,16 @@ export function relaxSteps(s: YarnSys, st: Relax, n: number) {
       for (let j = 0; j < len; j++) { q[j] = -g[j] * 1e-3; dg += q[j] * g[j]; const v = Math.abs(q[j]); if (v > big) big = v; }
     }
     // backtracking line search from the full step, capped
-    let a = big > cap ? cap / big : 1, En = st.energy;
-    for (let tries = 0; tries < 40; tries++) {
+    let a = big > cap ? cap / big : 1, En = st.energy, ok = false;
+    for (let tries = 0; tries < 30 && !ok; tries++) {
       for (let j = 0; j < len; j++) st.xn[j] = st.x[j] + a * q[j];
       En = energy(s, st.xn, st.gNew, st.w);
-      if (En <= st.energy + 1e-4 * a * dg) break;
-      a *= 0.5;
+      if (En <= st.energy + 1e-4 * a * dg) ok = true; else a *= 0.5;
+    }
+    if (!ok) { // no step lowers the energy along this direction: forget the history; stuck even from the gradient: done
+      energy(s, st.x, st.g, st.w);
+      if (st.k === 0) { st.moved = 0; st.iter++; break; }
+      st.k = 0; st.iter++; continue;
     }
     const i = st.k % HIST, S = st.S[i], Y = st.Y[i];
     let sy = 0, mv = 0, fm = 0;
@@ -317,7 +339,7 @@ export function relaxSteps(s: YarnSys, st: Relax, n: number) {
     const u = st.g; st.g = st.gNew; st.gNew = u;
     st.energy = En; st.moved = mv; st.force = fm; st.iter++;
   }
-  // the normals of the last energy evaluation are those of st.x only if the last trial was accepted, which it was
+  // the last energy evaluation was at st.x (an accepted step, or the re-evaluation after a failed one): its normals
   for (let j = 0; j < len; j++) st.pos[j] = st.x[j];
   st.nrm.set(st.w.nrm);
   return st.moved;
