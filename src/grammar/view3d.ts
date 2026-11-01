@@ -551,13 +551,14 @@ export class KnitView {
   pick(nx: number, ny: number): number | null {
     const s = this.sys; if (!s) return null;
     const ray = new THREE.Raycaster(); ray.setFromCamera(new THREE.Vector2(nx, ny), this.cam);
-    const o = ray.ray.origin, d = ray.ray.direction, r2 = 0.42 * 0.42;
-    let best = -1, bestT = Infinity;
+    // loop centres within about half a stitch of the ray (a pitch apart, so every stitch's yarn is covered); of those
+    // in the layer nearest the camera, the one nearest the ray
+    const o = ray.ray.origin, d = ray.ray.direction, r2 = 0.7 * 0.7, hits: number[] = [];
     const test = (loop: number, x: number, y: number, z: number) => {
       const vx = x - o.x, vy = y - o.y, vz = z - o.z, tt = vx * d.x + vy * d.y + vz * d.z;
       if (tt <= 0) return;
-      const qx = vx - d.x * tt, qy = vy - d.y * tt, qz = vz - d.z * tt;
-      if (qx * qx + qy * qy + qz * qz < r2 && tt < bestT) { bestT = tt; best = loop; }
+      const qx = vx - d.x * tt, qy = vy - d.y * tt, qz = vz - d.z * tt, q2 = qx * qx + qy * qy + qz * qz;
+      if (q2 < r2) hits.push(loop, tt, q2);
     };
     const t = s.t;
     if (this.mode === 'fabric') {
@@ -575,6 +576,9 @@ export class KnitView {
       }
       for (const h of this.dynCentres) test(h.loop, h.x, h.y, h.z);
     }
+    let near = Infinity, best = -1, bestQ = Infinity;
+    for (let k = 0; k < hits.length; k += 3) near = Math.min(near, hits[k + 1]);
+    for (let k = 0; k < hits.length; k += 3) if (hits[k + 1] < near + 0.8 && hits[k + 2] < bestQ) { bestQ = hits[k + 2]; best = hits[k]; }
     return best < 0 ? null : best;
   }
 

@@ -673,7 +673,7 @@ function relaxWorker() {
     view.setFabric(r.pos, r.nrm);
     const further = relaxMore ? 'a further ' : '';
     relaxStatus = r.done
-      ? `${r.limited ? 'relaxing stopped at the limit, not settled,' : 'relaxed'} after ${further}${(r.ms / 1000).toFixed(1)} s (${r.iter} steps on the ${r.on}) · ${sizeText(r.pos)} · uncalibrated estimate, free, no gravity`
+      ? `${r.limited ? 'relaxing stopped at the limit, not settled,' : r.jammed ? 'relaxing stopped, jammed: the yarn can\'t get to rest somewhere (a loop held over many passes?), not settled,' : 'relaxed'} after ${further}${(r.ms / 1000).toFixed(1)} s (${r.iter} steps on the ${r.on}) · ${sizeText(r.pos)} · uncalibrated estimate, free, no gravity`
       : `${relaxMore ? 'relaxing on from where it stopped' : 'relaxing'} on the ${r.on} · ${r.iter} / ${r.max} steps · ${(r.ms / 1000).toFixed(1)} s · ${r.stepMs.toFixed(1)} ms a step`;
     if (r.done) $('#kgmore').hidden = !r.limited;
     if (G.m3 === 'fabric') status3(relaxStatus);

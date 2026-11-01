@@ -97,7 +97,7 @@ export function mountSwatch(el: HTMLElement, spec: SwatchSpec, cb: SwatchCallbac
       if (!alive) return;
       view.setFabric(r.pos, r.nrm);
       if (!r.done) { cb.onStatus?.(`relaxing · ${(r.ms / 1000).toFixed(0)} s`); return; }
-      cb.onStatus?.(r.limited ? 'stopped at the step limit, not settled' : '');
+      cb.onStatus?.(r.limited ? 'stopped at the step limit, not settled' : r.jammed ? 'jammed, not settled' : '');
       if (!chosen) { view.setMode('fabric'); show(); cb.onMode?.('fabric'); }
     }, () => alive);
   }
