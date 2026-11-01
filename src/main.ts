@@ -3,6 +3,7 @@ import { detect, loadDetectors } from './detect';
 import { Editor, type Behind, type Tool } from './editor';
 import { download, encodeBmp, encodePng, encodeSvg, depthFits, smallestDepth, type BmpDepth } from './export';
 import * as store from './store';
+import * as exitcopy from './exitcopy';
 import { AUTO_FRAME, computeCrop, headBox, type FrameParams, type Head } from './frame';
 import { decodeImage, loadImage, photoCanvas, wireImport } from './importer';
 import { pixelArtOf, type PixelArt } from './pixelart';
@@ -629,15 +630,31 @@ function scheduleSave() {
   const now = Date.now();
   saveDue ||= now + 2000;
   clearTimeout(saveTimer);
-  saveTimer = window.setTimeout(() => {
-    saveDue = 0;
-    if (!S.photo) return;
-    store.saveState({
-      version: 1, photoId: S.photo.id, savedAt: Date.now(), settings: structuredClone(settings()),
-      edits: { W: S.ed.W, H: S.ed.H, cells: S.ed.flatEdits(), baked: S.ed.baked?.slice() ?? null },
-    }).then(() => { $$('[data-bind=saved]').forEach(e => (e.textContent = `Saved in this browser at ${new Date().toTimeString().slice(0, 5)}. Only the last project is kept.`)); }, storeFailed);
-  }, Math.min(600, saveDue - now));
+  saveTimer = window.setTimeout(saveNow, Math.min(600, saveDue - now));
 }
+const UNSAVED = 'kpae-portrait-unsaved'; // the exit copy (exitcopy.ts)
+let exitCopyAt = 0;
+const stateNow = (): store.SavedState => ({
+  version: 1, photoId: S.photo!.id, savedAt: Date.now(), settings: structuredClone(settings()),
+  edits: { W: S.ed.W, H: S.ed.H, cells: S.ed.flatEdits(), baked: S.ed.baked?.slice() ?? null },
+});
+function saveNow(st = S.photo && stateNow()) {
+  saveDue = 0;
+  if (!st) return;
+  store.saveState(st).then(() => {
+    if (exitCopyAt && st.savedAt >= exitCopyAt) { exitcopy.drop(UNSAVED); exitCopyAt = 0; }
+    $$('[data-bind=saved]').forEach(e => (e.textContent = `Saved in this browser at ${new Date().toTimeString().slice(0, 5)}. Only the last project is kept.`));
+  }, storeFailed);
+}
+// A change still waiting for its save when the page is hidden or closed: keep a copy, and start the save (it
+// completes if the page lives on).
+exitcopy.onExit(() => {
+  if (!saveDue || !S.photo || resetting) return;
+  clearTimeout(saveTimer);
+  const st = stateNow();
+  exitcopy.keep(UNSAVED, st); exitCopyAt = st.savedAt;
+  saveNow(st);
+});
 
 function drawThumb() {
   const t = $('#thumb') as HTMLCanvasElement, p = S.photo;
@@ -1062,7 +1079,7 @@ seg($('#depthseg'), b => { S.depth = +b.dataset.depth! as BmpDepth; refresh(); }
   dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close('cancel'); }); // a click on the backdrop
   dlg.addEventListener('close', () => {
     if (dlg.returnValue !== 'reset') return;
-    resetting = true; clearTimeout(saveTimer);
+    resetting = true; clearTimeout(saveTimer); exitcopy.drop(UNSAVED);
     log('> resetting…');
     store.forget().catch(() => {}).finally(() => location.reload());
   });
@@ -1246,7 +1263,13 @@ setStep('photo');
 paintGallery();
 // Reopen the last project, if this browser kept one.
 store.load().then(async saved => {
-  if (!saved || S.photo) return;
+  if (S.photo) return;
+  // a copy kept on exit, newer than the saved state, wins (and is saved properly once the project is open)
+  const copy = exitcopy.take<store.SavedState>(UNSAVED);
+  const useCopy = !!(saved && copy && copy.version === 1 && copy.photoId === saved.photo.id && copy.savedAt > (saved.state?.savedAt ?? 0));
+  if (!useCopy) exitcopy.drop(UNSAVED);
+  if (!saved) return;
+  if (useCopy) saved.state = copy;
   const p = saved.photo;
   if (p.kind === 'blank') startBlank(p.id, saved.state, true);
   else if (p.kind === 'pixels') {
@@ -1256,6 +1279,7 @@ store.load().then(async saved => {
   } else startPhoto(p.id, p.name, await decodeImage(p.png), { lm: p.lm, seg: p.seg, ms: p.ms }, saved.state, true);
   const when = saved.state ? new Date(saved.state.savedAt) : null;
   log(`> reopened the last session${when ? ` (saved ${when.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} at ${when.toTimeString().slice(0, 5)})` : ''}`);
+  if (useCopy) store.saveState(copy!).then(() => exitcopy.drop(UNSAVED), storeFailed);
 }).catch(() => {});
 // Warm the face models while the page is idle, so the first photo is quick.
 (window.requestIdleCallback ?? ((f: () => void) => setTimeout(f, 300)))(() => { loadDetectors().then(() => (detectorsReady = true), () => {}); });

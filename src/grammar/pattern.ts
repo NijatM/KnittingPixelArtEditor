@@ -2,6 +2,7 @@
 // pass 1, the first pass knitted. A cell holds an operation index into the pattern's key, or UNKNOWN + k for a
 // colour an import couldn't read (kept as it was, in pattern.unknown[k]).
 import { BASIC, cloneKey, type Key, type RGB } from './ops';
+import { b64, unb64 } from '../exitcopy';
 
 export const UNKNOWN = 128;
 export const MAX_SIDE = 600;
@@ -77,8 +78,6 @@ export function resized(p: Pattern, w: number, h: number, fill: number, cells = 
 export const cellRGB = (p: Pattern, v: number): RGB => (v >= UNKNOWN ? p.unknown[v - UNKNOWN] ?? [255, 0, 255] : p.key.ops[v]?.rgb ?? [255, 0, 255]);
 
 // ---------------------------------------------------------------- project file (JSON)
-const b64 = (u: Uint8Array) => { let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); };
-const unb64 = (s: string) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 
 export function toJSON(p: Pattern): string {
   return JSON.stringify({

@@ -18,6 +18,7 @@ import * as lib from './library';
 import { mountFigure, type FigureMount } from '../hl';
 import { latchNeedle, needleBed, racking, vSection } from './figures';
 import { download } from '../export';
+import * as exitcopy from '../exitcopy';
 import { A_KNIT, A_MISS, A_TUCK, A_XFER, EMPTY, MACHINE_DEFAULTS, parentsOf, run, TUCK, type MachineOpts, type Topo } from './machine';
 import { buildYarn, YARN_DEFAULTS, YARN_RANGES, type YarnParams, type YarnSys } from './yarn';
 import type { KnitView, Mode } from './view3d';
@@ -90,7 +91,8 @@ export function init(el: HTMLElement) {
   wire();
   lib.listKeys().then(k => { G.keys = k; }).catch(() => {});
   renderExperiments();
-  refreshLibrary().then(async () => {
+  exitcopy.onExit(saveOnExit);
+  takeExitCopy().then(refreshLibrary).then(async () => {
     const last = await lib.getMeta<string>('last').catch(() => undefined);
     const p = (last && G.list.find(x => x.id === last)) || G.list[0];
     if (p && !G.p) open(p, false);
@@ -323,12 +325,37 @@ function scheduleSave() {
   saveDue ||= now + 2000;
   clearTimeout(saveT);
   $('#kgsaved', root).textContent = 'saving…';
-  saveT = window.setTimeout(async () => {
-    saveDue = 0;
-    if (!G.p) return;
-    try { await lib.putPattern(G.p); $('#kgsaved', root).textContent = 'saved in this browser'; renderLibrary(); }
-    catch { $('#kgsaved', root).textContent = 'not saved (storage blocked)'; }
-  }, Math.min(400, saveDue - now));
+  saveT = window.setTimeout(saveNow, Math.min(400, saveDue - now));
+}
+const UNSAVED = 'kpae-grammar-unsaved'; // the exit copy (exitcopy.ts)
+let exitCopyAt = 0;
+async function saveNow() {
+  saveDue = 0;
+  if (!G.p) return;
+  const t = Date.now();
+  try {
+    await lib.putPattern(G.p);
+    if (exitCopyAt && t >= exitCopyAt) { exitcopy.drop(UNSAVED); exitCopyAt = 0; }
+    $('#kgsaved', root).textContent = 'saved in this browser'; renderLibrary();
+  } catch { $('#kgsaved', root).textContent = 'not saved (storage blocked)'; }
+}
+/** A change still waiting for its save when the page is hidden or closed: keep a copy of the pattern, and start
+ *  the save (it completes if the page lives on). */
+function saveOnExit() {
+  if (!saveDue || !G.p) return;
+  clearTimeout(saveT);
+  exitCopyAt = Date.now(); exitcopy.keep(UNSAVED, G.p);
+  saveNow();
+}
+/** On load: a copy kept on exit replaces its pattern, unless the library holds a newer one (or it was deleted). */
+async function takeExitCopy() {
+  const copy = exitcopy.take<Pattern>(UNSAVED);
+  if (!copy) return;
+  try {
+    const cur = await lib.getPattern(copy.id);
+    if (cur && cur.updated <= copy.updated) await lib.putPattern(copy);
+  } catch { /* storage blocked: nothing to restore into */ }
+  exitcopy.drop(UNSAVED);
 }
 
 let checkT = 0;
