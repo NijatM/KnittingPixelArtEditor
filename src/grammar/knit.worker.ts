@@ -1,5 +1,5 @@
-// Relaxes the fabric off the main thread: on the GPU (relaxgpu.ts) where WebGPU is available, else on the CPU
-// (relax.ts; same model). A new job replaces the one running (its results are dropped); progress is posted a few
+// Relaxes the fabric off the main thread: on the GPU (relaxgpu.ts) where WebGPU is available and the fabric isn't
+// small, else on the CPU (relax.ts; same model). A new job replaces the one running (its results are dropped); progress is posted a few
 // times a second so the shape can be watched settling.
 import type { Topo } from './machine';
 import { buildYarn, type YarnParams } from './yarn';
@@ -17,6 +17,9 @@ export interface RelaxPost {
  * within a time cap; and settled means no node moved more than relaxBudget's distance in any of the last WINDOW steps
  * (one small step alone doesn't: L-BFGS takes small steps between big ones). */
 const GPU_STEPS = 60000, GPU_MS = 120000, WINDOW = 50;
+/** Below this many nodes the CPU is quicker: a GPU step costs about the same at any small size (~1.5 ms, mostly
+ * dispatching), a CPU step grows with the nodes (~0.6 µs each). A small fabric on the CPU gets the GPU's budget. */
+const CPU_NODES = 2000;
 
 let current = 0;
 let last: { topo: Topo; pos: Float32Array } | null = null;
@@ -31,7 +34,8 @@ self.onmessage = async (e: MessageEvent<RelaxJob>) => {
   // (300 × 300: ~10 MB and a million-point tube) slowed the steps between to less than half speed
   let chunk = 4, posted = t0, stepMs = 0;
   const every = Math.max(220, s.nn / 500);
-  const g = await gpuRelaxStart(s, from).catch(() => null);
+  const small = s.nn < CPU_NODES;
+  const g = small ? null : await gpuRelaxStart(s, from).catch(() => null);
   if (current !== id) { g?.destroy(); return; }
   if (g) {
     const post = async (done: boolean, limited = false) => {
@@ -56,22 +60,24 @@ self.onmessage = async (e: MessageEvent<RelaxJob>) => {
     } finally { g.destroy(); }
     return;
   }
-  const st = relaxStart(s, from), budget = relaxBudget(s);
-  const post = (done: boolean) => {
+  const st = relaxStart(s, from), max = small ? GPU_STEPS : relaxBudget(s).max;
+  const post = (done: boolean, limited = false) => {
     const pos = st.pos.slice(), nrm = st.nrm.slice();
-    send({ id, pos, nrm, iter: st.iter, max: budget.max, moved: st.moved, done, ms: performance.now() - t0, stepMs, on: 'CPU', limited: done && st.moved >= budget.settled });
+    send({ id, pos, nrm, iter: st.iter, max, moved: st.moved, done, ms: performance.now() - t0, stepMs, on: 'CPU', limited });
   };
   post(false);
-  while (st.iter < budget.max) {
+  // settled as on the GPU: no node moved more than the distance in any of the last WINDOW steps
+  let most = 0, since = 0, calm = false;
+  while (st.iter < max && performance.now() - t0 < GPU_MS) {
     const a = performance.now();
-    relaxSteps(s, st, chunk);
+    for (let k = 0; k < chunk; k++) most = Math.max(most, relaxSteps(s, st, 1));
     stepMs = (performance.now() - a) / chunk;
     chunk = Math.max(1, Math.min(200, Math.round(45 / Math.max(0.01, stepMs)))); // about 45 ms of work between checks
     await new Promise(r => setTimeout(r, 0));
     if (current !== id) return; // replaced
-    if (st.moved < budget.settled) break;
+    if (st.iter - since >= WINDOW) { if (most < settled) { calm = true; break; } most = 0; since = st.iter; }
     if (performance.now() - posted > every) { posted = performance.now(); post(false); }
   }
   last = { topo, pos: st.pos };
-  post(true);
+  post(true, !calm);
 };

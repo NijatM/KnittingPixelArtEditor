@@ -39,6 +39,8 @@ uniform float uNOps;
 uniform sampler2D uLoopC; // relaxed fabric: each loop's middle
 uniform sampler2D uLoopN; //   and its normal
 uniform float uDepth;     //   how deep the fabric is, for the shading below (0: off)
+uniform vec4 uWin;        // a part of the chart to show, the rest dimmed: needles x0..x1, passes r0..r1 (x1 < x0: all)
+uniform float uW;         // the chart's width
 attribute float aSpan;
 varying vec3 vN;
 varying vec3 vP;
@@ -85,14 +87,16 @@ void main() {
   // colour: the operation that made the loop, or its yarn
   int op = int(m2.x + 0.5), g = int(m2.y + 0.5);
   vec3 col = uLook < 0.5 ? (op >= 0 ? texelFetch(uPal, ivec2(op, 0), 0).rgb : vec3(1.0, 0.0, 1.0)) : uYarn[g];
-  float glow = 0.0;
-  if (uMode == 1) {
+  float glow = 0.0, cx = mod(m1.w, uW);
+  bool away = uWin.y >= uWin.x && (m1.w < 0.0 || cx < uWin.x - 0.5 || cx > uWin.y + 0.5 || m1.z < uWin.z - 0.5 || m1.z > uWin.w + 0.5);
+  if (away) col *= 0.3;                            // outside the part shown: dim, never lit
+  else if (uMode == 1) {
     if (m1.z > uRow + 0.5) col *= 0.3;            // passes not knitted yet: dim
     else if (abs(m1.z - uRow) < 0.5) glow = 0.35;  // the pass looked at
   } else {
     if (abs(m1.z - uRow) < 0.5) glow = 0.2;        // this pass's loops
   }
-  if (float(loop) == uCurLoop) glow = 0.75;
+  if (!away && float(loop) == uCurLoop) glow = 0.75;
   if (m1.w == uCell || float(loop) == uLoop) glow = 0.9;
   vCol = col;
   vGlow = glow;
@@ -222,6 +226,7 @@ export class KnitView {
   private dynCentres: { loop: number; x: number; y: number; z: number }[] = [];
   private lodNow = 1;
   private framed = '';
+  private win: [number, number, number, number] | null = null;
   mode: Mode = 'fabric';
   look: Look = 'yarn';
   fold = 0;
@@ -244,7 +249,7 @@ export class KnitView {
       uPts: { value: null }, uFrm: { value: null }, uMeta: { value: null }, uMeta2: { value: null }, uPal: { value: null },
       uYarn: { value: YARN_COLOURS.map(c => new THREE.Color(c)) }, uR: { value: 0.14 }, uMode: { value: 1 },
       uAct: { value: -1 }, uRow: { value: 0 }, uCell: { value: -1 }, uLoop: { value: -1 }, uCurLoop: { value: -1 }, uLook: { value: 1 }, uNOps: { value: 1 },
-      uLoopC: { value: null }, uLoopN: { value: null }, uDepth: { value: 0 },
+      uLoopC: { value: null }, uLoopN: { value: null }, uDepth: { value: 0 }, uWin: { value: new THREE.Vector4(0, -1, 0, -1) }, uW: { value: 1 },
     });
     this.mat = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms: uniforms(), side: THREE.DoubleSide });
     this.matDyn = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms: uniforms(), side: THREE.DoubleSide });
@@ -286,7 +291,7 @@ export class KnitView {
     this.fabricPts = null;
     for (const m of [this.mat, this.matDyn]) {
       m.uniforms.uMeta.value = this.texMeta; m.uniforms.uMeta2.value = this.texMeta2;
-      m.uniforms.uR.value = sys.prm.d / 2;
+      m.uniforms.uR.value = sys.prm.d / 2; m.uniforms.uW.value = t.w;
     }
     const tag = `${t.w}x${t.h}|${this.mode}`;
     if (!keepView || this.framed !== tag) this.framed = '';
@@ -332,6 +337,13 @@ export class KnitView {
     this.row = row; this.act = act;
     for (const m of [this.mat, this.matDyn]) { m.uniforms.uRow.value = row; m.uniforms.uAct.value = act; }
     if (this.mode === 'machine') this.show(); else this.render();
+  }
+  /** Shows only a part of the chart, needles x0..x1 and passes r0..r1 (0 = pass 1), with the rest dimmed around it:
+   *  views are framed on it and passes are counted from r0. */
+  setWindow(x0: number, x1: number, r0: number, r1: number) {
+    this.win = [x0, x1, r0, r1];
+    for (const m of [this.mat, this.matDyn]) (m.uniforms.uWin.value as THREE.Vector4).set(x0, x1, r0, r1);
+    this.framed = ''; this.show();
   }
   /** Shows a chart cell's loops (-1: none) and one loop (-1: none). */
   setMark(cell: number, loop = -1) { for (const m of [this.mat, this.matDyn]) { m.uniforms.uCell.value = cell; m.uniforms.uLoop.value = loop; } this.render(); }
@@ -424,7 +436,7 @@ export class KnitView {
     const top = fr.shift[1] + (this.row + 0.2) * s.c0;
     this.label('fabric', this.compact ? 'fabric so far · not relaxed' : 'fabric made so far · pulled down by the take-down · not relaxed', new THREE.Vector3(lo - 1.5, top, 0), 'right');
     const dir = t.strokeDir[t.aStroke[Math.max(0, Math.min(t.na - 1, cur >= 0 ? cur : t.rowAct[Math.min(this.row, t.h - 1)]))]];
-    this.label('pass', `pass ${this.row + 1} ${dir === 1 ? '→' : '←'}`, new THREE.Vector3(hi + 1.6, (hf[1] + hb[1]) / 2, (hf[2] + hb[2]) / 2), 'left');
+    this.label('pass', `pass ${this.row + 1 - (this.win?.[2] ?? 0)} ${dir === 1 ? '→' : '←'}`, new THREE.Vector3(hi + 1.6, (hf[1] + hb[1]) / 2, (hf[2] + hb[2]) / 2), 'left');
   }
 
   private clearExtras() {
@@ -465,13 +477,21 @@ export class KnitView {
   frame() {
     const s = this.sys; if (!s) return;
     const box = new THREE.Box3();
+    const tp = s.t, w = this.win, v = new THREE.Vector3();
     if (this.mode === 'fabric' && this.fabricPts && this.lay) {
-      const v = new THREE.Vector3(), p = this.fabricPts;
-      for (let k = 0; k < this.lay.count; k += 3) box.expandByPoint(v.set(p[k * 4], p[k * 4 + 1], p[k * 4 + 2]).sub(this.fabricCentre));
+      const p = this.fabricPts, c = this.centres;
+      if (w && c) {
+        // the loops in the window, and a stitch around them
+        for (let i = 0; i < tp.n; i++) {
+          const x = tp.cell[i] % tp.w;
+          if (tp.cell[i] >= 0 && x >= w[0] && x <= w[1] && tp.row[i] >= w[2] && tp.row[i] <= w[3]) box.expandByPoint(v.set(c[i * 3], c[i * 3 + 1], c[i * 3 + 2]).sub(this.fabricCentre));
+        }
+        box.expandByScalar(1);
+      } else for (let k = 0; k < this.lay.count; k += 3) box.expandByPoint(v.set(p[k * 4], p[k * 4 + 1], p[k * 4 + 2]).sub(this.fabricCentre));
     } else {
       const fr = machineFrame(s, this.fold, this.row);
-      box.expandByPoint(new THREE.Vector3(-2, fr.hook(-1, 0)[1] + fr.needleLen * 0.9, 0));
-      box.expandByPoint(new THREE.Vector3(s.t.w + 1.5, fr.shift[1] + (this.row - Math.min(this.row, 14)) * s.c0, 0));
+      box.expandByPoint(new THREE.Vector3(w ? w[0] - 3 : -2, fr.hook(-1, 0)[1] + fr.needleLen * 0.9, 0));
+      box.expandByPoint(new THREE.Vector3(w ? w[1] + 3 : tp.w + 1.5, fr.shift[1] + (this.row - Math.min(this.row, 14)) * s.c0, 0));
     }
     if (box.isEmpty()) return;
     const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());

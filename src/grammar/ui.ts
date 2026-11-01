@@ -39,6 +39,7 @@ export const SHELL = `
       <span class="v3fold" id="kgfoldrow" title="fold the needle beds from flat (both facing you) into the real V"><span class="dim">beds flat</span><span class="bar" id="kgfold"></span><span class="dim">V</span></span>
       <span class="seg" id="kglook" title="colour the yarn by the operation that made each loop, or by yarn guide"><button data-look="grammar">grammar</button><button data-look="yarn">yarn</button></span>
       <button class="btn" id="kgrelax" title="relax the fabric again from the machine layout">relax again</button>
+      <button class="btn" id="kgmore" title="go on relaxing from where it stopped" hidden>keep relaxing</button>
       <button class="btn" id="kgflip" title="look at the other side">turn over</button>
     </div>
     <div class="v3dnote small" id="kg3dstatus" aria-live="polite"></div>

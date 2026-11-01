@@ -186,14 +186,17 @@ function mountSwatchFigure(f: HTMLElement) {
     if (!alive) return;
     const spec = SWATCHES[f.dataset.swatch!];
     box.innerHTML = '';
-    cap.textContent = `${spec.caption}. The marked loop is lit. Computed by the same model as the editor's 3D view: which loop passes through which is exact under its rules, the relaxed shape is an uncalibrated estimate. Drag to turn it.`;
+    cap.textContent = `${spec.caption}. The marked loop is lit. It is knitted in the middle of a larger piece, dimmed around it, so it is seen as it sits inside a fabric rather than curled up at its own edges. Computed by the same model as the editor's 3D view: which loop passes through which is exact under its rules, the relaxed shape is an uncalibrated estimate. Drag to turn it.`;
     try {
       const view = document.createElement('div'); view.className = 'swview'; box.append(view);
-      handle = mountSwatch(view, spec);
-      bar.innerHTML = '<span class="seg"><button data-sm="machine">machine</button><button data-sm="fabric" class="on">fabric</button></span><span class="stepper"><button data-sp="-1" aria-label="previous pass">‹</button><span class="swpass"></span><button data-sp="1" aria-label="next pass">›</button></span><button class="btn" data-sf>turn over</button>';
+      bar.innerHTML = '<span class="seg"><button data-sm="machine">machine</button><button data-sm="fabric">fabric</button></span><span class="stepper"><button data-sp="-1" aria-label="previous pass">‹</button><span class="swpass"></span><button data-sp="1" aria-label="next pass">›</button></span><button class="btn" data-sf>turn over</button><span class="swstate dim small"></span>';
+      const modes = bar.querySelector<HTMLElement>('.seg')!, state = bar.querySelector<HTMLElement>('.swstate')!;
+      const onMode = (m: Mode) => setSeg(modes, b => b.dataset.sm === m);
+      onMode('fabric');
+      handle = mountSwatch(view, spec, { onMode, onStatus: t => (state.textContent = t) });
       const label = bar.querySelector<HTMLElement>('.swpass')!;
       label.textContent = handle.step(0);
-      seg(bar.querySelector<HTMLElement>('.seg')!, b => handle?.mode(b.dataset.sm as Mode));
+      seg(modes, b => handle?.mode(b.dataset.sm as Mode));
       bar.querySelectorAll<HTMLButtonElement>('[data-sp]').forEach(b => (b.onclick = () => { if (handle) label.textContent = handle.step(+b.dataset.sp!); }));
       bar.querySelector<HTMLButtonElement>('[data-sf]')!.onclick = () => handle?.flip();
     } catch { box.innerHTML = '<div class="ph">3D needs WebGL, which this browser has turned off</div>'; }
@@ -646,7 +649,7 @@ async function startExperiment(id: string, fresh: boolean) {
 const MAX_3D = 300 * 300;
 let view: KnitView | null = null, viewLoading: Promise<void> | null = null, v3T = 0;
 let topo: Topo | null = null, topoCells: Uint8Array | null = null, topoKey = '', sys: YarnSys | null = null, sysKey = '';
-let worker: Worker | null = null, jobId = 0, relaxStatus = '';
+let worker: Worker | null = null, jobId = 0, relaxStatus = '', relaxMore = false;
 const status3 = (t: string) => { const el = root && $('#kg3dstatus', root); if (el) el.textContent = t; };
 
 async function ensureView() {
@@ -668,9 +671,11 @@ function relaxWorker() {
     const r = e.data;
     if (r.id !== jobId || !view || !sys) return;
     view.setFabric(r.pos, r.nrm);
+    const further = relaxMore ? 'a further ' : '';
     relaxStatus = r.done
-      ? `${r.limited ? 'relaxing stopped at the limit, not settled,' : 'relaxed'} after ${(r.ms / 1000).toFixed(1)} s (${r.iter} steps on the ${r.on}) · ${sizeText(r.pos)} · uncalibrated estimate, free, no gravity`
-      : `relaxing on the ${r.on} · ${r.iter} / ${r.max} steps · ${(r.ms / 1000).toFixed(1)} s · ${r.stepMs.toFixed(1)} ms a step`;
+      ? `${r.limited ? 'relaxing stopped at the limit, not settled,' : 'relaxed'} after ${further}${(r.ms / 1000).toFixed(1)} s (${r.iter} steps on the ${r.on}) · ${sizeText(r.pos)} · uncalibrated estimate, free, no gravity`
+      : `${relaxMore ? 'relaxing on from where it stopped' : 'relaxing'} on the ${r.on} · ${r.iter} / ${r.max} steps · ${(r.ms / 1000).toFixed(1)} s · ${r.stepMs.toFixed(1)} ms a step`;
+    if (r.done) $('#kgmore').hidden = !r.limited;
     if (G.m3 === 'fabric') status3(relaxStatus);
   };
   return worker;
@@ -711,9 +716,20 @@ async function show3D(fresh = false) {
   jobId++;
   const job: RelaxJob = { id: jobId, topo, prm: { ...G.yarn }, warm: !programChanged && !fresh };
   relaxWorker().postMessage(job);
+  relaxMore = false; $('#kgmore').hidden = true;
   relaxStatus = 'relaxing…';
   if (G.m3 === 'fabric') status3(relaxStatus);
   (window as unknown as { __kg3d?: object }).__kg3d = { run: tRun, build: tBuild, loops: topo.n, actions: topo.na, points: sys.np, at: performance.now() };
+}
+/** After the step or time limit: relaxes on from the last result, the same program, for another budget. */
+function keepRelaxing() {
+  if (!topo || !sys || !view) return;
+  jobId++;
+  const job: RelaxJob = { id: jobId, topo, prm: { ...G.yarn }, warm: true };
+  relaxWorker().postMessage(job);
+  relaxMore = true; $('#kgmore').hidden = true;
+  relaxStatus = 'relaxing on from where it stopped…';
+  if (G.m3 === 'fabric') status3(relaxStatus);
 }
 function schedule3D(delay = 250) { if (!G.view3d) return; clearTimeout(v3T); v3T = window.setTimeout(() => show3D(), delay); }
 function setView3D(on: boolean) {
@@ -1083,6 +1099,7 @@ function wire() {
   for (const id of ['#kglook', '#kglook2']) seg($(id, root), b => { G.look = b.dataset.look as Look; refresh(); view?.setLook(G.look); });
   for (const id of ['#kgm3d', '#kgm3d2']) seg($(id, root), b => { G.m3 = b.dataset.m3 as Mode; refresh(); view?.setMode(G.m3); stepView(); });
   $('#kgrelax', root).addEventListener('click', () => show3D(true));
+  $('#kgmore', root).addEventListener('click', keepRelaxing);
   $('#kgflip', root).addEventListener('click', () => view?.flip());
   new Bar($('#kgfold', root), { min: 0, max: 1, step: 0.01, value: G.fold, fmt: () => '', onInput: v => { G.fold = v; view?.setFold(v); } });
   const yarnBars: [string, keyof YarnParams, number][] = [['#bar-thick', 'd', 0.01], ['#bar-loop', 'loop', 0.1], ['#bar-stiff', 'stiff', 0.05]];
