@@ -5,7 +5,7 @@
 // the design (signs). Both are edited by the same tools through a GEditor each; with a live grammar, every change
 // to the signs rewrites the program (structures.ts). The 3D view (sim3d.ts, loaded on demand) shows the rough
 // outcome of the program.
-import { SHELL } from './ui';
+import { EDIT_STEPS, SHELL, num } from './ui';
 import { MINIS, PAGES, SOURCES } from './learn';
 import { BASIC, PRESETS, TWO, autoName, cloneKey, fromHex, glyphOf, hex, learnPageOf, rgbText, type Action, type Bed, type Key, type Move, type Op, type Step } from './ops';
 import { createPattern, dirOf, floatIndex, fromJSON, newId, passOf, resized, toJSON, UNKNOWN, MAX_SIDE, type Pattern, type Structure } from './pattern';
@@ -25,12 +25,12 @@ import type { KnitView, Mode } from './view3d';
 import type { RelaxJob, RelaxPost } from './knit.worker';
 import { $, $$, Bar, check, setCheck, seg, setSeg } from '../ui/controls';
 
-type Step_ = 'experiments' | 'library' | 'pattern' | 'key' | 'grammar' | 'draw' | 'view' | 'check' | 'export';
+type Step_ = (typeof EDIT_STEPS)[number];
 type Fmt = 'bmp' | 'pdf' | 'txt' | 'png' | 'svg' | 'json';
 type Look = 'grammar' | 'yarn';
 
 const FIGS: Record<string, FigureMount> = { needleBed, latchNeedle, racking, vSection };
-const STEPS: Step_[] = ['experiments', 'library', 'pattern', 'key', 'grammar', 'draw', 'view', 'check', 'export'];
+const STEPS: Step_[] = [...EDIT_STEPS];
 
 let root: HTMLElement;
 const G = {
@@ -90,7 +90,7 @@ export function init(el: HTMLElement) {
   root.innerHTML = SHELL;
   wire();
   lib.listKeys().then(k => { G.keys = k; }).catch(() => {});
-  renderExperiments();
+  renderExperiments(); renderGrammar();
   exitcopy.onExit(saveOnExit);
   takeExitCopy().then(refreshLibrary).then(async () => {
     const last = await lib.getMeta<string>('last').catch(() => undefined);
@@ -389,7 +389,7 @@ function edited() {
     return;
   }
   const d = G.p?.design;
-  if (d?.live) { d.live = false; renderGrammar(); log('> drawn on the knit layer by hand · live grammar is off so your edits stay (12 grammar to regenerate)'); }
+  if (d?.live) { d.live = false; renderGrammar(); log(`> drawn on the knit layer by hand · live grammar is off so your edits stay (${num('grammar')} grammar to regenerate)`); }
   changed();
 }
 
@@ -523,7 +523,7 @@ function setTool(t: GTool) { for (const e of [G.ed, G.ded]) { e.tool = t; if (t 
 function setOp(i: number) { const P = PL(); if (!P) return; ED().op = Math.max(0, Math.min(P.key.ops.length - 1, i)); refresh(); renderGrammarSel(); }
 function setMirror(on: boolean) { G.ed.mirror = G.ded.mirror = on; refresh(); }
 function setLayer(l: 'ops' | 'signs') {
-  if (l === 'signs' && !G.p?.design) { log('> this pattern has no grammar yet · start one in 12 grammar'); goEditor('grammar'); return; }
+  if (l === 'signs' && !G.p?.design) { log(`> this pattern has no grammar yet · start one in ${num('grammar')} grammar`); goEditor('grammar'); return; }
   G.layer = l; G.hover = null; baseDirty = true; refresh(); renderGrammarSel(); draw();
   log(l === 'signs' ? '> drawing signs: the design layer · the knit program follows the signs' : '> drawing on the knit program itself');
 }
@@ -571,7 +571,7 @@ function startGrammar() {
   };
   const uniform = p.cells.every(v => v === p.cells[0]);
   if (uniform) { go(); return; }
-  ask('12 · GRAMMAR', 'Start a grammar here?', '<p>The knit program will be written from the signs: everything is sign A (single jersey) to begin with, so your current program is replaced. Undo brings it back.</p>', 'start').then(ok => ok && go());
+  ask(`${num('grammar')} · GRAMMAR`, 'Start a grammar here?', '<p>The knit program will be written from the signs: everything is sign A (single jersey) to begin with, so your current program is replaced. Undo brings it back.</p>', 'start').then(ok => ok && go());
 }
 
 /** Changes the meaning of the signs as one undo step, then rewrites the program if live. */
@@ -592,7 +592,7 @@ function renderGrammar() {
   const d = p.design;
   if (!d) {
     box.innerHTML = `<div class="note">This pattern has no grammar yet. A grammar is a layer of <b class="hi">signs</b>: paint regions with signs, say what structure each sign is knitted as, and the knit program is written for you.</div>
-      <div class="inline"><button class="btn primary" id="kgstartgram">start a grammar</button><button class="btn" data-kstepgo="experiments">see one at work (08)</button></div>`;
+      <div class="inline"><button class="btn primary" id="kgstartgram">start a grammar</button><button class="btn" data-kstepgo="experiments">see one at work (${num('experiments')})</button></div>`;
     return;
   }
   const structs = structuresFor(p);
@@ -646,10 +646,10 @@ async function saveStructure() {
   if (!p?.design) { log('> start a grammar first'); return; }
   if (!sel) { log('> switch to the knit layer, select a motif (S), then save it'); return; }
   const n = p.design.custom.length + 1;
-  const ok = await ask('12 · GRAMMAR', 'Save as a structure', `<p>The selected ${sel.w} × ${sel.h} motif becomes a structure: it repeats from needle 1 and pass 1 wherever a sign is knitted as it.</p><div class="row"><label>name</label><input class="txt" id="kgstructname" value="my structure ${n}"></div>`, 'save');
+  const ok = await ask(`${num('grammar')} · GRAMMAR`, 'Save as a structure', `<p>The selected ${sel.w} × ${sel.h} motif becomes a structure: it repeats from needle 1 and pass 1 wherever a sign is knitted as it.</p><div class="row"><label>name</label><input class="txt" id="kgstructname" value="my structure ${n}"></div>`, 'save');
   if (!ok) return;
   const name = ($<HTMLInputElement>('#kgstructname', root).value.trim() || `my structure ${n}`);
-  changeGrammar(() => p.design!.custom.push(structureFrom(p, sel, name)), `"${name}" saved · give it to a sign in 12 grammar`);
+  changeGrammar(() => p.design!.custom.push(structureFrom(p, sel, name)), `"${name}" saved · give it to a sign in ${num('grammar')} grammar`);
 }
 
 // ---------------------------------------------------------------- experiments
@@ -660,7 +660,7 @@ function renderExperiments() {
   box.innerHTML = EXPERIMENTS.map((e, i) => `<div class="exp${e.id === cur ? ' on' : ''}">
     <button class="exphead" data-startexp="${e.id}"><span class="lnum">${String(i + 1).padStart(2, '0')}</span><span class="t">${esc(e.title)}</span><span class="dim small">${esc(e.line)}${e.mode === 2 ? ' · two guides' : ''}</span></button>
     ${e.id === cur ? `<div class="expbody small"><p>${esc(e.look)}</p><div class="dim">TRY</div><ul>${e.tries.map(t => `<li>${esc(t)}</li>`).join('')}</ul>
-      <div class="inline"><button class="btn" data-startexp="${e.id}" data-fresh="1">start again</button><button class="btn" data-kstepgo="grammar">12 grammar ›</button><button class="btn" data-v3go="${G.view3d ? 0 : 1}">${G.view3d ? 'see the program' : 'see it in 3D'}</button></div></div>` : ''}
+      <div class="inline"><button class="btn" data-startexp="${e.id}" data-fresh="1">start again</button><button class="btn" data-kstepgo="grammar">${num('grammar')} grammar ›</button><button class="btn" data-v3go="${G.view3d ? 0 : 1}">${G.view3d ? 'see the program' : 'see it in 3D'}</button></div></div>` : ''}
   </div>`).join('');
 }
 
@@ -676,6 +676,8 @@ async function startExperiment(id: string, fresh: boolean) {
   G.layer = 'signs'; G.ded.op = Math.min(1, p.design.signs.length - 1);
   refresh(); renderGrammarSel();
   goEditor('experiments');
+  // on a phone the list is below the stage: scroll back up to the stage if its top is out of view
+  const st = $('#kgstage', root!); if (st.getBoundingClientRect().top < 0) st.scrollIntoView({ block: 'start', behavior: 'smooth' });
   log(`> experiment "${e.title}" · drawn with signs, shown in 3D · switch to 2D to draw`);
 }
 
@@ -714,7 +716,7 @@ function relaxWorker() {
     view.setFabric(r.pos, r.nrm);
     const further = relaxMore ? 'a further ' : '';
     relaxStatus = r.done
-      ? `${r.limited ? 'relaxing stopped at the limit, not settled,' : r.jammed ? 'relaxing stopped, jammed: the yarn can\'t get to rest somewhere (a loop held over many passes?), not settled,' : 'relaxed'} after ${further}${(r.ms / 1000).toFixed(1)} s (${r.iter} steps on the ${r.on}) · ${sizeText(r.pos)} · uncalibrated estimate, free, no gravity`
+      ? `${r.limited ? 'relaxing stopped at the limit, not settled,' : r.jammed ? `relaxing stopped, jammed: the yarn can't get to rest${r.at ? ` near needle ${r.at[0]}, pass ${r.at[1]}` : ''} (a loop held over many passes?), not settled,` : 'relaxed'} after ${further}${(r.ms / 1000).toFixed(1)} s (${r.iter} steps on the ${r.on}) · ${sizeText(r.pos)} · uncalibrated estimate, free, no gravity`
       : `${relaxMore ? 'relaxing on from where it stopped' : 'relaxing'} on the ${r.on} · ${r.iter} / ${r.max} steps · ${(r.ms / 1000).toFixed(1)} s · ${r.stepMs.toFixed(1)} ms a step`;
     if (r.done) $('#kgmore').hidden = !r.limited;
     if (G.m3 === 'fabric') status3(relaxStatus);
@@ -898,7 +900,7 @@ async function importFile(f: File) {
     log(`> read ${f.name} as ${key.name}: ${m.exact} exact · ${m.snapped} snapped · ${m.unread} unknown`);
     if (lines.length) {
       const body = `<p>Read through <b>${esc(key.name)}</b>. These colours aren't exactly in the key:</p><table class="keytable small"><tbody>${lines.slice(0, 24).map(r =>
-        `<tr><td><span class="chip" style="background:${hex(r.rgb)}"></span></td><td class="num">${rgbText(r.rgb)}</td><td class="num">${r.count} px</td><td>${r.op >= 0 ? `→ ${esc(key.ops[r.op].name)} ${rgbText(key.ops[r.op].rgb)}` : '<span class="warnc">kept, flagged as unknown</span>'}</td></tr>`).join('')}</tbody></table>${lines.length > 24 ? `<p class="dim">… and ${lines.length - 24} more.</p>` : ''}<p class="dim">Snapped colours were close to one key colour and clearly nearer to it than to any other. Unknown cells are written back as they were; find them in 15 check.</p>`;
+        `<tr><td><span class="chip" style="background:${hex(r.rgb)}"></span></td><td class="num">${rgbText(r.rgb)}</td><td class="num">${r.count} px</td><td>${r.op >= 0 ? `→ ${esc(key.ops[r.op].name)} ${rgbText(key.ops[r.op].rgb)}` : '<span class="warnc">kept, flagged as unknown</span>'}</td></tr>`).join('')}</tbody></table>${lines.length > 24 ? `<p class="dim">… and ${lines.length - 24} more.</p>` : ''}<p class="dim">Snapped colours were close to one key colour and clearly nearer to it than to any other. Unknown cells are written back as they were; find them in ${num('check')} check.</p>`;
       await ask('IMPORT', 'Colours read', body, 'ok', false);
     }
   } catch (err) { log(`> could not open ${f.name}: ${(err as Error).message}`); }
@@ -1198,7 +1200,7 @@ function wire() {
   $('#kgdup', root).addEventListener('click', async () => { if (!G.p) return; const p = structuredClone(G.p); p.id = newId(); p.name += ' copy'; p.created = p.updated = Date.now(); await lib.putPattern(p); await refreshLibrary(); open(p); });
   $('#kgdel', root).addEventListener('click', async () => {
     const p = G.p; if (!p) return;
-    if (!(await ask('09 · LIBRARY', `Delete "${p.name}"?`, '<p>It is removed from this browser. Export it first if you want to keep it.</p>', 'delete'))) return;
+    if (!(await ask(`${num('library')} · LIBRARY`, `Delete "${p.name}"?`, '<p>It is removed from this browser. Export it first if you want to keep it.</p>', 'delete'))) return;
     await lib.deletePattern(p.id); G.p = null; G.dp = null; await refreshLibrary();
     if (G.list[0]) open(G.list[0]); else { refresh(); draw(); renderGrammar(); renderExperiments(); }
     log(`> deleted "${p.name}"`);
@@ -1251,7 +1253,7 @@ function addSign() {
 async function deleteSign(i: number) {
   const p = G.p, d = p?.design; if (!p || !d || d.signs.length <= 1) return;
   const n = d.cells.reduce((s, v) => s + (v === i ? 1 : 0), 0);
-  if (n && !(await ask('12 · GRAMMAR', `Remove sign ${d.signs[i].letter}?`, `<p>${n} cells use it; they become sign ${d.signs[i === 0 ? 1 : 0].letter}.</p>`, 'remove'))) return;
+  if (n && !(await ask(`${num('grammar')} · GRAMMAR`, `Remove sign ${d.signs[i].letter}?`, `<p>${n} cells use it; they become sign ${d.signs[i === 0 ? 1 : 0].letter}.</p>`, 'remove'))) return;
   changeGrammar(() => {
     d.cells = d.cells.map(v => (v === i ? 0 : v > i ? v - 1 : v)); // its cells go to the first remaining sign
     d.signs.splice(i, 1);
@@ -1270,7 +1272,7 @@ async function deleteStructure(id: string) {
 
 async function dropGrammar() {
   const p = G.p; if (!p?.design) return;
-  if (!(await ask('12 · GRAMMAR', 'Remove the grammar?', '<p>The signs go; the knit program stays as it is now. Undo brings the grammar back.</p>', 'remove'))) return;
+  if (!(await ask(`${num('grammar')} · GRAMMAR`, 'Remove the grammar?', '<p>The signs go; the knit program stays as it is now. Undo brings the grammar back.</p>', 'remove'))) return;
   G.ed.whole(() => { delete p.design; });
   syncDesign(); G.layer = 'ops'; renderGrammar(); changed();
 }
@@ -1296,7 +1298,7 @@ function addOp() {
 async function deleteOp(i: number) {
   const p = G.p; if (!p || p.key.ops.length <= 1) return;
   const n = io.usage(p).get(i) ?? 0, fl = floatIndex(p.key);
-  if (n && !(await ask('11 · KEY', `Remove "${p.key.ops[i].name}"?`, `<p>${n} cells use it; they become ${esc(p.key.ops[fl === i ? 0 : fl].name)}.</p>`, 'remove'))) return;
+  if (n && !(await ask(`${num('key')} · KEY`, `Remove "${p.key.ops[i].name}"?`, `<p>${n} cells use it; they become ${esc(p.key.ops[fl === i ? 0 : fl].name)}.</p>`, 'remove'))) return;
   G.ed.whole(() => {
     const to = fl === i ? 0 : fl;
     p.cells = p.cells.map(v => (v === i ? to : v)).map(v => (v < UNKNOWN && v > i ? v - 1 : v));
@@ -1320,7 +1322,7 @@ async function readAs(id: string) {
   if (!k || k.id === p.key.id) return;
   const r = io.rekey(p, k), lost = r.cells.filter(v => v >= UNKNOWN).length;
   const modeNote = k.mode !== p.key.mode ? `<p class="warnc">This changes the pattern from ${p.key.mode === 2 ? 'two yarn guides to one' : 'one yarn guide to two'}: the same colours will mean different operations.</p>` : '';
-  if (!(await ask('11 · KEY', `Read as "${k.name}"?`, `${modeNote}<p>${lost ? `${lost} cells have colours this key doesn't have; they are kept and flagged as unknown.` : 'Every colour of the pattern is in this key.'}</p>`, 'read as'))) return;
+  if (!(await ask(`${num('key')} · KEY`, `Read as "${k.name}"?`, `${modeNote}<p>${lost ? `${lost} cells have colours this key doesn't have; they are kept and flagged as unknown.` : 'Every colour of the pattern is in this key.'}</p>`, 'read as'))) return;
   G.ed.whole(() => { p.key = k.preset ? { ...cloneKey(k), preset: true } : structuredClone(k); p.cells = r.cells; p.unknown = r.unknown; });
   tiles.bump(); G.view.guides = G.view.guides && p.key.mode === 2; syncDesign(); syncPattern(); changed();
 }

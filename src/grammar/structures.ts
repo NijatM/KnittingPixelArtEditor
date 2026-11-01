@@ -157,10 +157,10 @@ export const EXPERIMENTS: Experiment[] = [
   },
   {
     id: 'window', title: 'Window', line: 'a square of eyelets', mode: 1, w: 40, h: 40,
-    signs: [['jersey', null, 'jersey'], ['eyelet', 'rib11', 'lace']],
+    signs: [['jersey', null, 'jersey'], ['eyelet', null, 'lace']],
     draw: (x, pass) => (x >= 12 && x < 28 && pass >= 12 && pass < 28 ? 1 : 0),
-    look: 'Each loop moved right leaves an empty needle that knits again: a small hole. The window is lace, framed by a rib outline (sign B\'s edge).',
-    tries: ['Turn the outline off (edge: none).', 'Make the window a circle.'],
+    look: 'Each loop moved right leaves an empty needle that knits again: a small hole. The window is a square of these holes in jersey.',
+    tries: ['Make the window a circle.', 'Give sign B an outline of 1 × 1 rib. There are no transfers into the rib, so at the window\'s sides a loop waits on the front bed for all 16 passes while its needle knits on the back. The held loops stretch and the 3D relax jams; a window 8 passes tall still settles.'],
   },
   {
     id: 'picture', title: 'Two-yarn picture', line: 'double knit with two guides', mode: 2, w: 36, h: 36,
@@ -173,7 +173,7 @@ export const EXPERIMENTS: Experiment[] = [
     id: 'own', title: 'Your own grammar', line: 'four signs, a blank sheet', mode: 1, w: 40, h: 40,
     signs: [['jersey', null, 'ground'], ['rib11', null, 'rib'], ['honeycomb', 'slip', 'tucks'], ['hold', null, 'hold']],
     draw: () => 0,
-    look: 'Paint regions with signs B, C and D (switch the layer to signs, pick a sign, draw), then change what each sign means in 12 grammar. The program and the 3D view follow.',
+    look: 'Paint regions with signs B, C and D (switch the layer to signs, pick a sign, draw), then change what each sign means in the grammar step of the editor. The program and the 3D view follow.',
     tries: ['Save a motif you drew in the knit program as a new structure.', 'Give a sign an outline of a different structure.'],
   },
 ];

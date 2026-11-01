@@ -2,7 +2,7 @@
 // small, else on the CPU (relax.ts; same model). A new job replaces the one running (its results are dropped); progress is posted a few
 // times a second so the shape can be watched settling.
 import type { Topo } from './machine';
-import { buildYarn, type YarnParams } from './yarn';
+import { buildYarn, type YarnParams, type YarnSys } from './yarn';
 import { relaxBudget, relaxStart, relaxSteps } from './relax';
 import { gpuRelaxStart } from './relaxgpu';
 
@@ -14,6 +14,8 @@ export interface RelaxPost {
   /** the largest force left on a node; jammed: it stopped moving (or crept) with forces still large, so not settled
    * either: somewhere the yarn can't get to rest (e.g. a loop held for many passes, pulled long) */
   force: number; jammed: boolean;
+  /** where a jammed fabric's largest force is, in the machine layout: [needle, pass], from 1 */
+  at?: [number, number];
 }
 
 /** The GPU's budget: enough steps to settle a small fabric (a 30 × 30 jersey stops by itself after 20000–31000),
@@ -25,6 +27,13 @@ const GPU_STEPS = 60000, GPU_MS = 120000, WINDOW = 50;
 const CPU_NODES = 2000;
 /** Settled fabrics end with forces of 1e-3 to 2e-2 (jersey 12 and 20, Learn swatches); a jammed one ~1e4. */
 const FORCE_OK = 1;
+
+/** The node with the largest force (gradient), placed by where the machine left it: needle across, course up. */
+function forceAt(s: YarnSys, g: ArrayLike<number>): [number, number] {
+  let most = -1, at = 0;
+  for (let i = 0; i < s.nn; i++) { const f = g[i * 3] ** 2 + g[i * 3 + 1] ** 2 + g[i * 3 + 2] ** 2; if (f > most) { most = f; at = i; } }
+  return [Math.round(s.init[at * 3]) + 1, Math.round(s.init[at * 3 + 1] / s.c0) + 1];
+}
 
 let current = 0;
 let last: { topo: Topo; pos: Float32Array } | null = null;
@@ -46,7 +55,8 @@ self.onmessage = async (e: MessageEvent<RelaxJob>) => {
     const post = async (done: boolean, limited = false) => {
       const { pos, nrm } = await g.read();
       if (done) last = { topo, pos: pos.slice() };
-      send({ id, pos, nrm, iter: g.iter, max: GPU_STEPS, moved: g.moved, done, ms: performance.now() - t0, stepMs, on: 'GPU', limited, force: g.force, jammed: done && !limited && !(g.force <= FORCE_OK) });
+      const jammed = done && !limited && !(g.force <= FORCE_OK);
+      send({ id, pos, nrm, iter: g.iter, max: GPU_STEPS, moved: g.moved, done, ms: performance.now() - t0, stepMs, on: 'GPU', limited, force: g.force, jammed, at: jammed ? forceAt(s, await g.gradient()) : undefined });
     };
     let most = 0, since = g.iter, calm = false;
     try {
@@ -67,8 +77,8 @@ self.onmessage = async (e: MessageEvent<RelaxJob>) => {
   }
   const st = relaxStart(s, from), max = small ? GPU_STEPS : relaxBudget(s).max;
   const post = (done: boolean, limited = false) => {
-    const pos = st.pos.slice(), nrm = st.nrm.slice();
-    send({ id, pos, nrm, iter: st.iter, max, moved: st.moved, done, ms: performance.now() - t0, stepMs, on: 'CPU', limited, force: st.force, jammed: done && !limited && !(st.force <= FORCE_OK) });
+    const pos = st.pos.slice(), nrm = st.nrm.slice(), jammed = done && !limited && !(st.force <= FORCE_OK);
+    send({ id, pos, nrm, iter: st.iter, max, moved: st.moved, done, ms: performance.now() - t0, stepMs, on: 'CPU', limited, force: st.force, jammed, at: jammed ? forceAt(s, st.g) : undefined });
   };
   post(false);
   // settled as on the GPU: no node moved more than the distance in any of the last WINDOW steps

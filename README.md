@@ -26,8 +26,9 @@ Nijat Mahamaliyev · Tailored Materiality Research
 ## Knit Grammar
 
 - **Learn**: the V-bed machine, the latch needle's knitting cycle, the operations (knit, tuck, float, transfer,
-  racking), reading the grammar, two yarn guides, structures and shaping. Interactive line figures and small 3D
-  yarn swatches; every page lists its sources. Pages are drafts until reviewed.
+  racking), reading the grammar, two yarn guides, structures and shaping, and a knitting taxonomy of framed samples
+  (one placeholder so far). Interactive line figures and small 3D yarn swatches; every page lists its sources.
+  Pages are drafts until reviewed.
 - **Editor**: paint operations, not colours. Tools: needle, run, flood, pass, wale, motif (select, move, flip,
   repeat with a shift), pick, mirror, undo. Views: colours, symbols, and a guides view that splits each
   two-guide pass into a YG1 and a YG2 row. Pass numbers and directions, needle numbers.
@@ -42,9 +43,9 @@ Nijat Mahamaliyev · Tailored Materiality Research
   the V, held loops on their hooks, transfers as arrows, the fabric made so far). *Fabric* shows the same yarn
   relaxed off the machine, in a background worker: an uncalibrated estimate (yarn length per stitch, bending,
   floats that can't stretch, yarn that can't pass through yarn, each interlock a clasp; the least energy found by
-  L-BFGS). Picking a stitch in 3D marks its cell, and
-  hovering a cell lights its loops. Two rules the class key doesn't state (when transfers happen, how two guides
-  travel) are switches marked "to confirm".
+  L-BFGS). Where it can't settle (a loop held over many passes) it says so and where. Picking a stitch in 3D marks
+  its cell, and hovering a cell lights its loops. Two rules the class key doesn't state (when transfers happen, how
+  two guides travel) are switches marked "to confirm".
 - **Keys**: the class presets (one and two yarn guides; colour key from Computational Textiles, MIT 4.S52/6.S895,
   Spring 2026, Mariana Popescu) and custom keys built from known operations.
 - **Open**: BMP / PNG (near colours snap to the key and are listed; others stay and are flagged) and project files.

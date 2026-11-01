@@ -2,8 +2,12 @@
 // stage with a toolbar and status bar, inspector panels on the right.
 import { PAGES } from './learn';
 
-const row = (step: string, num: string, label: string, bind = '') =>
-  `<div class="lrow" data-kstep="${step}" tabindex="0"><span class="lnum">${num}</span><span class="left">${label}</span><span class="right" data-kbind="${bind || step}"></span></div>`;
+/** The editor's steps, numbered on from the Learn pages. */
+export const EDIT_STEPS = ['experiments', 'library', 'pattern', 'key', 'grammar', 'draw', 'view', 'check', 'export'] as const;
+export const num = (step: (typeof EDIT_STEPS)[number]) => String(PAGES.length + EDIT_STEPS.indexOf(step)).padStart(2, '0');
+
+const row = (step: (typeof EDIT_STEPS)[number], label: string, bind = '') =>
+  `<div class="lrow" data-kstep="${step}" tabindex="0"><span class="lnum">${num(step)}</span><span class="left">${label}</span><span class="right" data-kbind="${bind || step}"></span></div>`;
 
 export const SHELL = `
 <nav class="snav" id="kgnav" aria-label="knit grammar">
@@ -16,15 +20,15 @@ export const SHELL = `
   <div class="list">${PAGES.map((p, i) => `<div class="lrow" data-learn="${p.id}" tabindex="0"><span class="lnum">${String(i).padStart(2, '0')}</span><span class="left">${p.nav}</span><span class="right">${p.draft ? 'draft' : ''}</span></div>`).join('')}</div>
   <div class="spaced dim navsec">EDITOR</div>
   <div class="list">
-    ${row('experiments', '09', 'experiments')}
-    ${row('library', '10', 'library')}
-    ${row('pattern', '11', 'pattern')}
-    ${row('key', '12', 'key')}
-    ${row('grammar', '13', 'grammar')}
-    ${row('draw', '14', 'draw')}
-    ${row('view', '15', 'view')}
-    ${row('check', '16', 'check')}
-    ${row('export', '17', 'export')}
+    ${row('experiments', 'experiments')}
+    ${row('library', 'library')}
+    ${row('pattern', 'pattern')}
+    ${row('key', 'key')}
+    ${row('grammar', 'grammar')}
+    ${row('draw', 'draw')}
+    ${row('view', 'view')}
+    ${row('check', 'check')}
+    ${row('export', 'export')}
   </div>
   <div class="navfoot small faint"><a href="https://nijatmahamaliyev.com">nijatmahamaliyev.com</a></div>
 </nav>
@@ -92,16 +96,16 @@ export const SHELL = `
   <input type="file" accept=".bmp,.png,.json,image/bmp,image/png,application/json" id="kgfile" class="vh" tabindex="-1">
 
   <section class="panel" data-kpanel="experiments">
-    <div class="kicker">09 · EDITOR</div>
+    <div class="kicker">${num('experiments')} · EDITOR</div>
     <div class="title">Experiments</div>
     <div class="dash"></div>
     <div class="note">Example patterns. Each opens as a new pattern with its signs drawn and its yarn shown in 3D.</div>
     <div id="kgexps"></div>
-    <div class="explain small">An experiment is an ordinary pattern with a grammar: change the signs (layer: signs), what each sign means (12 grammar), or the knit program itself, and the 3D view follows. The fabric view relaxes the yarn the program makes (see 14 view): an uncalibrated estimate, not a prediction. The machine view shows how each pass makes it.</div>
+    <div class="explain small">An experiment is an ordinary pattern with a grammar: change the signs (layer: signs), what each sign means (${num('grammar')} grammar), or the knit program itself, and the 3D view follows. The fabric view relaxes the yarn the program makes (see ${num('view')} view): an uncalibrated estimate, not a prediction. The machine view shows how each pass makes it.</div>
   </section>
 
   <section class="panel" data-kpanel="library">
-    <div class="kicker">10 · EDITOR</div>
+    <div class="kicker">${num('library')} · EDITOR</div>
     <div class="title">Library</div>
     <div class="dash"></div>
     <div class="note">Your patterns, kept in this browser. Nothing is uploaded.</div>
@@ -111,10 +115,11 @@ export const SHELL = `
     <div class="explain small">Open file reads a BMP or PNG (one pixel per needle, or enlarged by a whole factor) or a project file (.json, which also keeps the grammar). Colours close to the key snap to it and are listed; colours far from it stay as they are and are flagged. The newest pattern is on top; the open one is marked; G marks a pattern with a grammar.</div>
   </section>
 
-  <section class="panel" data-kpanel="pattern">
-    <div class="kicker">11 · EDITOR</div>
+  <section class="panel needspat" data-kpanel="pattern">
+    <div class="kicker">${num('pattern')} · EDITOR</div>
     <div class="title">Pattern</div>
     <div class="dash"></div>
+    <div class="warn small nopat">No pattern open: start one in ${num('library')} library or try an experiment (${num('experiments')}).</div>
     <div class="row"><label>name</label><input class="txt" id="kgname" aria-label="pattern name"></div>
     <div class="subhead">SIZE<i></i></div>
     <div class="row"><label>needles</label><div class="val numrow"><input class="txt num" id="kgw" type="number" min="1" max="600" aria-label="needles (width)"><span class="dim">×</span><input class="txt num" id="kgh" type="number" min="1" max="600" aria-label="passes (height)"><span class="dim">passes</span></div></div>
@@ -127,10 +132,11 @@ export const SHELL = `
     <div class="explain small">Resizing keeps pass 1 and needle 1 (the bottom-left corner) where they are; new cells are float (and the first sign). Passes alternate direction from pass 1; the first direction is shown as arrows next to the pass numbers. Yarn guides are fixed per pattern because the same colour means different things with one or two guides; start a two-guide pattern from the library. The intention is written into the exported key.</div>
   </section>
 
-  <section class="panel" data-kpanel="key">
-    <div class="kicker">12 · EDITOR</div>
+  <section class="panel needspat" data-kpanel="key">
+    <div class="kicker">${num('key')} · EDITOR</div>
     <div class="title">Key</div>
     <div class="dash"></div>
+    <div class="warn small nopat">No pattern open: start one in ${num('library')} library or try an experiment (${num('experiments')}).</div>
     <div class="note" id="kgkeynote"></div>
     <div class="subhead">OPERATIONS<i></i></div>
     <div class="oplist" id="kgops"></div>
@@ -142,17 +148,18 @@ export const SHELL = `
   </section>
 
   <section class="panel" data-kpanel="grammar">
-    <div class="kicker">13 · EDITOR</div>
+    <div class="kicker">${num('grammar')} · EDITOR</div>
     <div class="title">Grammar</div>
     <div class="dash"></div>
     <div id="kggram"></div>
     <div class="explain small">A shape grammar for knitting: you draw with signs on the design layer, each sign stands for a structure (a small tile of operations repeated from needle 1 and pass 1, so neighbouring regions mesh), and an outline structure can replace it where it touches another sign. With live on, the knit program is rewritten whenever the signs or their meanings change; drawing on the knit layer by hand turns live off so your edits stay. Make your own structure: draw it on the knit layer, select it with motif, then "save the selected motif". Keys: Tab switches layer · 1–8 signs on the signs layer.</div>
   </section>
 
-  <section class="panel" data-kpanel="draw">
-    <div class="kicker">14 · EDITOR</div>
+  <section class="panel needspat" data-kpanel="draw">
+    <div class="kicker">${num('draw')} · EDITOR</div>
     <div class="title">Draw</div>
     <div class="dash"></div>
+    <div class="warn small nopat">No pattern open: start one in ${num('library')} library or try an experiment (${num('experiments')}).</div>
     <div class="row"><label>layer</label><span class="val" data-kbind="layer"></span></div>
     <div class="inline"><div class="seg tools" aria-label="tool"><button data-ktool="needle">needle</button><button data-ktool="run">run</button><button data-ktool="flood">flood</button><button data-ktool="pass">pass</button><button data-ktool="wale">wale</button><button data-ktool="motif">motif</button><button data-ktool="pick">pick</button></div></div>
     <div class="row"><label>drawing with</label><span class="val" data-kbind="opname"></span></div>
@@ -168,7 +175,7 @@ export const SHELL = `
   </section>
 
   <section class="panel" data-kpanel="view">
-    <div class="kicker">15 · EDITOR</div>
+    <div class="kicker">${num('view')} · EDITOR</div>
     <div class="title">View</div>
     <div class="dash"></div>
     <div class="list">
@@ -192,10 +199,11 @@ export const SHELL = `
     <div class="explain small">Symbols appear when cells are at least 10 px. Guides splits every pass of a two-guide pattern into a YG1 row (top) and a YG2 row (bottom).<br><br>3D runs the program on a model V-bed. Each pass, every needle in the carriage's order knits (a new loop through the loops it holds, which it lets go), tucks (a new loop added to them) or misses (the yarn passes; its loops stay); knitting an empty needle makes a loop with nothing through it. Then transfers move a needle's loops to the other bed, or one needle left or right on the same bed; loops moved onto a needle that holds loops stack on top. A yarn guide turns at the last needle it works.<br><br>Machine shows that pass by pass, or action by action: the loops on each needle, the new loop, transfers as arrows, the carrier, and the fabric made so far, pulled down as it was knitted (not relaxed). Beds flat lays both beds facing you, the back bed on top as in the symbols; V folds them as on the machine.<br><br>Fabric shows the same yarn relaxed off the machine, free and without gravity: every stitch keeps its length of yarn, the yarn resists bending, floats can't stretch, and yarn can't pass through yarn. Which loop goes through which, and in what order, is exact under these rules. The shape is an estimate: no friction, no yarn sliding from one stitch into the next, nothing calibrated to a real yarn, machine or tension. Nothing about curling, gathering or bulging is written in; what you see comes from the rules above.<br><br>Not yet confirmed by the lab's script: whether a pass's transfers happen after it has knitted or at each needle, and whether two yarn guides share one carriage stroke (YG1 first) or take one each. Switch to compare.<br><br>Keys: D 2D / 3D · , and . pass · &lt; and &gt; action.</div>
   </section>
 
-  <section class="panel" data-kpanel="check">
-    <div class="kicker">16 · EDITOR</div>
+  <section class="panel needspat" data-kpanel="check">
+    <div class="kicker">${num('check')} · EDITOR</div>
     <div class="title">Check</div>
     <div class="dash"></div>
+    <div class="warn small nopat">No pattern open: start one in ${num('library')} library or try an experiment (${num('experiments')}).</div>
     <div class="note">Warnings only. Nothing is blocked.</div>
     <div class="subhead">LIMITS<i></i></div>
     <div class="row"><label>longest float</label><div class="val"><div class="stepper"><button data-klim="float:-1">‹</button><span data-kbind="lim-float"></span><button data-klim="float:1">›</button></div> <span class="dim">needles</span></div></div>
@@ -206,10 +214,11 @@ export const SHELL = `
     <div class="explain small">The limits are rules of thumb, not machine facts: set them for your yarn, gauge and machine. Show marks the cells in the view. A float is counted per yarn guide between two of its stitches in the same pass; a held loop is a needle that doesn't knit while it holds a loop (tucks and floats); stacked tucks are tucks on one needle before it knits again.</div>
   </section>
 
-  <section class="panel" data-kpanel="export">
-    <div class="kicker">17 · EDITOR</div>
+  <section class="panel needspat" data-kpanel="export">
+    <div class="kicker">${num('export')} · EDITOR</div>
     <div class="title">Export</div>
     <div class="dash"></div>
+    <div class="warn small nopat">No pattern open: start one in ${num('library')} library or try an experiment (${num('experiments')}).</div>
     <div class="note">One pixel per needle, one row per pass, the key's exact colours.</div>
     <div class="subhead">FILE<i></i></div>
     <div class="seg" id="kgfmt"><button data-fmt="bmp">BMP</button><button data-fmt="pdf">key PDF</button><button data-fmt="txt">key TXT</button><button data-fmt="png">chart PNG</button><button data-fmt="svg">chart SVG</button><button data-fmt="json">project</button></div>
