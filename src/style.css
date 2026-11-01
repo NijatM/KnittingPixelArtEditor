@@ -325,7 +325,9 @@ input.opname:hover, input.opname:focus { border-color: var(--line2); background:
 .article .pair figure, .article .pair .kmini { margin: 12px 0; }
 .swbox { width: 100%; min-height: 120px; }
 .swbox canvas { display: block; cursor: grab; }
+/* the canvas sits inside the box and never sizes it (a canvas not yet sized would hold a phone's column open at 600 px) */
 .swview { position: relative; width: 100%; aspect-ratio: 1.6; }
+.swview canvas { position: absolute; top: 0; left: 0; }
 .swbox .ph { border: 1px dashed var(--line2); color: var(--faint); aspect-ratio: 1.6; display: flex; align-items: center; justify-content: center; font-size: 11.5px; }
 .swbar { margin: 8px 0 0; gap: 10px; }
 .note-box { border: 1px dashed var(--line2); padding: 12px 14px; margin: 24px auto; }

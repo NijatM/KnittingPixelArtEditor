@@ -46,13 +46,21 @@ async function tx<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRe
   }
 }
 
-export const savePhoto = (p: SavedPhoto) => tx('readwrite', s => { s.put(p, 'photo'); s.delete('state'); });
+/** The photo as written: its bytes, not a Blob (Safari refuses Blobs in IndexedDB in private windows). Older
+ *  saves hold a Blob and still load. */
+type StoredPhoto = Omit<SavedPhoto, 'png'> & { png: Blob | ArrayBuffer; type?: string };
+
+export const savePhoto = async (p: SavedPhoto) => {
+  const png = await p.png.arrayBuffer();
+  return tx('readwrite', s => { s.put({ ...p, png, type: p.png.type } satisfies StoredPhoto, 'photo'); s.delete('state'); });
+};
 export const saveState = (st: SavedState) => tx('readwrite', s => { s.put(st, 'state'); });
 export const forget = () => tx('readwrite', s => { s.clear(); });
 
 export async function load(): Promise<{ photo: SavedPhoto; state: SavedState | null } | null> {
-  const photo = await tx<SavedPhoto>('readonly', s => s.get('photo'));
-  if (!photo) return null;
+  const raw = await tx<StoredPhoto>('readonly', s => s.get('photo'));
+  if (!raw) return null;
+  const photo: SavedPhoto = { ...raw, png: raw.png instanceof Blob ? raw.png : new Blob([raw.png], { type: raw.type || 'image/png' }) };
   const state = (await tx<SavedState>('readonly', s => s.get('state'))) ?? null;
   return { photo, state: state && state.version === 1 && state.photoId === photo.id ? state : null };
 }
