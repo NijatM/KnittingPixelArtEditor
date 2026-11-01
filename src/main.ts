@@ -616,22 +616,27 @@ function applySettings(v: Record<string, unknown>) {
   // Stamps are kept by name (older projects saved list positions).
   S.look.stamps = Object.fromEntries(STAMP_KINDS.map(k => [k, stampName(k, (s.look.stamps as Record<string, unknown> | undefined)?.[k])])) as Look['stamps'];
 }
-let saveTimer = 0, storeWarned = false;
+let saveTimer = 0, saveDue = 0, storeWarned = false;
 function storeFailed() {
   if (!storeWarned) log('> autosave is not available in this browser · export to keep your work');
   storeWarned = true;
 }
 let resetting = false; // set once a reset is confirmed: nothing may be saved again before the reload
+/** Saves 600 ms after the last change, and at most 2 s after the first unsaved one, so a run of changes can't
+ *  keep pushing the save back. */
 function scheduleSave() {
   if (!S.photo || resetting) return;
+  const now = Date.now();
+  saveDue ||= now + 2000;
   clearTimeout(saveTimer);
   saveTimer = window.setTimeout(() => {
+    saveDue = 0;
     if (!S.photo) return;
     store.saveState({
       version: 1, photoId: S.photo.id, savedAt: Date.now(), settings: structuredClone(settings()),
       edits: { W: S.ed.W, H: S.ed.H, cells: S.ed.flatEdits(), baked: S.ed.baked?.slice() ?? null },
     }).then(() => { $$('[data-bind=saved]').forEach(e => (e.textContent = `Saved in this browser at ${new Date().toTimeString().slice(0, 5)}. Only the last project is kept.`)); }, storeFailed);
-  }, 600);
+  }, Math.min(600, saveDue - now));
 }
 
 function drawThumb() {

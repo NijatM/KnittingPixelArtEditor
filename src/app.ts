@@ -22,14 +22,14 @@ const HOME = `
       <div class="n"><span>01 · PORTRAIT</span><span class="readout" data-read="0">rest</span></div>
       <div class="fig" data-fig="0"></div>
       <span class="t">Knitting Pixel Portrait</span>
-      <span class="d">A portrait photo into cohesive two-colour pixel art, one cell per stitch, ready to knit.</span>
+      <span class="d">Turns a portrait photo into a two-colour pixel chart for knitting, one cell per stitch.</span>
       <span class="go">open ›</span>
     </a>
     <a class="choice" href="#grammar">
       <div class="n"><span>02 · KNIT GRAMMAR</span><span class="readout" data-read="1">rest</span></div>
       <div class="fig" data-fig="1"></div>
       <span class="t">Knit Grammar</span>
-      <span class="d">One pixel, one needle, one pass. Learn how a V-bed knits, then write knit programs as bitmaps with exact colour keys.</span>
+      <span class="d">How a V-bed knitting machine works, and an editor for knit programs as bitmaps: one pixel per needle, one row per pass, colours from a key.</span>
       <span class="go">open ›</span>
     </a>
   </div>
