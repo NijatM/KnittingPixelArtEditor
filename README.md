@@ -41,7 +41,8 @@ Nijat Mahamaliyev · Tailored Materiality Research
   continuous yarn. *Machine* steps through it pass by pass or action by action (needle beds flat or folded into
   the V, held loops on their hooks, transfers as arrows, the fabric made so far). *Fabric* shows the same yarn
   relaxed off the machine, in a background worker: an uncalibrated estimate (yarn length per stitch, bending,
-  floats that can't stretch, strands that can't overlap side by side). Picking a stitch in 3D marks its cell, and
+  floats that can't stretch, yarn that can't pass through yarn, each interlock a clasp; the least energy found by
+  L-BFGS). Picking a stitch in 3D marks its cell, and
   hovering a cell lights its loops. Two rules the class key doesn't state (when transfers happen, how two guides
   travel) are switches marked "to confirm".
 - **Keys**: the class presets (one and two yarn guides; colour key from Computational Textiles, MIT 4.S52/6.S895,

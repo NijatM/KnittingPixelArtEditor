@@ -13,36 +13,51 @@ No packages needed: the serial port is opened with termios (macOS / Linux).
   options: --port /dev/cu.usbserial-10 (default: the first /dev/cu.usbserial* or /dev/ttyUSB*), --tab,
            --browser "Brave Browser" (any Chromium browser on macOS; default Google Chrome)
   start_reader.command (next to this file) starts it from Finder with a double-click.
+  While waiting for tags, the reader may be unplugged and plugged back in (or plugged in only after starting): it
+  waits for it and goes on.
 
 A tag without an address is looked up by its UID in tags.json next to this file ({"04a1b2c3d4e5f6": "https://..."});
 an unknown tag's UID is printed so it can be added there.
 """
-import glob, json, os, select, subprocess, sys, termios, time, webbrowser
+import errno, glob, json, os, select, subprocess, sys, termios, time, webbrowser
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PREFIX = {0: '', 1: 'http://www.', 2: 'https://www.', 3: 'http://', 4: 'https://'}
 
 
+LOST = (OSError, termios.error)                                              # the adapter unplugged (or its port gone)
+
+
 class PN532:
     def __init__(self, port):
         self.fd = os.open(port, os.O_RDWR | os.O_NOCTTY | os.O_NONBLOCK)
-        a = termios.tcgetattr(self.fd)
-        a[0] = 0; a[1] = 0; a[3] = 0                                         # raw: no input/output/local processing
-        a[2] = termios.CS8 | termios.CREAD | termios.CLOCAL                  # 8N1
-        a[4] = a[5] = termios.B115200
-        termios.tcsetattr(self.fd, termios.TCSANOW, a)
-        termios.tcflush(self.fd, termios.TCIOFLUSH)
-        os.write(self.fd, bytes([0x55, 0x55] + [0] * 14))                   # wake from power-down (HSU)
-        time.sleep(0.05)
-        self.call(0x14, [0x01, 0x14, 0x01])                                  # SAMConfiguration: normal mode
-        self.call(0x32, [0x05, 0xFF, 0x01, 0x05])                            # retries: answer "no tag" quickly
-        self.call(0x32, [0x01, 0x00]); time.sleep(0.05); self.call(0x32, [0x01, 0x01])  # field off and on: tags start fresh
+        try:
+            a = termios.tcgetattr(self.fd)
+            a[0] = 0; a[1] = 0; a[3] = 0                                     # raw: no input/output/local processing
+            a[2] = termios.CS8 | termios.CREAD | termios.CLOCAL              # 8N1
+            a[4] = a[5] = termios.B115200
+            termios.tcsetattr(self.fd, termios.TCSANOW, a)
+            termios.tcflush(self.fd, termios.TCIOFLUSH)
+            os.write(self.fd, bytes([0x55, 0x55] + [0] * 14))               # wake from power-down (HSU)
+            time.sleep(0.05)
+            self.call(0x14, [0x01, 0x14, 0x01])                              # SAMConfiguration: normal mode
+            self.call(0x32, [0x05, 0xFF, 0x01, 0x05])                        # retries: answer "no tag" quickly
+            self.call(0x32, [0x01, 0x00]); time.sleep(0.05); self.call(0x32, [0x01, 0x01])  # field off and on: tags start fresh
+        except BaseException: self.close(); raise
+
+    def close(self):
+        try: os.close(self.fd)
+        except OSError: pass
 
     def read(self, n, timeout):
         out, end = b'', time.time() + timeout
         while len(out) < n and time.time() < end:
             r, _, _ = select.select([self.fd], [], [], max(0, end - time.time()))
-            if r: out += os.read(self.fd, n - len(out))
+            if not r: continue
+            try: got = os.read(self.fd, n - len(out))
+            except BlockingIOError: continue
+            if not got: raise OSError(errno.EIO, 'the port closed')          # readable but empty: hung up
+            out += got
         return out
 
     def call(self, cmd, data=(), timeout=1.0):
@@ -173,6 +188,50 @@ def show(url, tab=False, browser='Google Chrome'):
     else: webbrowser.open(url)
 
 
+def find_port(want):
+    if want: return want if os.path.exists(want) else None
+    return next(iter(sorted(glob.glob('/dev/cu.usbserial*') + glob.glob('/dev/ttyUSB*'))), None)
+
+
+def connect(want):
+    """The reader, once its adapter is plugged in and the PN532 on it answers."""
+    said = False
+    while True:
+        port = find_port(want)
+        if port:
+            try:
+                nfc = PN532(port)
+                if nfc.call(0x02): return port, nfc                          # firmware version: it is a PN532, awake
+                nfc.close()
+            except LOST: pass
+        if not said: print(f'waiting for the reader on {want or "a USB-serial port"} (ctrl-c to stop)', flush=True); said = True
+        time.sleep(1)
+
+
+def watch(want, tab, browser):
+    try: table = json.load(open(os.path.join(HERE, 'tags.json')))
+    except (OSError, ValueError): table = {}
+    port, nfc = connect(want)
+    print(f'{port}: waiting for tags (ctrl-c to stop)', flush=True)
+    last = None
+    while True:
+        try:
+            uid = nfc.tag()
+            if uid and uid != last:
+                url = read_url(nfc)
+                if url is False: time.sleep(0.1); continue                   # not read whole: try again, not yet seen
+                url = url or table.get(uid.hex())
+                print(f'tag {uid.hex()}: {url or "no address on it and not in tags.json"}', flush=True)
+                if url: show(url, tab, browser)
+            last = uid                                                       # the same tag lying there opens once
+        except LOST as e:
+            nfc.close()
+            print(f'{port}: the reader went away ({e})', flush=True)
+            port, nfc = connect(want)
+            print(f'{port}: back, waiting for tags', flush=True)
+        time.sleep(0.3)
+
+
 def main():
     args = sys.argv[1:]
     port = None
@@ -183,7 +242,8 @@ def main():
     browser = 'Google Chrome'
     if '--browser' in args:
         i = args.index('--browser'); browser = args[i + 1]; del args[i:i + 2]
-    port = port or next(iter(sorted(glob.glob('/dev/cu.usbserial*') + glob.glob('/dev/ttyUSB*'))), None)
+    if args[:1] not in (['check'], ['info'], ['write']): return watch(port, tab, browser)
+    port = find_port(port)
     if not port: sys.exit('no USB-serial adapter found (use --port)')
     nfc = PN532(port)
     if args[:1] == ['check']:
@@ -207,21 +267,6 @@ def main():
         print(f'lay the tag on the reader to write {url}')
         while not nfc.tag(): time.sleep(0.2)
         print('written' if write_url(nfc, url) and read_url(nfc) == url else 'write failed')
-        return
-    try: table = json.load(open(os.path.join(HERE, 'tags.json')))
-    except (OSError, ValueError): table = {}
-    print(f'{port}: waiting for tags (ctrl-c to stop)')
-    last = None
-    while True:
-        uid = nfc.tag()
-        if uid and uid != last:
-            url = read_url(nfc)
-            if url is False: time.sleep(0.1); continue                       # not read whole: try again, not yet seen
-            url = url or table.get(uid.hex())
-            print(f'tag {uid.hex()}: {url or "no address on it and not in tags.json"}')
-            if url: show(url, tab, browser)
-        last = uid                                                           # the same tag lying there opens once
-        time.sleep(0.3)
 
 
 if __name__ == '__main__':
