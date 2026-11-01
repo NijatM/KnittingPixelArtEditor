@@ -2,7 +2,7 @@
 
 Every model file shipped in `public/models/`, where it comes from, and its license.
 
-## Informative Drawings — `opensketch_style` (preset E · ML lines)
+## Informative Drawings — `opensketch_style` (style G · ML lines)
 
 | | |
 |---|---|
@@ -27,12 +27,14 @@ Shipped in `public/models/mediapipe/` with the Apache 2.0 text as `LICENSE` next
 
 Model cards: `https://storage.googleapis.com/mediapipe-assets/` → *Model Card MediaPipe Face Mesh V2.pdf*, *MediaPipe BlazeFace Model Card (Short Range).pdf*, *Model Card Blendshape V2.pdf*, *Model Card Multiclass Segmentation.pdf*. Their out-of-scope uses are surveillance, identity recognition and life-critical decisions — stylising a portrait on the person's own device is within intended use.
 
-Runtime: `@mediapipe/tasks-vision` (npm, Apache 2.0); its WASM files are copied from `node_modules` into `public/mediapipe/wasm/` at dev/build time (`scripts/copy-mediapipe-wasm.mjs`), so nothing loads from a CDN.
+Runtime: `@mediapipe/tasks-vision` (npm, Apache 2.0); its WASM files are copied from `node_modules` into `public/mediapipe/wasm/` at dev/build time (`scripts/copy-runtimes.mjs`), so nothing loads from a CDN.
 
 ## Other third-party code and assets
 
 | What | License |
 |---|---|
 | IBM Plex Mono via `@fontsource/ibm-plex-mono` (bundled, self-hosted) | SIL Open Font License 1.1 |
-| ONNX Runtime Web (`onnxruntime-web`, runs style E; its WebGPU and CPU `.wasm` builds are bundled by Vite) | MIT |
-| Vite (build) · TypeScript (build) | MIT · Apache 2.0 |
+| ONNX Runtime Web (`onnxruntime-web`, runs style G; its WebGPU and CPU `.wasm` builds are bundled by Vite) | MIT |
+| three.js (`three`, the 3D views of Knit Grammar) | MIT |
+| hairline kernel by Lucas Marques (line figures; vendored in `src/vendor/hairline/` with its license) | MIT |
+| Vite (build) · TypeScript (build) · `@types/three` (build) · `@webgpu/types` (build) | MIT · Apache 2.0 · MIT · BSD-3-Clause |

@@ -1,5 +1,7 @@
 # KnittingPixelArtEditor — UI Design
 
+> UI design notes from 2026-10-09, kept as written. The site has since become dark-only and gained Knit Grammar; the current state is in [README.md](../README.md) and [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md).
+
 The look is borrowed from **nijatmahamaliyev.com / HTMAA site / SubdivisionEngine_BDMH** (`nijatm.github.io/Subdivision-BDMH/css/app.css`): dark, monochrome, IBM Plex Mono, 1px lines, uppercase letter-spaced labels, dashed borders for anything empty or not yet available.
 
 - Live mockup: `design/mockup.html` (open in a browser; clicks are faked but the layout and components are final).

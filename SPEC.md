@@ -1,5 +1,7 @@
 # KnittingPixelArtEditor — v1 Spec
 
+> The portrait tool's v1 spec from 2026-10-09, kept as written; some details changed while building (see HANDOFF.md). The current state is in [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 Agreed in planning session 2026-10-09. Evidence for every choice is in `RESEARCH.md` and `research/`. UI design: `design/DESIGN.md` + `design/mockup.html`. Session summary: `HANDOFF.md`.
 
 **Goal:** a free, public, browser-only editor that turns a portrait photo into a *cohesive, appealing* 2-color pixel portrait (later knitted), then lets the person refine it by hand.

@@ -1,5 +1,7 @@
 # Session handoff
 
+> Build log of the portrait tool, 2026-10-09 to 10-16, kept as written. The current state of the whole project is in [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 Start the next session by reading, in this order: **HANDOFF.md → SPEC.md → design/DESIGN.md**, then `README.md` for the code map and `RESEARCH.md` only if needed.
 
 Suggested first prompt next time:

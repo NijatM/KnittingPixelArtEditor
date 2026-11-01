@@ -1,5 +1,7 @@
 # PixelPortraitMaker — Research Notes
 
+> Research notes for the portrait tool from the 2026-10-09 planning session, kept as written. The current state is in [README.md](README.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 Goal: browser tool (GitHub Pages) that turns a photo portrait into a **binary (2-color) stitch grid** for knitting, with size selection, preliminary conversion methods, and live pixel editing.
 
 ---
