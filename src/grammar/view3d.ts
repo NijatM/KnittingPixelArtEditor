@@ -36,11 +36,15 @@ uniform float uLoop;    // a loop to show (-1 none)
 uniform float uCurLoop; // the loop the current action made (-1 none)
 uniform float uLook;    // 0 operation colours, 1 yarn colours
 uniform float uNOps;
+uniform sampler2D uLoopC; // relaxed fabric: each loop's middle
+uniform sampler2D uLoopN; //   and its normal
+uniform float uDepth;     //   how deep the fabric is, for the shading below (0: off)
 attribute float aSpan;
 varying vec3 vN;
 varying vec3 vP;
 varying vec3 vCol;
 varying float vGlow;
+varying float vShade;
 
 vec4 at(sampler2D s, int i) { return texelFetch(s, ivec2(i % ${TEXW}, i / ${TEXW}), 0); }
 
@@ -70,6 +74,14 @@ void main() {
   vP = wp.xyz;
   vN = normalize(mat3(modelMatrix) * n);
   gl_Position = projectionMatrix * viewMatrix * wp;
+  // in the relaxed fabric, yarn lying behind its loop's middle (as the camera sees it) is darker: the yarn in front
+  // shades it. Only the drawing; the shape is the model's. Scaled by how squarely the loop faces the camera.
+  vShade = 1.0;
+  if (uMode == 1 && uDepth > 0.0) {
+    vec3 wC = (modelMatrix * vec4(at(uLoopC, loop).xyz, 1.0)).xyz, Nf = at(uLoopN, loop).xyz;
+    float s = dot(wp.xyz - wC, Nf) * dot(Nf, normalize(cameraPosition - wC));
+    vShade = mix(0.4, 1.0, smoothstep(-uDepth, uDepth, s));
+  }
   // colour: the operation that made the loop, or its yarn
   int op = int(m2.x + 0.5), g = int(m2.y + 0.5);
   vec3 col = uLook < 0.5 ? (op >= 0 ? texelFetch(uPal, ivec2(op, 0), 0).rgb : vec3(1.0, 0.0, 1.0)) : uYarn[g];
@@ -92,16 +104,19 @@ varying vec3 vN;
 varying vec3 vP;
 varying vec3 vCol;
 varying float vGlow;
+varying float vShade;
 void main() {
   vec3 n = normalize(vN), v = normalize(cameraPosition - vP);
   if (dot(n, v) < 0.0 && !gl_FrontFacing) n = -n; // a ring folded over at a sharp turn: shade it as the outside
-  vec3 L1 = normalize(vec3(0.5, 0.9, 1.3)), L2 = normalize(vec3(-0.7, -0.3, -1.1));
+  // lights go with the camera (above right, and a fill from below left), so either side of the fabric is lit alike
+  mat3 toWorld = transpose(mat3(viewMatrix));
+  vec3 L1 = normalize(toWorld * vec3(0.5, 0.9, 1.3)), L2 = normalize(toWorld * vec3(-0.7, -0.3, 0.6));
   float hemi = 0.5 + 0.5 * n.y;
   vec3 amb = mix(vec3(0.09), vec3(0.36), hemi);
   float d1 = max(dot(n, L1), 0.0), d2 = max(dot(n, L2), 0.0);
   float sp = pow(max(dot(n, normalize(L1 + v)), 0.0), 36.0) * 0.22;
   float rim = pow(1.0 - max(dot(n, v), 0.0), 2.0);
-  vec3 c = vCol * (amb + 0.9 * d1 + 0.32 * d2) + sp;
+  vec3 c = (vCol * (amb + 0.9 * d1 + 0.32 * d2) + sp) * vShade;
   c = mix(c, vec3(1.0), vGlow * 0.45) + vec3(1.0) * rim * vGlow * 0.5;
   gl_FragColor = vec4(c, 1.0);
   #include <colorspace_fragment>
@@ -196,6 +211,8 @@ export class KnitView {
   private texMeta: THREE.DataTexture | null = null;
   private texMeta2: THREE.DataTexture | null = null;
   private texPal: THREE.DataTexture | null = null;
+  private texLoopC: THREE.DataTexture | null = null;
+  private texLoopN: THREE.DataTexture | null = null;
   private tubesMachine: Tubes | null = null;
   private tubesFabric: Tubes | null = null;
   private tubesDyn: Tubes | null = null;
@@ -227,6 +244,7 @@ export class KnitView {
       uPts: { value: null }, uFrm: { value: null }, uMeta: { value: null }, uMeta2: { value: null }, uPal: { value: null },
       uYarn: { value: YARN_COLOURS.map(c => new THREE.Color(c)) }, uR: { value: 0.14 }, uMode: { value: 1 },
       uAct: { value: -1 }, uRow: { value: 0 }, uCell: { value: -1 }, uLoop: { value: -1 }, uCurLoop: { value: -1 }, uLook: { value: 1 }, uNOps: { value: 1 },
+      uLoopC: { value: null }, uLoopN: { value: null }, uDepth: { value: 0 },
     });
     this.mat = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms: uniforms(), side: THREE.DoubleSide });
     this.matDyn = new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: FRAG, uniforms: uniforms(), side: THREE.DoubleSide });
@@ -299,6 +317,10 @@ export class KnitView {
     if (!this.tubesFabric) this.tubesFabric = new Tubes(this.mat, this.lay.spans, d, this.lodNow);
     else this.tubesFabric.bounds(this.lay.spans, d);
     this.centres = detailCentres(s, this.lay, d, this.centres && this.centres.length === s.t.n * 3 ? this.centres : undefined);
+    const lc = new Float32Array(s.t.n * 4), ln = new Float32Array(s.t.n * 4);
+    for (let i = 0; i < s.t.n; i++) for (let k = 0; k < 3; k++) { lc[i * 4 + k] = this.centres[i * 3 + k]; ln[i * 4 + k] = nrm[i * 3 + k]; }
+    this.texLoopC = dataTex(lc, s.t.n, this.texLoopC); this.texLoopN = dataTex(ln, s.t.n, this.texLoopN);
+    this.mat.uniforms.uLoopC.value = this.texLoopC; this.mat.uniforms.uLoopN.value = this.texLoopN; this.mat.uniforms.uDepth.value = 1.5 * s.prm.d;
     if (this.mode === 'fabric') this.show();
   }
 
@@ -540,7 +562,7 @@ export class KnitView {
     cancelAnimationFrame(this.raf);
     this.ro.disconnect(); this.controls.dispose(); this.clearExtras();
     this.tubesMachine?.dispose(); this.tubesFabric?.dispose(); this.tubesDyn?.dispose();
-    [this.texMachine, this.texFabric, this.texDyn, this.frmMachine, this.frmFabric, this.frmDyn, this.texMeta, this.texMeta2, this.texPal].forEach(t => t?.dispose());
+    [this.texMachine, this.texFabric, this.texDyn, this.frmMachine, this.frmFabric, this.frmDyn, this.texMeta, this.texMeta2, this.texPal, this.texLoopC, this.texLoopN].forEach(t => t?.dispose());
     this.mat.dispose(); this.matDyn.dispose(); this.renderer.dispose();
     this.renderer.domElement.remove(); this.labels.remove();
   }
