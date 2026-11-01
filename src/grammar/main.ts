@@ -200,7 +200,7 @@ function mountSwatchFigure(f: HTMLElement) {
       bar.querySelectorAll<HTMLButtonElement>('[data-sp]').forEach(b => (b.onclick = () => { if (handle) label.textContent = handle.step(+b.dataset.sp!); }));
       bar.querySelector<HTMLButtonElement>('[data-sf]')!.onclick = () => handle?.flip();
     } catch { box.innerHTML = '<div class="ph">3D needs WebGL, which this browser has turned off</div>'; }
-  }).catch(() => { box.innerHTML = '<div class="ph">could not load the 3D view</div>'; });
+  }).catch(e => { console.error(e); box.innerHTML = `<div class="ph">${LOAD_FAILED}</div>`; });
 }
 
 function keyTable(k: Key) {
@@ -652,15 +652,22 @@ let topo: Topo | null = null, topoCells: Uint8Array | null = null, topoKey = '',
 let worker: Worker | null = null, jobId = 0, relaxStatus = '', relaxMore = false;
 const status3 = (t: string) => { const el = root && $('#kg3dstatus', root); if (el) el.textContent = t; };
 
+/** A lazily loaded file could not be fetched: mostly a page opened before the site was updated (its files are renamed
+ *  on every deploy), sometimes a dropped connection. Reloading fixes both. */
+const LOAD_FAILED = 'could not load the 3D view\'s code: the site was probably updated since this page was opened (or the connection dropped). Reload the page.';
+
 async function ensureView() {
   if (view) return;
+  // a failure is reported, then forgotten, so showing the 3D view again tries again
   viewLoading ??= import('./view3d').then(m => {
-    view = new m.KnitView($('#kg3dbox', root), {
-      onPick: (loop, click) => pick3D(loop, click),
-    });
+    try {
+      view = new m.KnitView($('#kg3dbox', root), {
+        onPick: (loop, click) => pick3D(loop, click),
+      });
+    } catch (e) { console.error(e); status3('could not start the 3D view: WebGL is off or unavailable in this browser'); viewLoading = null; return; }
     view.setLook(G.look); view.setFold(G.fold);
     if (import.meta.env.DEV) (window as unknown as { __kgview?: KnitView }).__kgview = view;
-  }).catch(() => { status3('could not load the 3D view (WebGL off?)'); });
+  }, e => { console.error(e); status3(LOAD_FAILED); viewLoading = null; });
   await viewLoading;
 }
 
@@ -677,6 +684,13 @@ function relaxWorker() {
       : `${relaxMore ? 'relaxing on from where it stopped' : 'relaxing'} on the ${r.on} · ${r.iter} / ${r.max} steps · ${(r.ms / 1000).toFixed(1)} s · ${r.stepMs.toFixed(1)} ms a step`;
     if (r.done) $('#kgmore').hidden = !r.limited;
     if (G.m3 === 'fabric') status3(relaxStatus);
+  };
+  // its file is missing (the site was updated since this page opened) or it failed: say so, and start a new one next time
+  worker.onerror = e => {
+    console.error(e.message || e);
+    relaxStatus = 'relaxing failed: reload the page (the site may have been updated since it was opened)';
+    if (G.m3 === 'fabric') status3(relaxStatus);
+    worker?.terminate(); worker = null;
   };
   return worker;
 }

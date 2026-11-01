@@ -54,12 +54,12 @@ const idle: Worker[] = [], waiting: (() => void)[] = [], relaxed = new Map<Swatc
 let running = 0, ids = 0;
 const next = () => waiting.shift()?.();
 
-function relax(spec: SwatchSpec, topo: Topo, onPost: (r: RelaxPost) => void, wanted: () => boolean) {
+function relax(spec: SwatchSpec, topo: Topo, onPost: (r: RelaxPost) => void, onFail: () => void, wanted: () => boolean) {
   const go = () => {
     if (!wanted()) return next();
     let w = idle.pop();
     try { w ??= new Worker(new URL('./knit.worker.ts', import.meta.url), { type: 'module' }); }
-    catch { return next(); }
+    catch { onFail(); return next(); }
     const id = ++ids, ww = w;
     running++;
     const finish = (keep: boolean) => { running--; if (keep) idle.push(ww); else ww.terminate(); next(); };
@@ -69,7 +69,8 @@ function relax(spec: SwatchSpec, topo: Topo, onPost: (r: RelaxPost) => void, wan
       onPost(e.data);
       if (e.data.done) finish(true);
     };
-    w.onerror = () => finish(false);
+    // its file is missing (the site was updated since this page opened) or it failed
+    w.onerror = e => { console.error(e.message || e); onFail(); finish(false); };
     const job: RelaxJob = { id, topo, prm: YARN_DEFAULTS, warm: false };
     w.postMessage(job);
   };
@@ -99,7 +100,7 @@ export function mountSwatch(el: HTMLElement, spec: SwatchSpec, cb: SwatchCallbac
       if (!r.done) { cb.onStatus?.(`relaxing · ${(r.ms / 1000).toFixed(0)} s`); return; }
       cb.onStatus?.(r.limited ? 'stopped at the step limit, not settled' : r.jammed ? 'jammed, not settled' : '');
       if (!chosen) { view.setMode('fabric'); show(); cb.onMode?.('fabric'); }
-    }, () => alive);
+    }, () => { if (alive) cb.onStatus?.('relaxing failed: reload the page'); }, () => alive);
   }
   show();
   return {
