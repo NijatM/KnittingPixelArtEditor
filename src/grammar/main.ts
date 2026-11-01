@@ -875,7 +875,7 @@ function pick3D(loop: number | null, click: boolean) {
 /** The stage shared between the chart and 3D. */
 function layoutStage() {
   if (!root) return;
-  const st = $('#kgstage', root), split = G.view3d && st.clientWidth >= 860;
+  const st = $('#kgstage', root), split = G.view3d && st.clientWidth >= 760;
   root.dataset.split = split ? '1' : '0';
   root.style.setProperty('--k3w', `${Math.round(st.clientWidth * G.k3w)}px`);
   baseDirty = true;
