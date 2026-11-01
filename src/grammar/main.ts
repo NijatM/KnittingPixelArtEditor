@@ -316,15 +316,19 @@ function syncDesign() {
   Object.assign(G.ded, { tool: G.ed.tool, mirror: G.ed.mirror, every: G.ed.every, op: Math.max(0, op) });
 }
 
-let saveT = 0;
+let saveT = 0, saveDue = 0;
+/** Saves 400 ms after the last change, and at most 2 s after the first unsaved one. */
 function scheduleSave() {
+  const now = Date.now();
+  saveDue ||= now + 2000;
   clearTimeout(saveT);
   $('#kgsaved', root).textContent = 'saving…';
   saveT = window.setTimeout(async () => {
+    saveDue = 0;
     if (!G.p) return;
     try { await lib.putPattern(G.p); $('#kgsaved', root).textContent = 'saved in this browser'; renderLibrary(); }
     catch { $('#kgsaved', root).textContent = 'not saved (storage blocked)'; }
-  }, 400);
+  }, Math.min(400, saveDue - now));
 }
 
 let checkT = 0;
@@ -364,9 +368,12 @@ function edited() {
 
 // ---------------------------------------------------------------- canvas
 const ZMIN = 2, ZMAX = 56;
+/** The space the chart has. tb / sb / ph: the toolbar, status bar and pass scrubber where they float over the stage
+ *  (0 on phones, where they sit above and below it in the page). */
 function stageArea() {
-  const v = $('#kgview', root), tb = $('#kgtoolbar', root).offsetHeight, sb = $('#kgstatus', root).offsetHeight + (G.view3d ? $('#kgplay', root).offsetHeight : 0);
-  return { w: Math.max(80, v.clientWidth - 40), h: Math.max(80, v.clientHeight - tb - sb - 24), tb, sb: $('#kgstatus', root).offsetHeight };
+  const v = $('#kgview', root), tbar = $('#kgtoolbar', root), over = getComputedStyle(tbar).position !== 'static';
+  const tb = over ? tbar.offsetHeight : 0, sb = over ? $('#kgstatus', root).offsetHeight : 0, ph = over && G.view3d ? $('#kgplay', root).offsetHeight : 0;
+  return { w: Math.max(80, v.clientWidth - 40), h: Math.max(80, v.clientHeight - tb - sb - ph - 24), tb, sb, ph };
 }
 function fitCs() {
   if (!G.p) return 10;
@@ -380,7 +387,7 @@ const viewOpts = (): ViewOpts => ({ cs: cs(), symbols: G.view.symbols, guides: G
 function draw() {
   if (!root || !G.p || G.mode !== 'editor') return;
   const a = stageArea();
-  const v3 = $('#kg3dview', root), play = $('#kgplay', root), ph = G.view3d ? play.offsetHeight : 0;
+  const v3 = $('#kg3dview', root), play = $('#kgplay', root), ph = a.ph;
   v3.style.paddingTop = `${a.tb}px`; v3.style.paddingBottom = `${a.sb + ph}px`;
   $('.v3dbar', v3).style.bottom = `${a.sb + ph}px`; $('.v3dnote', v3).style.top = `${a.tb}px`;
   play.style.bottom = `${a.sb}px`;

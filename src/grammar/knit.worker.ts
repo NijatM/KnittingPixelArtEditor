@@ -46,7 +46,7 @@ self.onmessage = async (e: MessageEvent<RelaxJob>) => {
     const post = async (done: boolean, limited = false) => {
       const { pos, nrm } = await g.read();
       if (done) last = { topo, pos: pos.slice() };
-      send({ id, pos, nrm, iter: g.iter, max: GPU_STEPS, moved: g.moved, done, ms: performance.now() - t0, stepMs, on: 'GPU', limited, force: g.force, jammed: done && !limited && g.force > FORCE_OK });
+      send({ id, pos, nrm, iter: g.iter, max: GPU_STEPS, moved: g.moved, done, ms: performance.now() - t0, stepMs, on: 'GPU', limited, force: g.force, jammed: done && !limited && !(g.force <= FORCE_OK) });
     };
     let most = 0, since = g.iter, calm = false;
     try {
@@ -68,7 +68,7 @@ self.onmessage = async (e: MessageEvent<RelaxJob>) => {
   const st = relaxStart(s, from), max = small ? GPU_STEPS : relaxBudget(s).max;
   const post = (done: boolean, limited = false) => {
     const pos = st.pos.slice(), nrm = st.nrm.slice();
-    send({ id, pos, nrm, iter: st.iter, max, moved: st.moved, done, ms: performance.now() - t0, stepMs, on: 'CPU', limited, force: st.force, jammed: done && !limited && st.force > FORCE_OK });
+    send({ id, pos, nrm, iter: st.iter, max, moved: st.moved, done, ms: performance.now() - t0, stepMs, on: 'CPU', limited, force: st.force, jammed: done && !limited && !(st.force <= FORCE_OK) });
   };
   post(false);
   // settled as on the GPU: no node moved more than the distance in any of the last WINDOW steps

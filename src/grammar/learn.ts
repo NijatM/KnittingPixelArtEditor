@@ -147,7 +147,7 @@ export const PAGES: Page[] = [
 <h3>an example: a picture in two yarns</h3>
 <p>Read literally, a two-guide row gives every needle a stitch of each yarn, one on each bed, and the yarn on the front bed shows on the face. So a picture drawn in dark blue (YG1 on the front) and light blue (YG2 on the front) comes out on the face in two yarns, with the colours swapped on the back: double knitting. How the lab's script schedules the two guides is to be confirmed.</p>
 <div class="pair"><div data-mini="doubleknit"></div><div data-mini="doubleknitg"></div></div>
-<h3>one file, one mode</h3>
+<h3>the guide mode is per pattern</h3>
 <p>A pattern is one-guide or two-guide as a whole, because the same colour means different things in each: light blue is "knit back" in a one-guide file and "YG1 knit back · YG2 knit front" in a two-guide file. The mode is chosen when a pattern is made and written into the exported key.</p>`,
   },
   {

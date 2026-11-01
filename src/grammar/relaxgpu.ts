@@ -148,7 +148,11 @@ export async function gpuRelaxStart(s: YarnSys, warm?: Float32Array): Promise<Gp
     const decl = k.binds.map(([n, kind, e = 'f32'], i) => kind === 'u' ? `@group(0) @binding(${i}) var<uniform> ${n}: vec4u;`
       : `@group(0) @binding(${i}) var<storage, ${kind === 'r' ? 'read' : 'read_write'}> ${n}: array<${kind === 'a' ? 'atomic<u32>' : e}>;`).join('\n');
     const helpers = k.binds.map(([n, kind, e = 'f32']) => {
-      if (kind === 'a') return `fn add_${n}(i: u32, v: f32) { if (v == 0.0) { return; } var o = atomicLoad(&${n}[i]); loop { let r = atomicCompareExchangeWeak(&${n}[i], o, bitcast<u32>(bitcast<f32>(o) + v)); if (r.exchanged) { break; } o = r.old_value; } }
+      // float add by exchange: take the sum out (leaving 0), add, put it back; a value found there meanwhile is another
+      // thread's part sum, taken along into the next round. Not atomicCompareExchangeWeak: Safari 27.2 turns every use
+      // of it into Metal that doesn't compile ("field may not be qualified with an address space"). Sums are only read
+      // by later dispatches, never while they're being added to.
+      if (kind === 'a') return `fn add_${n}(i: u32, v: f32) { if (v == 0.0) { return; } var s = v; loop { s += bitcast<f32>(atomicExchange(&${n}[i], 0u)); let p = atomicExchange(&${n}[i], bitcast<u32>(s)); if (p == 0u) { break; } s = bitcast<f32>(p); } }
 fn get_${n}(i: u32) -> f32 { return bitcast<f32>(atomicLoad(&${n}[i])); }
 fn v3_${n}(i: u32) -> vec3f { return vec3f(get_${n}(i * 3u), get_${n}(i * 3u + 1u), get_${n}(i * 3u + 2u)); }
 fn add3_${n}(i: u32, v: vec3f) { add_${n}(i * 3u, v.x); add_${n}(i * 3u + 1u, v.y); add_${n}(i * 3u + 2u, v.z); }`;
@@ -511,7 +515,11 @@ ${head()} {
     dev.queue.writeBuffer(B.CNT, 4 * 4, Uint32Array.of(1));
   }
 
+  // a kernel this browser can't compile would leave every point at 0: fall back to the CPU instead
+  dev.pushErrorScope('validation'); dev.pushErrorScope('internal');
   sizedBuffers();
+  const bad = (await dev.popErrorScope()) ?? (await dev.popErrorScope());
+  if (bad) { console.warn('3D: the GPU relax could not be built here, relaxing on the CPU:', bad.message.split('\n').find(l => /error/.test(l)) ?? bad.message.slice(0, 200)); for (const b of all) b.destroy(); dev.destroy(); return null; }
   dev.queue.writeBuffer(B.CNT, 4 * 4, Uint32Array.of(1)); // first evaluation builds the pairs
   // the state at the start: evaluate at x (as a trial equal to it), then take it as the accepted point
   for (;;) {

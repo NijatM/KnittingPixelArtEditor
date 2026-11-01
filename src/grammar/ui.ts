@@ -9,7 +9,6 @@ export const SHELL = `
 <nav class="snav" id="kgnav" aria-label="knit grammar">
   <div class="navhead">
     <div class="name"><a href="#" class="homelink">Nijat Mahamaliyev</a></div>
-    <div class="what">Knit grammar: one pixel, one needle, one pass.</div>
     <div class="lab">Tailored Materiality Research</div>
   </div>
   <div class="seg secseg" aria-label="section"><a href="#portrait">portrait</a><a href="#grammar" class="on" aria-current="page">grammar</a></div>
@@ -96,7 +95,7 @@ export const SHELL = `
     <div class="kicker">09 · EDITOR</div>
     <div class="title">Experiments</div>
     <div class="dash"></div>
-    <div class="note">Small tests of how a grammar becomes a shape. Each one opens as a new pattern with its signs drawn, next to its yarn in 3D.</div>
+    <div class="note">Example patterns. Each opens as a new pattern with its signs drawn and its yarn shown in 3D.</div>
     <div id="kgexps"></div>
     <div class="explain small">An experiment is an ordinary pattern with a grammar: change the signs (layer: signs), what each sign means (12 grammar), or the knit program itself, and the 3D view follows. The fabric view relaxes the yarn the program makes (see 14 view): an uncalibrated estimate, not a prediction. The machine view shows how each pass makes it.</div>
   </section>
