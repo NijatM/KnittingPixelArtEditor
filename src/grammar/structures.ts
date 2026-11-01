@@ -104,6 +104,8 @@ export interface Experiment {
   h: number;
   /** [fill, edge, name] per sign */
   signs: [string, string | null, string][];
+  /** structures of its own, given to the pattern (signs can use them) */
+  custom?: Structure[];
   /** sign index at needle x (0 = left) and pass (0 = pass 1) */
   draw: (x: number, pass: number, w: number, h: number) => number;
   look: string;
@@ -115,10 +117,15 @@ const disc = (x: number, pass: number, w: number, h: number, r: number) => Math.
 export const EXPERIMENTS: Experiment[] = [
   {
     id: 'accordion', title: 'Accordion', line: 'bands of rib between jersey', mode: 1, w: 40, h: 42,
-    signs: [['jersey', null, 'jersey'], ['rib11', null, 'rib']],
-    draw: (_x, pass) => (Math.floor(pass / 7) % 2 ? 1 : 0),
-    look: 'Rib pulls in across its width, jersey does not. The rib bands gather and the fabric between them waves.',
-    tries: ['Make the rib bands thinner or wider.', 'Set sign B to 2 × 2 rib and compare.', 'Draw the rib as a diagonal band instead.'],
+    signs: [['jersey', null, 'jersey'], ['rib11', null, 'rib'], ['acc-xb', null, 'to back'], ['acc-xf', null, 'to front']],
+    custom: [
+      S('acc-xb', 'jersey, then to the back', ['kf kfxb'], 'knits jersey, then moves every other loop to the back bed for the rib'),
+      S('acc-xf', 'rib, then to the front', ['kf kbxf'], 'knits rib, then moves the back loops to the front bed for the jersey'),
+    ],
+    // 6 passes of jersey, a pass of C, 6 of rib, a pass of D
+    draw: (_x, pass) => [0, 0, 0, 0, 0, 0, 2, 1, 1, 1, 1, 1, 1, 3][pass % 14],
+    look: 'Rib pulls in across its width, jersey does not. The rib bands gather and the fabric between them waves. Rows C and D move every other loop to the back bed for the rib and back to the front after it.',
+    tries: ['Make the rib bands thinner or wider, with a C row below each band and a D row above it.', 'Draw over the C and D rows with A and B: without the transfers, every other loop waits on its bed through the whole band.'],
   },
   {
     id: 'bubble', title: 'Bubble', line: 'a disc of tucks in jersey', mode: 1, w: 40, h: 40,
@@ -172,7 +179,7 @@ export const EXPERIMENTS: Experiment[] = [
 ];
 
 export function experimentDesign(e: Experiment, p: Pattern): Design {
-  const d: Design = { cells: new Uint8Array(p.w * p.h), signs: e.signs.map(([fill, edge, name], i) => ({ ...newSign(i, fill, name), edge })), custom: [], live: true };
+  const d: Design = { cells: new Uint8Array(p.w * p.h), signs: e.signs.map(([fill, edge, name], i) => ({ ...newSign(i, fill, name), edge })), custom: structuredClone(e.custom ?? []), live: true };
   for (let y = 0; y < p.h; y++) for (let x = 0; x < p.w; x++) d.cells[y * p.w + x] = e.draw(x, p.h - 1 - y, p.w, p.h);
   return d;
 }

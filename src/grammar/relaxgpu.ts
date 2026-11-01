@@ -238,6 +238,12 @@ fn bendE(e1: vec3f, e2: vec3f) -> f32 {
   if (q1 < 1e-18 || q2 < 1e-18) { return 0.0; }
   let th = angle(length(cross(e1, e2)), dot(e1, e2)); return KB * th * th / ((sqrt(q1) + sqrt(q2)) / 2.0);
 }`;
+  // the fold-back barrier (relax.ts); WGSL has no infinity, so where two points meet the energy is just huge
+  const fold = `fn fold(l: f32) -> f32 {
+  if (l >= D / 4.0) { return 0.0; }
+  if (l <= 0.0) { return 1e30; }
+  let u = l / (D / 4.0); return -KH * D * D / 16.0 * (1.0 - u) * (1.0 - u) * log(u);
+}`;
   const dims = `fn dims(o: u32, n: u32, s: u32) { let g = (n + s - 1u) / s; IND[o] = min(g, 32768u); IND[o + 1u] = max(1u, (g + 32767u) / 32768u); IND[o + 2u] = 1u; if (g == 0u) { IND[o] = 0u; } }`;
 
   function kernels(): Kern[] {
@@ -342,12 +348,17 @@ ${head()} {
     let Cn = max(0.0, ln - FM[i]); let Co = max(0.0, lo - FM[i]);
     de = 0.5 * KH * (Cn - Co) * (Cn + Co); en = 0.5 * KH * Cn * Cn;
     if (Cn > 0.0) { let h = KH * Cn / ln; add3_GP(fb, h * v); add3_GP(fa, -h * v); }`),
-      // yarn doesn't fold back on itself: consecutive points at least half a thickness apart
+      // yarn doesn't fold back on itself: consecutive points at least half a thickness apart, and the barrier
       term('minsp', [['XN', 'r', 'i32'], ['X', 'r', 'i32'], ['OFN', 'r'], ['OFNO', 'r'], ['SEG', 'r', 'u32'], ['GP', 'a']], 'NS', 'OFFM', `
     let p = SEG[i]; let v = dN(p + 1u, p); let ln = length(v); let lo = length(dO(p + 1u, p));
-    let Cn = select(0.0, D / 2.0 - ln, ln < D / 2.0 && ln >= 1e-12); let Co = select(0.0, D / 2.0 - lo, lo < D / 2.0 && lo >= 1e-12);
-    de = 0.5 * KH * (Cn - Co) * (Cn + Co); en = 0.5 * KH * Cn * Cn;
-    if (Cn > 0.0) { let k = KH * Cn / ln; add3_GP(p, k * v); add3_GP(p + 1u, -k * v); }`),
+    let Cn = select(0.0, D / 2.0 - ln, ln < D / 2.0); let Co = select(0.0, D / 2.0 - lo, lo < D / 2.0);
+    let bn = fold(ln);
+    de = 0.5 * KH * (Cn - Co) * (Cn + Co) + (bn - fold(lo)); en = 0.5 * KH * Cn * Cn + bn;
+    if (Cn > 0.0 && ln > 0.0) {
+      var k = KH * Cn / ln;
+      if (ln < D / 4.0) { let u = ln / (D / 4.0); k -= KH * D / 4.0 * (2.0 * (1.0 - u) * log(u) - (1.0 - u) * (1.0 - u) / u) / ln; }
+      add3_GP(p, k * v); add3_GP(p + 1u, -k * v);
+    }`),
       // bending: θ² / l at every point along a yarn, θ the angle between its two segments, l their mean length
       term('bend', [['XN', 'r', 'i32'], ['X', 'r', 'i32'], ['OFN', 'r'], ['OFNO', 'r'], ['BT', 'r', 'u32'], ['GP', 'a']], 'NB', 'OFFB', `
     let ia = BT[i * 3u]; let im = BT[i * 3u + 1u]; let ib = BT[i * 3u + 2u];
@@ -458,7 +469,7 @@ ${head()} {
 }` },
     ];
     return list.map(k => ({ ...k, body: k.body.replace(/OFF([A-Z])/g, (_, c: string) => `${OFF[{ C: 'contact', L: 'len', F: 'flt', M: 'minsp', B: 'bend', E: 'edge', G: 'gap' }[c]!]}u`) }))
-      .map(k => ({ ...k, body: (k.name === 'contact' ? closest + '\n' : k.name === 'bend' ? bendE + '\n' : '') + (k.binds.some(b => b[0] === 'OFNO') ? rel + '\n' : '') + k.body }));
+      .map(k => ({ ...k, body: (k.name === 'contact' ? closest + '\n' : k.name === 'bend' ? bendE + '\n' : k.name === 'minsp' ? fold + '\n' : '') + (k.binds.some(b => b[0] === 'OFNO') ? rel + '\n' : '') + k.body }));
   }
 
   // ---- encoding

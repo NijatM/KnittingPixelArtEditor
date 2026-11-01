@@ -9,7 +9,11 @@
 //     and it can't fold back on itself: consecutive points along it stay half a thickness apart;
 //     a float stays on the gap side of the loops it passes;
 //     the program has no cast-on or bind-off: pass 1's loops are held together as if cast on, and the loops left on
-//     the needles as if bound off (each no further from its neighbour than the needles it was made on).
+//     the needles as if bound off (each no further from its neighbour than the needles it was made on);
+//   · and a barrier where consecutive points come within a quarter of the thickness: its energy grows without limit
+//     as they meet (Li et al., Incremental Potential Contact, 2020). The fold-back penalty alone can be overcome: a
+//     loop held over passes, pulled long, squeezed a stretch of yarn to nothing, where the bending (over the length
+//     of yarn) is undefined and the relaxing went no further. Yarn that doesn't come that close doesn't feel it.
 // The order of strands where loops interlock is fixed by construction (yarn.ts). Friction is not modelled, and
 // nothing is calibrated to a real yarn or machine. Shapes such as curling, gathering or bulging are not written in
 // anywhere; whatever appears comes from these rules.
@@ -186,13 +190,19 @@ function energy(s: YarnSys, x: Float64Array, g: Float64Array, w: Work): number {
     gp[q] += h * dx; gp[q + 1] += h * dy; gp[q + 2] += h * dz; gp[p] -= h * dx; gp[p + 1] -= h * dy; gp[p + 2] -= h * dz;
   }
   // yarn doesn't fold back on itself: consecutive points at least half a thickness apart
-  const h2 = d / 2;
+  const h2 = d / 2, h4 = d / 4, kf = kh * h4 * h4;
   for (let q = 0; q < w.seg.length; q++) {
     const p = w.seg[q] * 3, r = p + 3, dx = pts[r] - pts[p], dy = pts[r + 1] - pts[p + 1], dz = pts[r + 2] - pts[p + 2], l = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    if (l >= h2 || l < 1e-12) continue;
+    if (l >= h2) continue;
+    if (!(l > 0)) return Infinity; // the barrier: no step gets here
     const C = h2 - l;
     E += 0.5 * kh * C * C;
-    const k = kh * C / l;
+    let k = kh * C / l;
+    if (l < h4) { // the barrier, -(1 - u)² ln u with u = l / h4
+      const u = l / h4, lu = Math.log(u);
+      E -= kf * (1 - u) * (1 - u) * lu;
+      k -= kf / h4 * (2 * (1 - u) * lu - (1 - u) * (1 - u) / u) / l;
+    }
     gp[p] += k * dx; gp[p + 1] += k * dy; gp[p + 2] += k * dz; gp[r] -= k * dx; gp[r + 1] -= k * dy; gp[r + 2] -= k * dz;
   }
   // bending: θ² / l at every point along a yarn, θ the angle between its two segments, l their mean length
