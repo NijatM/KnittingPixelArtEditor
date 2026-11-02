@@ -30,6 +30,8 @@ export function yarnShares(yarn: Yarn, fibers: Map<string, Fiber>): { origin: Or
 export const TAG_BASE: string;
 export const TAG_DATA_BYTES: number;
 export function sampleUrl(id: string, base?: string): string;
+export function ndefMessage(url: string, json?: string | null): Uint8Array;
 export function ndefBytes(url: string, json?: string | null): number;
+export function tlv(message: Uint8Array): Uint8Array;
 export function tlvBytes(message: number): number;
 export function tagPayload(sample: Sample, t: TagContext, base?: string): { url: string; json: string; bytes: number; cut: string[] };

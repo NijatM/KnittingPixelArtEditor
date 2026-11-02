@@ -26,6 +26,14 @@ the full record.
 
 `src/taxonomy/core.js` (`tagPayload`) builds the record in this order; the site and the scripts use it.
 
+## Writing a tag
+
+`python3 tools/nfc/taxonomy_reader.py write SMP_0001` with the desk reader: it gets the bytes from
+`node scripts/taxonomy-tag.mjs SMP_0001` (the same code as above: the message in its TLV, from page 4), checks the
+capability container, asks before writing over another sample's tag, writes, and reads every byte back.
+`info` prints a tag's address and data. Records over 255 bytes use the long form (4 length bytes); so does the TLV
+(`FF` and 2 bytes) when the message is 255 bytes or more.
+
 ## Keys
 
 | key | field | value |

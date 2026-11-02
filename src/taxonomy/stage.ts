@@ -2,7 +2,8 @@
 // pixels. When a sample becomes current its mark in the open view (a spine, a lineage tick, a map mark) hides and
 // its frame appears in the mark's place, edge on, pulls out, turns face on and flies to the preview; the one before
 // flies back and its mark shows again. In the preview the frame can be turned by dragging (double-click: back to
-// the resting turn).
+// the resting turn). The same sample arriving again (its tag laid on again) flies back and in once more; in the
+// kiosk the frame at rest swings slowly from side to side.
 import * as THREE from 'three';
 import type { DB, Rec } from './data';
 import { backMesh, FRAME, FRAME_MID, frameMesh, loadModel, stripe } from './model';
@@ -16,6 +17,8 @@ const OUT_MS = 480, BACK_MS = 420, FOV = 20;
 const REST = { x: 0.14, y: -0.36 };
 /** how far a frame rises out of the row before it flies (px) */
 const PULL = 70;
+/** the kiosk's swing at rest: how far either way (rad) and one full swing (ms) */
+const SWAY = 0.55, SWAY_MS = 12000;
 /** the photo's place: the window, just behind the frame */
 const PHOTO_Z = -0.3;
 
@@ -27,6 +30,10 @@ export interface Stage {
   face(f: Face): void;
   /** Another view opened: frames now leave from and land on its marks. */
   source(s: Source): void;
+  /** The sample in the preview flies back to its mark and in again. */
+  again(): void;
+  /** The frame at rest swings slowly from side to side (the kiosk), or keeps still. */
+  swing(on: boolean): void;
   destroy(): void;
 }
 
@@ -68,6 +75,7 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: 
   }
 
   let current: Piece | null = null, turn = { x: 0, y: 0 }, raf = 0;
+  let after: Rec | null = null, swinging = false, sway = 0, swayT = 0, last = 0;
   const pieces = new Set<Piece>();
   const kick = () => { if (!raf) raf = requestAnimationFrame(tick); };
 
@@ -81,7 +89,7 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: 
   /** where it rests: face on in the preview, turned a little (plus the reader's turn) */
   function restPose(): Pose {
     const b = view.getBoundingClientRect(), s = Math.min(b.width / (FRAME.w * 1.25), b.height / (FRAME.h * 1.12));
-    return { x: b.x + b.width / 2, y: b.y + b.height / 2, s: [s, s, s], rx: REST.x + turn.x, ry: REST.y + turn.y };
+    return { x: b.x + b.width / 2, y: b.y + b.height / 2, s: [s, s, s], rx: REST.x + turn.x, ry: REST.y + turn.y + sway };
   }
   function poseOf(p: Piece): Pose {
     return { x: p.obj.position.x, y: -p.obj.position.y, s: [p.obj.scale.x, p.obj.scale.y, p.obj.scale.z], rx: p.obj.rotation.x, ry: p.obj.rotation.y };
@@ -95,6 +103,13 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: 
   function tick(now: number) {
     raf = 0;
     let moving = false;
+    const dt = last ? Math.min(100, now - last) : 0;
+    last = now;
+    if (swinging && current?.dir === 'rest' && !drag && !still.matches) {
+      swayT += dt;
+      sway = SWAY * Math.sin((swayT / SWAY_MS) * 2 * Math.PI);
+      moving = true;
+    }
     for (const p of pieces) {
       if (p.dir === 'rest') { put(p, restPose()); continue; }
       const to = p.dir === 'out' ? restPose() : spinePose(p);
@@ -111,8 +126,9 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: 
         rx: mix(a.rx, to.rx, r), ry: mix(a.ry, to.ry, r),
       });
     }
+    if (swinging && current?.dir === 'rest' && !drag && !still.matches) moving = true; // landed: the swing starts
     renderer.render(scene, cam);
-    if (moving) kick();
+    if (moving) kick(); else last = 0;
   }
   function land(p: Piece) {
     if (p.dir === 'out') { p.dir = 'rest'; put(p, restPose()); return; }
@@ -121,6 +137,7 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: 
     pieces.delete(p);
     scene.remove(p.obj);
     p.dispose.forEach(f => f());
+    if (after === p.rec) show(p.rec);
   }
   function fly(p: Piece, dir: 'out' | 'back', instant = false) {
     const from = p.obj.parent ? poseOf(p) : spinePose(p);
@@ -179,11 +196,12 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: 
   }
 
   function show(r: Rec | null, instant = false) {
+    after = null;
     if (current?.rec === r) return;
     if (current) fly(current, 'back');
     current = null;
     if (!r) return;
-    turn = { x: 0, y: 0 };
+    turn = { x: 0, y: 0 }; sway = swayT = 0;
     // on its way back still: turn it round
     let p = [...pieces].find(q => q.rec === r);
     if (!p) { p = make(r); pieces.add(p); marks.setAway(r.s.sample_id, true); }
@@ -201,7 +219,7 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: 
     drag.x = e.clientX; drag.y = e.clientY;
     kick();
   };
-  const up = () => { drag = null; view.classList.remove('turning'); };
+  const up = () => { drag = null; view.classList.remove('turning'); kick(); };
   const reset = () => { turn = { x: 0, y: 0 }; kick(); };
   view.addEventListener('pointerdown', down);
   view.addEventListener('pointermove', move);
@@ -224,6 +242,12 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: 
       marks = s;
       kick();
     },
+    again() {
+      const r = current?.rec ?? null;
+      show(null);
+      after = r;
+    },
+    swing(on) { swinging = on; kick(); },
     destroy() {
       cancelAnimationFrame(raf);
       removeEventListener('resize', size);

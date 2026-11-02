@@ -439,6 +439,9 @@ ol.sources a { word-break: break-all; }
 .txshelf[data-hairline] { position: absolute; inset: 0; aspect-ratio: auto; overflow-y: auto; overflow-x: hidden; outline: none; }
 .txshelf:focus-visible, .txlin:focus-visible, .txperf:focus-visible { box-shadow: inset 0 0 0 1px var(--accent-hi); }
 #tx [hidden] { display: none !important; }
+/* rows fixed, so a hidden notice (no demo data) or band (the kiosk) does not move the others up */
+#tx > .txbar { grid-row: 1; } #tx > .txnotice { grid-row: 2; } #tx > .txmain { grid-row: 3; } #tx > .txband, #tx > .txkline { grid-row: 4; }
+.txnfc { display: flex; align-items: center; gap: 8px; }
 /* Lineage and Performance: one canvas each (lineage.ts, perf.ts) */
 .txlin, .txperf { position: absolute; inset: 0; outline: none; touch-action: none; }
 .txlin > canvas, .txperf > canvas { display: block; }
@@ -498,6 +501,19 @@ svg.band { display: block; }
 .yarnrec svg.band { display: inline-block; vertical-align: -1px; }
 .txdrawer code { font-size: 11px; word-break: break-all; }
 .txdrawer a { color: var(--hi); text-decoration: underline dotted var(--line2); text-underline-offset: 3px; }
+
+/* the kiosk (?kiosk, tools/nfc/taxonomy_reader.py kiosk): no band and no ways out of the section; a sample shown
+   opens the large preview (left) and its full record (right) over the view; one line at the bottom */
+#tx.kiosk .txband, #tx.kiosk .secseg { display: none; }
+#tx.kiosk .txname a { pointer-events: none; }
+#tx.kiosk .txdrawer a { pointer-events: none; color: inherit; text-decoration: none; }
+.txbig { position: absolute; inset: 0 auto 0 0; width: 44%; z-index: 3; display: flex; flex-direction: column; background: var(--bg); border-top: 1px solid var(--line2); border-right: 1px solid var(--line); opacity: 0; pointer-events: none; transition: opacity 260ms; }
+#tx.kiosk.showing .txbig { opacity: 1; pointer-events: auto; }
+.txbig .txpreview { flex: 1; min-height: 0; padding: 28px 28px 18px; }
+.txbig .txview { flex: 1; height: auto; min-height: 0; }
+.txbig .txcap { font-size: 13px; }
+#tx.kiosk .txdrawer { left: 44%; }
+.txkline { padding: 14px 20px 16px; border-top: 1px solid var(--line); color: var(--hi); font-size: 18px; text-align: center; }
 
 /* phones: the band above the shelf, everything in one scroll (the full phone layout comes later) */
 @media (max-width: 760px) {

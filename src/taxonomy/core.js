@@ -32,18 +32,27 @@ export const TAG_DATA_BYTES = 872;
 export const sampleUrl = (id, base = TAG_BASE) => `${base}#taxonomy/${id}`;
 
 const enc = new TextEncoder();
-const utf8 = s => enc.encode(s).length;
-const URI_PREFIXES = ['https://www.', 'http://www.', 'https://', 'http://'];
+const URI_CODES = [['https://www.', 2], ['http://www.', 1], ['https://', 4], ['http://', 3]];
 
-/** Bytes of the NDEF message: a URI record (prefix abbreviated) and, when given, one application/json record. */
-export function ndefBytes(url, json) {
-  const pre = URI_PREFIXES.find(p => url.startsWith(p));
-  const uri = 1 + utf8(pre ? url.slice(pre.length) : url);
-  let n = 4 + uri + (uri > 255 ? 3 : 0);
-  if (json != null) { const b = utf8(json); n += 3 + utf8('application/json') + b + (b > 255 ? 3 : 0); }
-  return n;
+/** One NDEF record: header (first, last, short when the payload is under 256 bytes, TNF), lengths, type, payload. */
+function record(tnf, type, payload, first, last) {
+  const n = payload.length, short = n < 256;
+  return [(first ? 0x80 : 0) | (last ? 0x40 : 0) | (short ? 0x10 : 0) | tnf, type.length,
+    ...(short ? [n] : [n >>> 24, (n >>> 16) & 255, (n >>> 8) & 255, n & 255]), ...type, ...payload];
 }
+/** The NDEF message: a URI record (prefix abbreviated) and, when given, one application/json record. */
+export function ndefMessage(url, json) {
+  const [pre, code] = URI_CODES.find(([p]) => url.startsWith(p)) ?? ['', 0];
+  const last = json == null, out = record(1, [0x55], [code, ...enc.encode(url.slice(pre.length))], true, last);
+  if (!last) out.push(...record(2, [...enc.encode('application/json')], [...enc.encode(json)], false, true));
+  return Uint8Array.from(out);
+}
+export const ndefBytes = (url, json) => ndefMessage(url, json).length;
 /** The message inside its TLV (type, 1 or 3 length bytes, message, terminator), as it sits in the data area. */
+export function tlv(message) {
+  const n = message.length;
+  return Uint8Array.from([0x03, ...(n < 255 ? [n] : [0xff, n >> 8, n & 255]), ...message, 0xfe]);
+}
 export const tlvBytes = m => 1 + (m < 255 ? 1 : 3) + m + 1;
 
 /** The tag's JSON record, filled part by part in the order of docs/TAG_FORMAT.md; stops at the first part that

@@ -4,6 +4,11 @@
 // two properties (perf.ts). In each, pointing at a sample lifts it; resting on it for DWELL ms makes it the current
 // sample, shown in the band below; a click pins it there (the address follows); a second click or Esc unpins. The
 // current sample's frame flies from its mark to the preview in 3D (stage.ts). Search and keys work in every view.
+// A sample's address arriving while it is already pinned (its tag laid on again) flies its frame in once more.
+// Tags reach the page three ways: an address opened (a phone, the desk reader setting this tab's address); on
+// Android Chrome, Web NFC behind the "scan tags here" button; in the kiosk (?kiosk, served by
+// tools/nfc/taxonomy_reader.py), the reader's events. The kiosk opens the full record beside a large preview by
+// itself, swings the frame slowly, needs no hover, and puts the sample back when it is lifted off the reader.
 import { EXPERIMENTS } from '../grammar/structures';
 import { sampleUrl, tagPayload, TAG_DATA_BYTES } from './core.js';
 import type { Term } from './core';
@@ -16,6 +21,7 @@ import { loadModel, type Model } from './model';
 import { mountStage, type Face, type Stage } from './stage';
 
 const DWELL = 120, LEAVE = 450;
+const KIOSK = new URLSearchParams(location.search).has('kiosk');
 /** The band's key values: areal density and thickness, then the Performance view's two axes, each once. */
 const keyValues = () => ['areal_density', 'thickness', AXES.x, AXES.y].filter((v, i, a) => a.indexOf(v) === i);
 type ViewName = 'samples' | 'lineage' | 'performance';
@@ -30,6 +36,8 @@ const views: Partial<Record<ViewName, View>> = {};
 const v = () => views[view]!;
 let sort: SortKey = 'id', current: Rec | null = null, pinned = false, overBand = false, drawer = false, missing = '';
 let dwell = 0, leaveT = 0, matches: Rec[] | null = null;
+/** kiosk: the sample the reader showed ('' none), and whether the reader is connected */
+let tagged = '', reader = false;
 let stage: Stage | null = null, face: Face = 'model', first = true, instant = false;
 const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector(s) as T;
 
@@ -43,29 +51,38 @@ const SHELL = `
   <div class="seg txsort" role="group" aria-label="order"><span class="small dim">order</span><button data-sort="id" class="on">ID</button><button data-sort="structure">structure</button><button data-sort="origin">origin</button></div>
   <div class="txaxes" role="group" aria-label="axes" hidden><label class="small dim">x <select data-axis="x"></select></label><label class="small dim">y <select data-axis="y"></select></label></div>
   <span class="txlive" aria-live="polite"></span>
+  <span class="txnfc" hidden><button class="btn" data-nfc aria-pressed="false">scan tags here</button><span class="small dim" aria-live="polite"></span></span>
 </header>
 <div class="txnotice small" hidden></div>
 <div class="txmain">
   <div class="txshelf" tabindex="0" role="listbox" aria-label="samples"></div>
   <div class="txlin" tabindex="0" role="group" aria-label="lineage: fibres, yarns, samples and structures; arrow keys move along the samples" hidden></div>
   <div class="txperf" tabindex="0" role="group" aria-label="performance map; arrow keys move between samples" hidden></div>
+  <div class="txbig" hidden></div>
   <section class="txdrawer" aria-label="full record" hidden></section>
 </div>
 <footer class="txband">
   <div class="txleft"></div>
   <div class="txpreview"><div class="txview"></div><div class="txcap small"></div></div>
   <div class="txright"></div>
-</footer>`;
+</footer>
+<div class="txkline" aria-live="polite" hidden></div>`;
 
 export async function init(el: HTMLElement) {
   root = el;
   root.innerHTML = SHELL;
+  root.classList.toggle('kiosk', KIOSK);
   find = $<HTMLInputElement>('.txfind');
+  // the kiosk's preview: large, beside the full record
+  if (KIOSK) { $('.txbig').hidden = false; $('.txkline').hidden = false; $('.txbig').appendChild($('.txpreview')); }
   db = await load();
   box = $('.txshelf');
   shelf = mountShelf(box, db, events);
   views.samples = shelf;
   stage = mountStage(root, $('.txview'), db, shelf);
+  stage?.swing(KIOSK);
+  if (KIOSK) listen();
+  if ('NDEFReader' in window && !KIOSK) $('.txnfc').hidden = false;
   const opts = GROUP.map(g => `<optgroup label="${esc(g.label)}">${db.properties.filter(p => p.group === g.id).map(p => `<option value="${p.id}">${esc(p.label)} (${esc(p.unit)})</option>`).join('')}</optgroup>`).join('');
   root.querySelectorAll<HTMLSelectElement>('[data-axis]').forEach(sel => {
     sel.innerHTML = opts;
@@ -87,7 +104,8 @@ export async function init(el: HTMLElement) {
     if (w) { setView(w.dataset.view as ViewName); return; }
     if (t.closest('[data-pin]')) { if (current) (pinned ? unpin() : pin(current)); return; }
     if (t.closest('[data-full]')) { openDrawer(!drawer); return; }
-    if (t.closest('[data-close]')) { openDrawer(false); return; }
+    if (t.closest('[data-close]')) { if (KIOSK) unpin(); else openDrawer(false); return; }
+    if (t.closest('[data-nfc]')) { void scanTags(); return; }
     const f = t.closest<HTMLElement>('[data-face]');
     if (f) { face = f.dataset.face as Face; stage?.face(face); render(); return; }
   });
@@ -103,7 +121,7 @@ export async function init(el: HTMLElement) {
   for (const b of Object.values(BOX)) $(b).addEventListener('keydown', keys);
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape' || document.body.dataset.section !== 'taxonomy' || e.target === find) return;
-    if (drawer) openDrawer(false); else if (pinned) unpin();
+    if (drawer && !KIOSK) openDrawer(false); else if (pinned) unpin();
   });
   render();
 }
@@ -116,16 +134,77 @@ export function route(sub: string) {
   // the address the page opened with: its sample is already in the preview, no flight
   instant = first;
   first = false;
-  if (/^SMP_\d{4}$/.test(id)) {
-    const r = db.byId.get(id);
-    if (r) { reveal(r); pin(r); return; }
-    missing = id; // keep the address as asked, show that there is no such sample
-    pinned = false;
-    v().setPinned(null);
-    show(null);
-  }
+  if (/^SMP_\d{4}$/.test(id) && arrive(id)) return;
   instant = false;
   render();
+}
+
+/** A sample's address arrived (a tag, a link, the reader): it is pinned; already pinned, its frame flies in again.
+ *  No such sample: the address stays as asked and the band says so. */
+function arrive(id: string) {
+  const r = db.byId.get(id);
+  if (r && pinned && current === r) { stage?.again(); reveal(r); history.replaceState(null, '', `#taxonomy/${id}`); return true; }
+  if (r) { reveal(r); pin(r); return true; }
+  missing = id;
+  pinned = false;
+  v().setPinned(null);
+  show(null);
+  if (!location.hash.startsWith(`#taxonomy/${id}`)) history.replaceState(null, '', `#taxonomy/${id}`);
+  return false;
+}
+
+/** The sample a tag's address opens, as app.ts routes it (also the first tag's old address), or ''. */
+function sampleIn(url: string) {
+  const m = /#taxonomy\/(SMP_\d{4})(?:\/|$)/.exec(url), old = /#grammar\/learn\/taxonomy(?:\/frame-(\d+))?$/.exec(url);
+  return m ? m[1] : old ? `SMP_${(old[1] ?? '1').padStart(4, '0')}` : '';
+}
+
+// ---------------------------------------------------------------- tags on Android (Web NFC) and the kiosk's reader
+interface NfcRecord { recordType: string; data?: DataView }
+interface NfcReader extends EventTarget { scan(): Promise<void>; onreading: ((e: Event & { message: { records: NfcRecord[] } }) => void) | null; onreadingerror: (() => void) | null }
+let scanning = false;
+async function scanTags() {
+  const Reader = (window as unknown as { NDEFReader?: new () => NfcReader }).NDEFReader, btn = $('[data-nfc]'), say = (t: string) => ($('.txnfc .small').textContent = t);
+  if (!Reader || scanning) return;
+  try {
+    const nfc = new Reader();
+    await nfc.scan();
+    scanning = true;
+    btn.textContent = 'scanning tags'; btn.classList.add('on'); btn.setAttribute('aria-pressed', 'true');
+    say('hold a tag to the back of the phone');
+    nfc.onreading = e => {
+      const url = e.message.records.filter(r => r.recordType === 'url' && r.data).map(r => new TextDecoder().decode(r.data))[0] ?? '';
+      const id = sampleIn(url);
+      say(id ? '' : 'not a sample tag');
+      if (id) { arrive(id); render(); }
+    };
+    nfc.onreadingerror = () => say('could not read the tag: hold it still');
+  } catch (err) { say(`NFC: ${(err as Error).message || 'not allowed'}`); }
+}
+
+function listen() {
+  const es = new EventSource('reader');
+  es.addEventListener('open', () => { reader = true; kline(); });
+  es.addEventListener('error', () => { reader = false; kline(); });
+  es.addEventListener('show', e => {
+    const id = (e as MessageEvent<string>).data;
+    tagged = id;
+    arrive(id);
+    render();
+  });
+  es.addEventListener('clear', () => {
+    if (tagged && current?.s.sample_id === tagged) unpin();
+    tagged = missing = '';
+    kline();
+  });
+}
+function kline() {
+  if (!KIOSK) return;
+  $('.txkline').textContent = !reader ? 'Reader not connected.'
+    : missing ? `${missing}: no sample with this ID here.`
+    : tagged && current?.s.sample_id === tagged ? 'Lift the sample off the reader to put it back.'
+    : tagged ? 'Lift the sample off the reader before placing the next.'
+    : 'Place a sample on the reader.';
 }
 
 // ---------------------------------------------------------------- views
@@ -163,7 +242,7 @@ function hover(r: Rec | null) {
   clearTimeout(dwell);
   clearTimeout(leaveT);
   v().setLifted(r?.s.sample_id ?? null);
-  if (pinned) return;
+  if (pinned || KIOSK) return; // the kiosk shows a sample on the reader or a click, never on hover
   if (r) dwell = window.setTimeout(() => show(r), DWELL);
   else leaveT = window.setTimeout(() => { if (!pinned && !overBand) show(null); }, LEAVE);
 }
@@ -181,7 +260,8 @@ function show(r: Rec | null) {
   if (r) box.setAttribute('aria-activedescendant', `sp-${r.s.sample_id}`); else box.removeAttribute('aria-activedescendant');
   // the canvas views have no element per sample: say which one is current
   $('.txlive').textContent = r && view !== 'samples' ? `${r.s.sample_id}, ${r.s.sample_name}` : '';
-  if (!r && drawer) openDrawer(false);
+  if (KIOSK) openDrawer(!!r);
+  else if (!r && drawer) openDrawer(false);
   render();
 }
 function pin(r: Rec) {
@@ -197,6 +277,7 @@ function unpin() {
   pinned = false;
   v().setPinned(null);
   if (location.hash !== '#taxonomy') history.replaceState(null, '', '#taxonomy');
+  if (KIOSK) show(null); // nothing to hover back to: the frame goes back to its mark
   render();
 }
 function reveal(r: Rec) { v().reveal(r.s.sample_id); }
@@ -237,6 +318,8 @@ const valueCell = (r: Rec, id: string) => {
 function render() {
   const r = current, left = $('.txleft'), right = $('.txright');
   root.classList.toggle('pinned', pinned);
+  root.classList.toggle('showing', !!r);
+  kline();
   if (!r) {
     left.innerHTML = missing
       ? `<div class="kicker">${esc(missing)}</div><p class="warn">No sample with this ID here.</p>`

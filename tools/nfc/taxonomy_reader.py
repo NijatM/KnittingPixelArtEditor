@@ -6,22 +6,42 @@ No packages needed: the serial port is opened with termios (macOS / Linux).
 
   python3 taxonomy_reader.py                 wait for tags; each one's address opens in one Chrome window kept for
                                              the reader, filling the screen (macOS; first time, allow the terminal
-                                             to control Chrome); elsewhere, or with --tab, in the default browser
+                                             to control Chrome); elsewhere, or with --tab, in the default browser.
+                                             The tag already shown, laid on again: the page flies its frame in again
+  python3 taxonomy_reader.py kiosk           the exhibition kiosk, offline: serves the built site (dist/, made by
+                                             "npm run build") on this computer, opens it full screen in Chrome and
+                                             tells the page which sample lies on the reader (see KIOSK below)
   python3 taxonomy_reader.py check           print the PN532's firmware version and exit
-  python3 taxonomy_reader.py info            print the next tag's UID, chip version, first pages and address (reads only)
-  python3 taxonomy_reader.py write <url>     write <url> to the next NTAG21x tag laid on the reader
+  python3 taxonomy_reader.py info            print the next tag's UID, chip version, first pages, address and data
+  python3 taxonomy_reader.py write SMP_0001  write that sample's tag from the records (address + data, as in
+                                             docs/TAG_FORMAT.md; needs node, run from this repository)
+  python3 taxonomy_reader.py write <url>     write only <url> to the next NTAG21x tag laid on the reader
   options: --port /dev/cu.usbserial-10 (default: the first /dev/cu.usbserial* or /dev/ttyUSB*), --tab,
-           --browser "Brave Browser" (any Chromium browser on macOS; default Google Chrome)
-  start_reader.command (next to this file) starts it from Finder with a double-click.
+           --browser "Brave Browser" (any Chromium browser on macOS; default Google Chrome);
+           kiosk only: --http 8017 (the local port), --no-browser, --keys (no reader: type what lies on it, see KIOSK)
+  start_reader.command and start_kiosk.command (next to this file) start them from Finder with a double-click.
   While waiting for tags, the reader may be unplugged and plugged back in (or plugged in only after starting): it
   waits for it and goes on.
 
 A tag without an address is looked up by its UID in tags.json next to this file ({"04a1b2c3d4e5f6": "https://..."});
 an unknown tag's UID is printed so it can be added there.
+
+KIOSK. The rig has one slot. A sample laid on it flies in and its full record opens; lifted off, it flies back to
+its spine HOLD seconds after the reader last saw it (the wait also covers reads the reader misses). Only tags whose
+address ends in #taxonomy/SMP_#### count; any other tag is ignored and named in this terminal. While the shown tag
+lies there, other tags are ignored; once it is gone, a new sample takes over at once (a quick swap does not wait).
+Tags carry the public address; the kiosk shows the same sample from the local copy. With --keys there is no reader:
+each line typed is what lies on it now (sample IDs or addresses, several at once allowed; an empty line: nothing).
 """
-import errno, glob, json, os, select, subprocess, sys, termios, time, webbrowser
+import errno, functools, glob, hashlib, http.server, json, os, re, select, subprocess, sys, tempfile, termios, threading, time
+import urllib.parse, webbrowser
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(HERE))                                # the repository
+BASE = '/KnittingPixelArtEditor/'                                            # the site's base (vite.config.ts)
+PUBLIC = 'https://nijatm.github.io' + BASE                                   # TAG_BASE in src/taxonomy/core.js
+HOLD = 3.0                                                                   # kiosk: s after the shown tag is last seen
+GONE = 1.0                                                                   # desk: s unseen before a tag counts as lifted
 PREFIX = {0: '', 1: 'http://www.', 2: 'https://www.', 3: 'http://', 4: 'https://'}
 
 
@@ -82,85 +102,140 @@ class PN532:
                     return None
         return None
 
-    def tag(self):
-        """UID of a tag on the reader, or None."""
-        r = self.call(0x4A, [0x01, 0x00], timeout=1.5)                       # InListPassiveTarget, 106 kbps type A
-        if not r or r[0] == 0: return None
-        return bytes(r[6:6 + r[5]])
+    def tags(self):
+        """The tags on the reader, up to two: [(target number, UID)]."""
+        r = self.call(0x4A, [0x02, 0x00], timeout=1.5)                       # InListPassiveTarget, 106 kbps type A
+        out, i = [], 1
+        for _ in range(r[0] if r else 0):
+            if i + 5 > len(r): break
+            tg, sel, n = r[i], r[i + 3], r[i + 4]
+            out.append((tg, bytes(r[i + 5:i + 5 + n])))
+            i += 5 + n
+            if sel & 0x20 and i < len(r): i += r[i]                          # an ISO 14443-4 card's ATS (length first)
+        return out
 
-    def page4(self, page):
-        r = self.call(0x40, [0x01, 0x30, page])                              # InDataExchange: NTAG READ (16 bytes)
+    def page4(self, page, tg=1):
+        r = self.call(0x40, [tg, 0x30, page])                                # InDataExchange: NTAG READ (16 bytes)
         return bytes(r[1:17]) if r and r[0] == 0 and len(r) >= 17 else None
 
     def version(self):
         r = self.call(0x42, [0x60])                                          # InCommunicateThru: NTAG GET_VERSION
         return bytes(r[1:]) if r and r[0] == 0 else None
 
-    def write_page(self, page, four):
-        r = self.call(0x40, [0x01, 0xA2, page] + list(four))                 # NTAG WRITE (4 bytes)
+    def write_page(self, page, four, tg=1):
+        r = self.call(0x40, [tg, 0xA2, page] + list(four))                   # NTAG WRITE (4 bytes)
         return bool(r) and r[0] == 0
 
 
-def parse(mem):
-    """(whole, url): whole is False while the NDEF message runs past the bytes read so far; url is its first URI or None."""
+def message(mem):
+    """The NDEF message's records complete in the bytes read so far, [(TNF, type, payload)], and whether the whole
+    message is in (or there is none)."""
     i = 0
-    while i < len(mem):
+    while i + 1 < len(mem):
         t = mem[i]
         if t == 0x00: i += 1; continue
-        if t == 0xFE: return True, None
-        if i + 4 > len(mem): return False, None
+        if t == 0xFE: return [], True
+        if mem[i + 1] == 0xFF and i + 4 > len(mem): break
         n, h = (mem[i + 1], 2) if mem[i + 1] != 0xFF else (int.from_bytes(mem[i + 2:i + 4], 'big'), 4)
-        if i + h + n > len(mem): return False, None
-        if t == 0x03:
-            rec = mem[i + h:i + h + n]
-            if len(rec) < 4: return True, None
-            flags, tl = rec[0], rec[1]
-            short = flags & 0x10
-            pl = rec[2] if short else int.from_bytes(rec[2:6], 'big')
-            j = 3 if short else 6
-            if flags & 0x08: j += 1                                          # ID length present
-            typ = rec[j:j + tl]; payload = rec[j + tl:j + tl + pl]
-            if typ == b'U' and payload and len(payload) == pl:
-                return True, PREFIX.get(payload[0], '') + payload[1:].decode('utf-8', 'replace')
-            return True, None
+        if t == 0x03: return records(mem[i + h:i + h + n]), i + h + n <= len(mem)
+        if i + h + n > len(mem): break
         i += h + n
-    return False, None
+    return [], False
 
 
-def read_url(nfc):
-    """The first URI record of the tag's NDEF message, None if it has none, or False if the tag went away before its
-    message was read whole (a frame lifted or slid mid-read): a cut-off address is never returned."""
-    mem = b''
+def records(msg):
+    out, j = [], 0
+    while j + 3 <= len(msg):
+        flags, tl = msg[j], msg[j + 1]
+        k = j + 3 if flags & 0x10 else j + 6                                 # short record: 1 length byte, else 4
+        if k > len(msg): break
+        pl = msg[j + 2] if flags & 0x10 else int.from_bytes(msg[j + 2:j + 6], 'big')
+        il = 0
+        if flags & 0x08:                                                     # ID length present
+            if k >= len(msg): break
+            il = msg[k]; k += 1
+        end = k + tl + il + pl
+        if end > len(msg): break
+        out.append((flags & 0x07, bytes(msg[k:k + tl]), bytes(msg[k + tl + il:end])))
+        if flags & 0x40: break                                               # message end
+        j = end
+    return out
+
+
+def read_tag(nfc, tg=1, whole=False):
+    """(address, data): the tag's first URI record and, with whole=True, its application/json record (else None);
+    either is None if the tag has none. False if the tag went away before what is needed was read whole (a frame
+    lifted or slid mid-read): a cut-off address is never returned. Without whole, reading stops at the address."""
+    mem, recs = b'', []
     for page in range(4, 228, 4):                                            # up to an NTAG216's last user page
-        chunk = nfc.page4(page)
+        chunk = nfc.page4(page, tg)
         if chunk is None: return False
         mem += chunk
-        whole, url = parse(mem)
-        if whole: return url
-    return None
+        recs, done = message(mem)
+        url = next((PREFIX.get(p[0], '') + p[1:].decode('utf-8', 'replace') for f, t, p in recs if f == 1 and t == b'U' and p), None)
+        if done or (url and not whole): break
+    data = next((p.decode('utf-8', 'replace') for f, t, p in recs if f == 2 and t == b'application/json'), None)
+    return url, data
 
 
-def write_url(nfc, url):
+def url_tlv(url):
+    """The NDEF TLV of one short URI record (an address only)."""
     code, rest = 0, url
     for k in (4, 3, 2, 1):
         if url.startswith(PREFIX[k]): code, rest = k, url[len(PREFIX[k]):]; break
     payload = bytes([code]) + rest.encode()
-    rec = bytes([0xD1, 0x01, len(payload)]) + b'U' + payload                 # one short well-known URI record
-    tlv = bytes([0x03, len(rec)]) + rec + b'\xfe'
+    if len(payload) > 255: sys.exit('address too long for one short record')
+    rec = bytes([0xD1, 0x01, len(payload)]) + b'U' + payload
+    return bytes([0x03, len(rec)]) + rec + b'\xfe'
+
+
+def sample_tlv(sid):
+    """The TLV for a sample, from the records, by scripts/taxonomy-tag.mjs (the site's own code, src/taxonomy/core.js)."""
+    try: r = subprocess.run(['node', os.path.join(ROOT, 'scripts', 'taxonomy-tag.mjs'), sid], capture_output=True, text=True)
+    except FileNotFoundError: sys.exit('writing a sample needs node (the one this repository builds with)')
+    if r.returncode: sys.exit(r.stderr.strip() or 'scripts/taxonomy-tag.mjs failed')
+    t = json.loads(r.stdout)
+    print(f'{sid}: {t["bytes"]} bytes' + (f'; left off (the address leads to the full record): {", ".join(t["cut"])}' if t['cut'] else '; everything fits'))
+    return t['url'], bytes.fromhex(t['tlv'])
+
+
+def write_tlv(nfc, tlv, url):
     tlv += b'\x00' * (-len(tlv) % 4)
     cc = nfc.page4(3)
     if not cc or cc[0] != 0xE1: sys.exit(f'no NDEF capability container on page 3 ({cc[:4].hex(" ") if cc else "unreadable"}); not writing')
     if cc[3] & 0xF0: sys.exit(f'the tag is write-protected (CC {cc[:4].hex(" ")})')
-    if len(tlv) > cc[2] * 8: sys.exit(f'address needs {len(tlv)} bytes, the tag holds {cc[2] * 8}')
-    print(f'CC {cc[:4].hex(" ")} ({cc[2] * 8} bytes); address on it now: {read_url(nfc)}')
+    if len(tlv) > cc[2] * 8: sys.exit(f'needs {len(tlv)} bytes, the tag holds {cc[2] * 8}')
+    old = read_tag(nfc)
+    now = old[0] if old else None
+    print(f'CC {cc[:4].hex(" ")} ({cc[2] * 8} bytes); address on it now: {now}')
+    was, will = sample_of(now), sample_of(url)
+    if was and will and was != will and input(f'this is {was}\'s tag; write {will} over it? [y/N] ').strip().lower() != 'y': sys.exit('not written')
     for k in range(0, len(tlv), 4):
         if not nfc.write_page(4 + k // 4, tlv[k:k + 4]): return False
-    return True
+    back = b''
+    for page in range(4, 4 + len(tlv) // 4, 4):                              # read it back, byte for byte
+        chunk = nfc.page4(page)
+        if chunk is None: return False
+        back += chunk
+    return back[:len(tlv)] == tlv
+
+
+SAMPLE = re.compile(r'#taxonomy/(SMP_\d{4})$')
+OLD = re.compile(r'#grammar/learn/taxonomy(?:/frame-(\d+))?$')                # the first tag's address (2026-10-31)
+
+
+def sample_of(url):
+    """The sample a tag's address opens (as the site's router reads it), or None: not a Knitting Taxonomy tag."""
+    m = SAMPLE.search(url or '')
+    if m: return m.group(1)
+    m = OLD.search(url or '')
+    return f'SMP_{int(m.group(1) or 1):04d}' if m else None
 
 
 # Chrome (or another Chromium browser), through JavaScript for Automation: the reader's own window (else one already on the site, else a new one),
-# sized to the screen above the Dock and brought to the front; the same address again reloads, so the page scrolls
-# back to the frame.
+# sized to the screen above the Dock and brought to the front. A sample's address already open: the same address
+# with "/again" after it, which the page takes as the same sample and flies its frame in again (no reload); any
+# other address already open reloads.
 SHOW = r'''
 function run(argv) {
   const url = argv[0], want = argv[1] || '', chrome = Application(argv[2]);
@@ -168,7 +243,7 @@ function run(argv) {
   let win = chrome.windows().find(w => String(w.id()) === want) || chrome.windows().find(w => w.activeTab().url().startsWith(site));
   if (!win) { chrome.Window().make(); win = chrome.windows[0]; }
   const tab = win.activeTab();
-  if (tab.url() === url) tab.reload(); else tab.url = url;
+  if (tab.url() !== url) tab.url = url; else if (/#taxonomy\/SMP_\d{4}$/.test(url)) tab.url = url + '/again'; else tab.reload();
   ObjC.import('AppKit');
   const f = $.NSScreen.mainScreen.frame, v = $.NSScreen.mainScreen.visibleFrame;
   win.bounds = { x: v.origin.x, y: f.size.height - v.origin.y - v.size.height, width: v.size.width, height: v.size.height };
@@ -208,40 +283,196 @@ def connect(want):
         time.sleep(1)
 
 
+def load_table():
+    try: return json.load(open(os.path.join(HERE, 'tags.json')))
+    except (OSError, ValueError): return {}
+
+
+class Desk:
+    """The tags on the PN532 at each look, {UID: address or None}, and which of them are new. Each tag is read once
+    while it stays; one the reader misses for less than `keep` s still counts as there (not read again)."""
+    def __init__(self, nfc, keep):
+        self.nfc, self.keep, self.table, self.known, self.when = nfc, keep, load_table(), {}, {}
+
+    def look(self):
+        now, out, new = time.time(), {}, []
+        for tg, uid in self.nfc.tags():
+            if uid not in self.known:
+                got = read_tag(self.nfc, tg)
+                if got is False: continue                                    # not read whole: next look
+                self.known[uid] = got[0] or self.table.get(uid.hex())
+                new.append(uid)
+            self.when[uid] = now
+        for uid, t in list(self.when.items()):
+            if now - t > self.keep: del self.when[uid]; del self.known[uid]
+            else: out[uid] = self.known[uid]
+        return out, new
+
+
+class Keys:
+    """Instead of a reader (kiosk --keys): each line typed is what lies on it now."""
+    def __init__(self):
+        self.now, self.seen = {}, set()
+        threading.Thread(target=self.read, daemon=True).start()
+
+    def read(self):
+        for line in sys.stdin:
+            items = line.split()
+            self.now = {hashlib.sha1(i.encode()).digest()[:7]: (PUBLIC + '#taxonomy/' + i if re.fullmatch(r'SMP_\d{4}', i) else i) for i in items}
+
+    def look(self):
+        now = dict(self.now)
+        new = [u for u in now if u not in self.seen]
+        self.seen = set(now)
+        return now, new
+
+
 def watch(want, tab, browser):
-    try: table = json.load(open(os.path.join(HERE, 'tags.json')))
-    except (OSError, ValueError): table = {}
     port, nfc = connect(want)
+    desk = Desk(nfc, GONE)
     print(f'{port}: waiting for tags (ctrl-c to stop)', flush=True)
-    last = None
     while True:
         try:
-            uid = nfc.tag()
-            if uid and uid != last:
-                url = read_url(nfc)
-                if url is False: time.sleep(0.1); continue                   # not read whole: try again, not yet seen
-                url = url or table.get(uid.hex())
+            tags, new = desk.look()
+            for uid in new:                                                  # a tag lying there opens once
+                url = tags[uid]
                 print(f'tag {uid.hex()}: {url or "no address on it and not in tags.json"}', flush=True)
                 if url: show(url, tab, browser)
-            last = uid                                                       # the same tag lying there opens once
         except LOST as e:
             nfc.close()
             print(f'{port}: the reader went away ({e})', flush=True)
             port, nfc = connect(want)
+            desk = Desk(nfc, GONE)
             print(f'{port}: back, waiting for tags', flush=True)
         time.sleep(0.3)
 
 
+# ---------------------------------------------------------------- the kiosk
+class Rig:
+    """The one slot's rules (KIOSK above): tells the page show <sample> or clear."""
+    def __init__(self, say):
+        self.say, self.uid, self.sample, self.seen = say, None, None, 0.0
+
+    def look(self, now, tags):
+        """tags: {UID: sample or None (not a Knitting Taxonomy tag)} on the reader now."""
+        if self.uid in tags: self.seen = now; return                         # the shown one is still there
+        new = next(((u, s) for u, s in tags.items() if s), None)
+        if new:
+            (self.uid, self.sample), self.seen = new, now
+            self.say('show', self.sample)
+        elif self.sample and now - self.seen >= HOLD:
+            self.uid = self.sample = None
+            self.say('clear', '')
+
+
+class Hub:
+    """What the reader last told the page; each kiosk page listening (server-sent events) gets every change."""
+    def __init__(self):
+        self.cv, self.n, self.state, self.boot = threading.Condition(), 0, ('clear', ''), f'{int(time.time())}'
+
+    def say(self, event, data):
+        with self.cv:
+            self.n += 1; self.state = (event, data); self.cv.notify_all()
+        print(f'  page: {event} {data}'.rstrip(), flush=True)
+
+    def wait(self, n, timeout):
+        with self.cv:
+            self.cv.wait_for(lambda: self.n != n, timeout)
+            return self.n, self.state
+
+
+class Site(http.server.SimpleHTTPRequestHandler):
+    """The built site under BASE, and BASE + "reader": the reader's events."""
+    hub = None
+
+    def do_GET(self):
+        path = urllib.parse.urlsplit(self.path).path
+        if path == '/':
+            self.send_response(302); self.send_header('Location', BASE + '?kiosk#taxonomy'); self.send_header('Content-Length', '0'); self.end_headers(); return
+        if not path.startswith(BASE): return self.send_error(404)
+        if path == BASE + 'reader': return self.events()
+        return super().do_GET()
+
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-cache')                       # a rebuilt site shows at the next load
+        super().end_headers()
+
+    def translate_path(self, path):
+        return super().translate_path('/' + urllib.parse.urlsplit(path).path[len(BASE):])
+
+    def events(self):
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream'); self.end_headers()
+        hub, last = self.hub, self.headers.get('Last-Event-ID')
+        n, state = hub.wait(-1, 0)
+        try:
+            self.wfile.write(b'retry: 2000\n\n')
+            if last != f'{hub.boot}-{n}': self.send(hub.boot, n, state)        # a page that reconnects has it already
+            while True:
+                m, state = hub.wait(n, 15)
+                if m == n: self.wfile.write(b': still here\n\n')
+                else: n = m; self.send(hub.boot, n, state)
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError): pass
+
+    def send(self, boot, n, state):
+        self.wfile.write(f'id: {boot}-{n}\nevent: {state[0]}\ndata: {state[1]}\n\n'.encode()); self.wfile.flush()
+
+    def log_message(self, *a): pass
+
+
+def open_full_screen(url, browser):
+    """Chrome (or another Chromium browser) in kiosk mode, its own profile so it starts as a new instance (cmd-Q
+    leaves); elsewhere the default browser."""
+    if sys.platform == 'darwin' and os.path.isdir(f'/Applications/{browser}.app'):
+        profile = os.path.join(tempfile.gettempdir(), 'knitting-taxonomy-kiosk')
+        subprocess.run(['open', '-na', browser, '--args', '--kiosk', f'--user-data-dir={profile}', '--no-first-run',
+                        '--no-default-browser-check', '--disable-pinch', '--overscroll-history-navigation=0', url])
+    else: webbrowser.open(url)
+
+
+def kiosk(want, port, keys, browser, open_browser):
+    site = os.path.join(ROOT, 'dist')
+    if not os.path.isfile(os.path.join(site, 'index.html')): sys.exit('no built site in dist/: run "npm run build" here first')
+    hub = Hub()
+    handler = type('KioskSite', (Site,), {'hub': hub})
+    try: server = http.server.ThreadingHTTPServer(('127.0.0.1', port), functools.partial(handler, directory=site))
+    except OSError as e: sys.exit(f'port {port}: {e.strerror} (another kiosk running? use --http <port>)')
+    server.daemon_threads = True
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    url = f'http://127.0.0.1:{port}{BASE}?kiosk#taxonomy'
+    print(f'kiosk page: {url}', flush=True)
+    if open_browser: open_full_screen(url, browser)
+    rig = Rig(hub.say)
+    if keys: source, nfc = Keys(), None; print('no reader: type what lies on it (sample IDs or addresses), Enter; an empty line: nothing', flush=True)
+    else: port_, nfc = connect(want); source = Desk(nfc, HOLD); print(f'{port_}: waiting for tags (ctrl-c to stop)', flush=True)
+    while True:
+        try:
+            tags, new = source.look()
+            for uid in new:
+                s = sample_of(tags[uid])
+                print(f'tag {uid.hex()}: {s}' if s else f'tag {uid.hex()}: ignored, not a sample ({tags[uid] or "no address"})', flush=True)
+            rig.look(time.time(), {u: sample_of(a) for u, a in tags.items()})
+        except LOST as e:
+            nfc.close()
+            print(f'{port_}: the reader went away ({e})', flush=True)
+            rig.look(time.time(), {})
+            port_, nfc = connect(want); source = Desk(nfc, HOLD)
+            print(f'{port_}: back, waiting for tags', flush=True)
+        time.sleep(0.2)
+
+
 def main():
     args = sys.argv[1:]
-    port = None
-    if '--port' in args:
-        i = args.index('--port'); port = args[i + 1]; del args[i:i + 2]
-    tab = '--tab' in args
-    if tab: args.remove('--tab')
-    browser = 'Google Chrome'
-    if '--browser' in args:
-        i = args.index('--browser'); browser = args[i + 1]; del args[i:i + 2]
+    def opt(name, default=None):
+        if name not in args: return default
+        i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v
+    def flag(name):
+        if name not in args: return False
+        args.remove(name); return True
+    port, browser, http_port = opt('--port'), opt('--browser', 'Google Chrome'), int(opt('--http', '8017'))
+    tab, keys, no_browser = flag('--tab'), flag('--keys'), flag('--no-browser')
+    if args[:1] == ['kiosk']: return kiosk(port, http_port, keys, browser, not no_browser)
     if args[:1] not in (['check'], ['info'], ['write']): return watch(port, tab, browser)
     port = find_port(port)
     if not port: sys.exit('no USB-serial adapter found (use --port)')
@@ -252,21 +483,22 @@ def main():
         return
     if args[:1] == ['info']:
         print('lay the tag on the reader')
-        while not (uid := nfc.tag()): time.sleep(0.2)
-        print(f'UID {uid.hex(" ")}')
+        while not (got := nfc.tags()): time.sleep(0.2)
+        print(f'UID {got[0][1].hex(" ")}' + (f' (and {len(got) - 1} more tag on the reader)' if len(got) > 1 else ''))
         for page in (0, 4, 8, 12):
             c = nfc.page4(page)
             print(f'pages {page:2}-{page + 3:2}: {c.hex(" ") if c else "unreadable"}')
-        u = read_url(nfc)
-        print(f'address: {"not read whole (the tag moved?)" if u is False else u}')
+        t = read_tag(nfc, whole=True)
+        print('address: not read whole (the tag moved?)' if t is False else f'address: {t[0]}\ndata: {t[1]}')
         v = nfc.version()                                                    # last: a chip without it stops answering
         print(f'GET_VERSION {v.hex(" ") if v else "no answer"}')
         return
     if args[:1] == ['write']:
-        url = args[1]
+        what = args[1]
+        url, tlv = sample_tlv(what) if re.fullmatch(r'SMP_\d{4}', what) else (what, url_tlv(what))
         print(f'lay the tag on the reader to write {url}')
-        while not nfc.tag(): time.sleep(0.2)
-        print('written' if write_url(nfc, url) and read_url(nfc) == url else 'write failed')
+        while not nfc.tags(): time.sleep(0.2)
+        print('written and read back' if write_tlv(nfc, tlv, url) else 'write failed (the tag moved?): lay it on again and repeat')
 
 
 if __name__ == '__main__':

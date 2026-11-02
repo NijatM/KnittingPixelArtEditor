@@ -102,7 +102,15 @@ a click pins it, "full record" opens every field. Each frame carries an NFC tag 
 (`#taxonomy/SMP_0001`, format in [docs/TAG_FORMAT.md](docs/TAG_FORMAT.md)), so a phone opens it directly; the
 first tag's old address (`#grammar/learn/taxonomy/frame-01`) still works. At the desk,
 `tools/nfc/taxonomy_reader.py` reads tags with a PN532 module on a USB-serial adapter and opens the same address
-on the laptop (no Python packages needed; `check`, `info` and `write <url>` are there for setting up tags).
+on the laptop; laying the tag already shown on again flies its frame in again (no Python packages needed).
+`write SMP_0001` writes a sample's whole tag (its address and its data, from the records), and `check` and `info`
+help set up the reader and tags. On Android Chrome, "scan tags here" in the bar reads tags into the open page (Web
+NFC), so tags do not open new tabs.
+
+For an exhibition, `kiosk` runs the same site offline from the built copy (`dist/`) on the laptop, full screen in
+Chrome, with the reader beside it: a sample laid on the reader flies in and its full record opens beside a large,
+slowly turning preview; lifted off, it goes back to its spine after 3 s. Only tags with a sample's address count,
+and while a sample lies there other tags are ignored. `--keys` stands in for the reader (type sample IDs).
 
 For now the shelf holds 300 **generated demo samples**: every value is made up and marked so
 (`node scripts/taxonomy-demo.mjs` writes them; `SHOW_DEMO` in `src/taxonomy/data.ts` removes them all).
@@ -166,8 +174,11 @@ python3 scripts/build-avatar-library.py <portrait-40-multi-resolution folder>
 The NFC desk reader (macOS or Linux, Python 3):
 
 ```sh
-python3 tools/nfc/taxonomy_reader.py          # wait for tags and open their addresses
-python3 tools/nfc/taxonomy_reader.py check    # print the PN532's firmware version
+python3 tools/nfc/taxonomy_reader.py                 # wait for tags and open their addresses
+python3 tools/nfc/taxonomy_reader.py check           # print the PN532's firmware version
+python3 tools/nfc/taxonomy_reader.py info            # print a tag's address and data
+python3 tools/nfc/taxonomy_reader.py write SMP_0001  # write a sample's tag from the records (needs node)
+npm run build && python3 tools/nfc/taxonomy_reader.py kiosk   # the exhibition kiosk (start_kiosk.command)
 ```
 
 ## Documentation

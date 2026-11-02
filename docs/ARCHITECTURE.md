@@ -304,6 +304,7 @@ sequenceDiagram
   P->>S: opens it
   T->>R: read by the PN532
   R->>S: opens the same address on the laptop
+  R->>S: kiosk: show / clear (server-sent events from the local copy)
 ```
 
 - `src/taxonomy/` is its own section (`#taxonomy/<sample_id>`), loaded the first time it opens. `data.ts` bundles
@@ -332,7 +333,17 @@ sequenceDiagram
 - `tools/nfc/taxonomy_reader.py` talks to a PN532 over a USB-serial adapter (HSU, 115200 baud) with `termios`, so
   it needs no packages. It waits for tags and opens each address in one reused browser window, survives the
   adapter being unplugged and plugged back in, and can `check` the reader, print a tag's `info`, or `write` an
-  address to an NTAG21x tag. `start_reader.command` launches it on macOS.
+  address to an NTAG21x tag. `start_reader.command` launches it on macOS. It lists up to two tags per look and
+  reads a tag only until its address (5 pages instead of ~40); the same address again is set with `/again` after
+  it, which the page takes as "fly the frame in again". `write SMP_####` gets the bytes from
+  `scripts/taxonomy-tag.mjs` (`core.js`'s `tagPayload`, `ndefMessage`, `tlv`: the site's own code), writes them
+  and reads them back.
+- `kiosk` serves `dist/` on 127.0.0.1 and `…/reader`, a server-sent event stream (`show SMP_####` / `clear`; the
+  latest state on connect). `Rig` holds the slot's rules: tags without a sample's address are ignored; while the
+  shown tag is seen, others are ignored; once it is gone, a new sample takes over at once, else `clear` after 3 s.
+  The page (`?kiosk`) hides the band and the ways out of the section, moves the preview into a large panel beside
+  the full record, shows a sample only by the reader or a click, and asks `stage.ts` to swing the frame.
+- On Android Chrome `main.ts` offers Web NFC (`NDEFReader`): a tag's URI record is routed like an address.
 
 ## Storage
 
