@@ -106,6 +106,9 @@ on the laptop (no Python packages needed; `check`, `info` and `write <url>` are 
 
 For now the shelf holds 300 **generated demo samples**: every value is made up and marked so
 (`node scripts/taxonomy-demo.mjs` writes them; `SHOW_DEMO` in `src/taxonomy/data.ts` removes them all).
+The current sample's frame flies from its spine to the preview in 3D. Its window shows a yarn model of the sample's
+structure (not a photo of the sample): one per structure, relaxed once with the Knit Grammar yarn engine
+(`npm run taxonomy:models`), each yarn in its origin colour. A sample with a photo shows the photo first.
 The records follow the material_bank v0.2 conventions (Tailored Materiality Group) in our own schema and
 vocabulary files (`src/taxonomy/schema`, `src/taxonomy/vocab`); `node scripts/taxonomy-check.mjs` checks them
 before every build.
@@ -200,7 +203,7 @@ python3 tools/nfc/taxonomy_reader.py check    # print the PN532's firmware versi
 | 3D view | `src/grammar/view3d.ts` |
 | Learn pages, figures, 3D swatches | `src/grammar/learn.ts`, `figures.ts`, `swatch3d.ts`, `src/hl.ts`, `src/vendor/hairline/` |
 | Knitting Taxonomy | `src/taxonomy/` (`main.ts`, `shelf.ts`, `data.ts`, `core.js`, `figure.ts`), `scripts/taxonomy-*.mjs` |
-| Frame drawing in 3D (placeholder, for the next step) | `src/grammar/frame3d.ts` |
+| Taxonomy 3D frame and yarn models | `src/taxonomy/stage.ts`, `model.ts`, `data/models/`, `scripts/taxonomy-models.ts` |
 | Interface | `src/grammar/ui.ts`, `src/grammar/main.ts` |
 | **Other** | |
 | NFC desk reader | `tools/nfc/` |

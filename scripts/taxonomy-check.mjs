@@ -80,6 +80,7 @@ function checkSet(name, set, files) {
   const STRUCT = ids('structure'), ROLE = ids('yarn_role'), METHOD = ids('method'), PROP = new Map(VOC.property.map(p => [p.id, p]));
   const MACH = new Map(VOC.machine.map(m => [m.id, m]));
   for (const s of set.samples) {
+    if (s.photo && (!/^[\w.-]+$/.test(s.photo) || !existsSync(join(ROOT, 'public/taxonomy/photos', s.photo)))) err(`sample ${s.sample_id}: photo ${s.photo} is not a file in public/taxonomy/photos/`);
     const at = `sample ${s.sample_id}`, demo = s.status === 'demo';
     for (const k of ['sample_date', 'data_as_of']) if (!realDate(s[k])) err(`${at}: ${k} ${s[k]} is not a date`);
     if (s.data_as_of < s.sample_date) err(`${at}: data_as_of is before sample_date`);
@@ -129,6 +130,13 @@ function checkVocab() {
   for (const [n, terms] of Object.entries(VOC)) {
     const seen = new Set();
     for (const t of terms) { if (seen.has(t.id)) errors.push(`vocab ${n}: ${t.id} twice`); seen.add(t.id); }
+  }
+  // every structure has a 3D model (scripts/taxonomy-models.ts), or names the one it is drawn with
+  for (const t of VOC.structure) {
+    const p = join(ROOT, 'src/taxonomy/data/models', `${t.id}.json`);
+    if (!existsSync(p)) { errors.push(`structure ${t.id}: no model (npm run taxonomy:models -- ${t.id})`); continue; }
+    const m = JSON.parse(readFileSync(p, 'utf8'));
+    if (m.same_as ? !existsSync(join(ROOT, 'src/taxonomy/data/models', `${m.same_as}.json`)) : !m.yarns?.length) errors.push(`structure ${t.id}: its model has no yarn`);
   }
   const GROUP = ids('property_group'), METHOD = ids('method');
   for (const p of VOC.property) {

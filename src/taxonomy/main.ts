@@ -1,12 +1,15 @@
 // Knitting Taxonomy: knitted samples in frames, each with an NFC tag that holds its address (#taxonomy/SMP_0001).
 // Loaded by app.ts the first time the section opens. The Samples view is a shelf of spines (shelf.ts); Lineage and
 // Performance come later. Pointing at a spine lifts it; resting on it for DWELL ms makes it the current sample,
-// shown in the band below; a click pins it there (the address follows); a second click or Esc unpins.
+// shown in the band below; a click pins it there (the address follows); a second click or Esc unpins. The current
+// sample's frame flies from its spine to the preview in 3D (stage.ts).
 import { EXPERIMENTS } from '../grammar/structures';
 import { sampleUrl, tagPayload, TAG_DATA_BYTES } from './core.js';
 import type { Term } from './core';
 import { fibreLine, fmtValue, load, vocab, type DB, type Rec, type SortKey, type YarnUse } from './data';
 import { mountShelf, type Dir, type Shelf } from './shelf';
+import { loadModel, type Model } from './model';
+import { mountStage, type Face, type Stage } from './stage';
 
 const DWELL = 120, LEAVE = 450;
 /** The band's key values: areal density and thickness, then the Performance view's two axes (its defaults until it
@@ -20,6 +23,7 @@ const ROLE = termOf('yarn_role'), METHOD = termOf('method'), STATUS = termOf('re
 let root: HTMLElement, db: DB, shelf: Shelf, box: HTMLElement;
 let sort: SortKey = 'id', current: Rec | null = null, pinned = false, overBand = false, drawer = false, missing = '';
 let dwell = 0, leaveT = 0, matches: Rec[] | null = null;
+let stage: Stage | null = null, face: Face = 'model', first = true, instant = false;
 const $ = <T extends HTMLElement = HTMLElement>(s: string) => root.querySelector(s) as T;
 
 const SHELL = `
@@ -38,7 +42,7 @@ const SHELL = `
 </div>
 <footer class="txband">
   <div class="txleft"></div>
-  <div class="txpreview"></div>
+  <div class="txpreview"><div class="txview"></div><div class="txcap small"></div></div>
   <div class="txright"></div>
 </footer>`;
 
@@ -48,6 +52,7 @@ export async function init(el: HTMLElement) {
   db = await load();
   box = $('.txshelf');
   shelf = mountShelf(box, db, { hover, click });
+  stage = mountStage(root, $('.txview'), db, shelf);
   const n = db.recs.length;
   if (db.demo) { const t = $('.txnotice'); t.hidden = false; t.innerHTML = `<b>Demo data.</b> ${n} generated samples: every value is made up (status <i>generated</i>), none is a real sample. Real samples will replace them.`; }
   count();
@@ -61,6 +66,8 @@ export async function init(el: HTMLElement) {
     if (t.closest('[data-pin]')) { if (current) (pinned ? unpin() : pin(current)); return; }
     if (t.closest('[data-full]')) { openDrawer(!drawer); return; }
     if (t.closest('[data-close]')) { openDrawer(false); return; }
+    const f = t.closest<HTMLElement>('[data-face]');
+    if (f) { face = f.dataset.face as Face; stage?.face(face); render(); return; }
   });
   const band = $('.txband');
   band.addEventListener('pointerenter', () => { overBand = true; clearTimeout(leaveT); });
@@ -92,14 +99,18 @@ export function route(sub: string) {
   if (!db) return;
   const id = sub.split('/')[0];
   missing = '';
+  // the address the page opened with: its sample is already in the preview, no flight
+  instant = first;
+  first = false;
   if (/^SMP_\d{4}$/.test(id)) {
     const r = db.byId.get(id);
-    if (r) { pin(r); reveal(r); return; }
+    if (r) { reveal(r); pin(r); return; }
     missing = id; // keep the address as asked, show that there is no such sample
     pinned = false;
     shelf.setPinned(null);
     show(null);
   }
+  instant = false;
   render();
 }
 
@@ -119,6 +130,9 @@ function click(r: Rec) {
 function show(r: Rec | null) {
   if (r === current) return;
   current = r;
+  face = r?.s.photo ? 'photo' : 'model';
+  stage?.show(r, instant);
+  instant = false;
   shelf.setCurrent(r?.s.sample_id ?? null);
   if (r) box.setAttribute('aria-activedescendant', `sp-${r.s.sample_id}`); else box.removeAttribute('aria-activedescendant');
   if (!r && drawer) openDrawer(false);
@@ -155,7 +169,7 @@ function count() {
 function openDrawer(on: boolean) {
   drawer = on && !!current;
   const d = $('.txdrawer');
-  if (drawer) { d.innerHTML = fullRecord(current!); d.hidden = false; requestAnimationFrame(() => d.classList.add('open')); }
+  if (drawer) { d.innerHTML = fullRecord(current!); notes(current!); d.hidden = false; requestAnimationFrame(() => d.classList.add('open')); }
   else { d.classList.remove('open'); window.setTimeout(() => { if (!drawer) d.hidden = true; }, 260); }
   render();
 }
@@ -175,14 +189,14 @@ const valueCell = (r: Rec, id: string) => {
 };
 
 function render() {
-  const r = current, left = $('.txleft'), right = $('.txright'), pv = $('.txpreview');
+  const r = current, left = $('.txleft'), right = $('.txright');
   root.classList.toggle('pinned', pinned);
   if (!r) {
     left.innerHTML = missing
       ? `<div class="kicker">${esc(missing)}</div><p class="warn">No sample with this ID here.</p>`
       : `<div class="kicker">SAMPLE</div><p class="dim">Point at a spine to see its sample; click to keep it here. A tag opens its sample directly.</p>`;
     right.innerHTML = '';
-    pv.innerHTML = frame(null);
+    preview(null);
     return;
   }
   const s = r.s;
@@ -196,17 +210,40 @@ function render() {
     <div class="kicker">KEY VALUES</div>
     <table class="kv"><tbody>${KEY_VALUES.map(id => `<tr><td>${esc(db.properties.find(p => p.id === id)!.label)}</td>${valueCell(r, id)}</tr>`).join('')}</tbody></table>
     <div class="inline"><button class="btn${pinned ? ' on' : ''}" data-pin aria-pressed="${pinned}">${pinned ? 'pinned' : 'pin'}</button><button class="btn" data-full aria-expanded="${drawer}">${drawer ? 'close record' : 'full record ›'}</button></div>`;
-  pv.innerHTML = frame(r);
-  if (drawer) $('.txdrawer').innerHTML = fullRecord(r);
+  preview(r);
+  if (drawer) { $('.txdrawer').innerHTML = fullRecord(r); notes(r); }
 }
 
-/** Until the 3D frame exists: a flat frame with the family mark in the window. */
-function frame(r: Rec | null) {
+/** The preview's caption; without a sample (or without WebGL) a flat frame in the box instead of the 3D one. */
+function preview(r: Rec | null) {
+  const view = $('.txview'), cap = $('.txcap');
+  view.innerHTML = r && stage ? '' : flat(r);
+  if (!r) { cap.innerHTML = ''; return; }
+  if (!stage) { cap.innerHTML = '<span class="faint">No 3D view here: WebGL is off or unavailable.</span>'; return; }
+  const photo = r.s.photo ? `<div class="seg txface" role="group" aria-label="window"><button data-face="photo" class="${face === 'photo' ? 'on' : ''}">photo</button><button data-face="model" class="${face === 'model' ? 'on' : ''}">model</button></div>` : '';
+  cap.innerHTML = face === 'photo'
+    ? `${photo}<div class="dim">Photo of this sample.</div>`
+    : `${photo}<div class="dim">Model of the structure, not a photo of this sample.</div>${photo ? '' : '<div class="faint">drag to turn</div>'}`;
+}
+
+/** What the 3D model shows, in the full record, once its file is loaded. */
+function notes(r: Rec) {
+  const say = (t: string) => { if (current === r) root.querySelectorAll('[data-mnote]').forEach(n => (n.textContent = t)); };
+  loadModel(r.structure.id).then(m => say(modelText(r, m)), () => say('The model could not be loaded: reload the page.'));
+}
+function modelText(r: Rec, m: Model | null) {
+  if (!m) return 'No model of this structure yet.';
+  const left = r.yarns.length > m.yarns.length ? ` Only ${m.yarns.length > 1 ? 'its main and contrast yarns are' : 'its main yarn is'} drawn.` : '';
+  return `${m.note[0].toUpperCase()}${m.note.slice(1)}. Relaxed with the Knit Grammar yarn engine (${m.status}); the piece's outer two needles and passes are held flat, as in the frame.${left} Each yarn in its origin colour; a blend twisted in stripes by share.`;
+}
+
+/** An empty frame, or (no WebGL) a flat one with the family mark in the window. */
+function flat(r: Rec | null) {
   const marks: Record<string, string> = { plain: 'M-12 -10L0 10L12 -10', rib: 'M-6 -11V11M6 -11V11', purl: 'M-12 -5H12M-12 5H12', interlock: 'M-12 -11L0 -1L12 -11M-12 1L0 11L12 1', unknown: 'M-12 0H12' };
   return `<svg class="txframe${r ? '' : ' empty'}" viewBox="0 0 160 170" aria-hidden="true">
     <rect x="10" y="6" width="140" height="150" rx="3"/><rect class="win" x="28" y="24" width="104" height="104"/>
     ${r ? `<path class="m" transform="translate(80 76)" d="${marks[r.family] ?? marks.unknown}"/><text x="80" y="146">${r.s.sample_id}</text>` : ''}
-  </svg>${r ? '<div class="small faint">3D model of the structure: next build step</div>' : ''}`;
+  </svg>`;
 }
 
 function fullRecord(r: Rec) {
@@ -235,6 +272,7 @@ function fullRecord(r: Rec) {
         ${row('structure', `${esc(st.label)} <span class="dim">· ${esc(r.family)} family</span>`)}
         ${row('', `<span class="small dim">${esc(st.definition)}</span>`)}
         ${exp ? row('pattern', `<a href="#grammar/editor/experiments">Knit Grammar experiment: ${esc(exp.title)} ›</a>`) : ''}
+        ${row('3D model', '<span class="small dim" data-mnote></span>')}
         ${row('origin', `${esc(r.origin)} <span class="small faint">over all its fibres (material_bank ADR-0004)</span>`)}
       </tbody></table>
       <div class="subhead">YARNS<i></i></div>${yarns}

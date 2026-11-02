@@ -28,7 +28,7 @@
     },
     "structure": { "type": "string", "description": "vocab/structure.json" },
     "pattern": { "type": "string", "description": "A Knit Grammar structure id, when this sample's own program differs from the structure's." },
-    "photo": { "type": "string", "description": "Path of a photo of this sample, when there is one." },
+    "photo": { "type": "string", "pattern": "^[\\w.-]+$", "description": "File name of a photo of this sample in public/taxonomy/photos/, when there is one." },
     "machine": {
       "type": "object",
       "additionalProperties": false,

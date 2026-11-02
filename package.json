@@ -11,7 +11,8 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "taxonomy:demo": "node scripts/taxonomy-demo.mjs",
-    "taxonomy:check": "node scripts/taxonomy-check.mjs"
+    "taxonomy:check": "node scripts/taxonomy-check.mjs",
+    "taxonomy:models": "rolldown scripts/taxonomy-models.ts --file node_modules/.cache/taxonomy-models.mjs --format esm --platform node && node node_modules/.cache/taxonomy-models.mjs"
   },
   "dependencies": {
     "@fontsource/ibm-plex-mono": "^5.3.0",

@@ -312,6 +312,13 @@ sequenceDiagram
   spines with the hairline kernel: a straight-on camera gives every spine the same shape, so one path is reused
   and a CSS transform places it; sorting slides them, hit tests use the layout. `main.ts` holds the state
   (pointed at → after 120 ms current → pinned; the address follows the pin), the band below and the full record.
+- `stage.ts` is one transparent three.js canvas over the section, in CSS pixels: the current sample's spine hides and
+  its frame (`model.ts`) leaves edge on from the spine's place, turns face on and flies to the preview; the one before
+  flies back. Behind the window is the structure's yarn model from `data/models/` (loaded on first use), drawn as
+  tubes in origin colours, blends as a twisted stripe. `scripts/taxonomy-models.ts` makes the models: each
+  structure's program knitted larger than the window, relaxed with `relax.ts` (its outer two needles and passes
+  held flat, as by the frame: `relaxStart`'s fixed coordinates) and cropped to the window. Run it after changing
+  the structure vocabulary; `taxonomy-check.mjs` fails when a structure has no model.
 - `scripts/taxonomy-demo.mjs` writes the generated demo set (seeded); `scripts/taxonomy-check.mjs` validates every
   record against `src/taxonomy/schema` and the vocabularies and fits each tag (`docs/TAG_FORMAT.md`); it runs in
   `prebuild`. The old Learn address `#grammar/learn/taxonomy/frame-NN` is rewritten to `#taxonomy/SMP_00NN`.

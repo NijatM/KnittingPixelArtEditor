@@ -34,6 +34,10 @@ export interface Shelf {
   order(): Rec[];
   /** The spine element, for scrolling it into view and screen-reader focus. */
   el(id: string): SVGGElement | null;
+  /** The spine's front face on screen: where its 3D frame (stage.ts) leaves from and lands. */
+  face(id: string): DOMRect | null;
+  /** Hides a spine while its frame is out (stage.ts). */
+  setAway(id: string, away: boolean): void;
   destroy(): void;
 }
 
@@ -194,6 +198,11 @@ export function mountShelf(box: HTMLElement, db: DB, on: { hover(r: Rec | null):
     },
     order: () => ord,
     el: id => spines.get(id)?.g ?? null,
+    face: id => {
+      const b = spines.get(id)?.sil.getBoundingClientRect();
+      return b?.width ? new DOMRect(b.x, b.y + DEPTH * K, b.width, b.height - DEPTH * K) : null;
+    },
+    setAway: (id, away) => spines.get(id)?.g.classList.toggle('away', away),
     destroy() { svg.removeEventListener('pointermove', move); svg.removeEventListener('pointerleave', leave); svg.removeEventListener('click', click); svg.remove(); },
   };
 }
