@@ -1,5 +1,5 @@
 // The 3D layer over the Knitting Taxonomy section: one transparent three.js canvas over the whole window, in CSS
-// pixels. When a sample becomes current its mark in the open view (a spine, a lineage tick, a map mark) hides and
+// pixels (on phones over the preview and down from it: see mountStage). When a sample becomes current its mark in the open view (a spine, a lineage tick, a map mark) hides and
 // its frame appears in the mark's place, edge on, pulls out, turns face on and flies to the preview; the one before
 // flies back and its mark shows again. In the preview the frame can be turned by dragging (double-click: back to
 // the resting turn). The same sample arriving again (its tag laid on again) flies back and in once more; in the
@@ -47,15 +47,18 @@ interface Piece {
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 
-/** Mounts the layer into `root`; `view` is the preview's box (also where dragging turns the frame). Returns null
- *  without WebGL. */
-export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: Source): Stage | null {
+/** Mounts the layer into `root`; `view` is the preview's box (also where dragging turns the frame). While `held`
+ *  matches (phones) the layer lives in the preview's box instead, which stays at the top of the page as it scrolls:
+ *  a frame at rest then scrolls with its box. A layer fixed to the window followed the page a frame or more late
+ *  (iOS scrolls apart from the page's script) and slid out of the box. Returns null without WebGL. */
+export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: Source, held: MediaQueryList): Stage | null {
   let renderer: THREE.WebGLRenderer;
   const canvas = document.createElement('canvas');
   canvas.className = 'txgl';
   canvas.setAttribute('aria-hidden', 'true');
   try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true }); } catch { return null; }
-  root.appendChild(canvas);
+  const place = () => (held.matches ? view.parentElement! : root).appendChild(canvas);
+  place();
   renderer.setPixelRatio(Math.min(2, devicePixelRatio));
   renderer.setClearColor(0x000000, 0);
   const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(FOV, 1, 1, 10);
@@ -64,9 +67,10 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: 
   const rim = new THREE.DirectionalLight(0xffffff, 0.7); rim.position.set(-500, -200, -800); scene.add(rim);
   const still = matchMedia('(prefers-reduced-motion: reduce)');
 
-  // the camera sees the plane z = 0 at one unit per CSS pixel, x right and y up from the window's top left
+  // the camera sees the plane z = 0 at one unit per CSS pixel, x right and y up from the layer's top left
   function size() {
-    const w = innerWidth, h = innerHeight, d = h / 2 / Math.tan(THREE.MathUtils.degToRad(FOV / 2));
+    const w = canvas.clientWidth, h = canvas.clientHeight, d = h / 2 / Math.tan(THREE.MathUtils.degToRad(FOV / 2));
+    if (!w || !h) return;
     renderer.setSize(w, h, false);
     cam.aspect = w / h; cam.near = d / 4; cam.far = d * 4;
     cam.position.set(w / 2, -h / 2, d); cam.lookAt(w / 2, -h / 2, 0);
@@ -83,13 +87,13 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: 
   function spinePose(p: Piece): Pose | null {
     const f = marks.face(p.rec.s.sample_id);
     if (!f) return null;
-    const sy = f.height / FRAME.h;
-    return { x: f.x + f.width / 2, y: f.y + f.height / 2, s: [sy, sy, f.width / p.depth], rx: 0, ry: Math.PI / 2 };
+    const o = canvas.getBoundingClientRect(), sy = f.height / FRAME.h;
+    return { x: f.x - o.x + f.width / 2, y: f.y - o.y + f.height / 2, s: [sy, sy, f.width / p.depth], rx: 0, ry: Math.PI / 2 };
   }
   /** where it rests: face on in the preview, turned a little (plus the reader's turn) */
   function restPose(): Pose {
-    const b = view.getBoundingClientRect(), s = Math.min(b.width / (FRAME.w * 1.25), b.height / (FRAME.h * 1.12));
-    return { x: b.x + b.width / 2, y: b.y + b.height / 2, s: [s, s, s], rx: REST.x + turn.x, ry: REST.y + turn.y + sway };
+    const b = view.getBoundingClientRect(), o = canvas.getBoundingClientRect(), s = Math.min(b.width / (FRAME.w * 1.25), b.height / (FRAME.h * 1.12));
+    return { x: b.x - o.x + b.width / 2, y: b.y - o.y + b.height / 2, s: [s, s, s], rx: REST.x + turn.x, ry: REST.y + turn.y + sway };
   }
   function poseOf(p: Piece): Pose {
     return { x: p.obj.position.x, y: -p.obj.position.y, s: [p.obj.scale.x, p.obj.scale.y, p.obj.scale.z], rx: p.obj.rotation.x, ry: p.obj.rotation.y };
@@ -215,7 +219,8 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: 
   const move = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
     turn.y += (e.clientX - drag.x) * 0.012;
-    turn.x = Math.max(-1.3, Math.min(1.3, turn.x + (e.clientY - drag.y) * 0.012));
+    // on phones a finger turns it side to side only: up and down scroll the page (style.css)
+    if (!held.matches || e.pointerType === 'mouse') turn.x = Math.max(-1.3, Math.min(1.3, turn.x + (e.clientY - drag.y) * 0.012));
     drag.x = e.clientX; drag.y = e.clientY;
     kick();
   };
@@ -226,9 +231,13 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: 
   view.addEventListener('pointerup', up);
   view.addEventListener('pointercancel', up);
   view.addEventListener('dblclick', reset);
-  addEventListener('resize', size);
-  // a frame at rest follows the preview when the page scrolls (phones), and one in flight its mark in a scrolled view
-  const scrolled = () => { if (pieces.size) kick(); };
+  const ro = new ResizeObserver(size);
+  ro.observe(canvas);
+  const moved = () => place();
+  held.addEventListener('change', moved);
+  // a frame in flight follows its mark in a scrolled view; one at rest is drawn again only where the layer does not
+  // scroll with the preview
+  const scrolled = () => { if ([...pieces].some(p => p.dir !== 'rest' || !held.matches)) kick(); };
   addEventListener('scroll', scrolled, { capture: true, passive: true });
   size();
   // every structure's model built while the page is idle, one at a time, so a first flight does not stop for it
@@ -261,7 +270,8 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: 
     destroy() {
       gone = true;
       cancelAnimationFrame(raf);
-      removeEventListener('resize', size);
+      ro.disconnect();
+      held.removeEventListener('change', moved);
       removeEventListener('scroll', scrolled, { capture: true });
       for (const p of pieces) p.dispose.forEach(f => f());
       renderer.dispose(); canvas.remove();

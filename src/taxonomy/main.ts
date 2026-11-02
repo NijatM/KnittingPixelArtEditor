@@ -91,7 +91,7 @@ export async function init(el: HTMLElement) {
   box = $('.txshelf');
   shelf = mountShelf(box, db, events);
   views.samples = shelf;
-  stage = mountStage(root, $('.txview'), db, shelf);
+  stage = mountStage(root, $('.txview'), db, shelf, KIOSK ? matchMedia('not all') : PHONE);
   stage?.swing(KIOSK);
   if (KIOSK) listen();
   if ('NDEFReader' in window && !KIOSK) $('.txnfc').hidden = false;

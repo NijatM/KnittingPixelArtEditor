@@ -354,6 +354,10 @@ sequenceDiagram
   preview is sticky at the top, the record opens inline, the shelf is as tall as its rows (`shelf.ts`). Safari has
   no scroll anchoring, so `render()` keeps the open view where it was on screen when the summary above it changes
   height (never scrolling the summary's head under the preview), and `#tx` turns Chrome's anchoring off to match.
+  On phones the 3D canvas lives in the sticky preview (as tall as the largest window), so a frame at rest scrolls
+  with its box: a canvas fixed to the window was moved by script after each scroll and, on iOS, where scrolling
+  runs apart from the page's script, trailed the page out of the box. A finger turns the frame side to side only;
+  up and down scroll the page.
 - On Android Chrome `main.ts` offers Web NFC (`NDEFReader`): a tag's URI record is routed like an address.
 
 ## Storage
