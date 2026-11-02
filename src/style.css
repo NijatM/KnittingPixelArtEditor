@@ -539,9 +539,8 @@ svg.band { display: block; }
   .txpreview { order: 3; position: sticky; top: 0; z-index: 4; background: var(--bg); padding: 10px 16px 6px; border-bottom: 1px solid var(--line); }
   .txview { height: min(28vh, 210px); }
   /* the 3D layer in the preview (stage.ts), as tall as the largest window, so the toolbar coming and going does not
-     resize it; #tx clips it where the page ends. A finger going up or down on the frame scrolls the page */
+     resize it; #tx clips it where the page ends. A finger on the frame only turns it: the page scrolls from outside its box */
   .txpreview > .txgl { position: absolute; inset: 0 auto auto 0; width: 100%; height: 100lvh; }
-  .txview:empty { touch-action: pan-y pinch-zoom; }
   .txleft { order: 4; padding: 12px 16px 0; overflow: visible; }
   .txright { order: 5; align-items: flex-start; text-align: left; padding: 12px 16px 14px; overflow: visible; }
   .txright:empty { display: none; }

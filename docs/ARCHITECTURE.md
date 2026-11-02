@@ -320,7 +320,8 @@ sequenceDiagram
   keys, a mark's screen rectangle): the shelf; `lineage.ts`, the four layers on a canvas (fibres and structures in
   vocabulary order, yarns and samples ordered by layered barycentre sweeps, keeping the order with the fewest
   crossings; the sample row is a fisheye solved so the lens centre stays under the pointer; a chain is everything
-  up and down from the node pointed at); `perf.ts`, a canvas map of two properties (`AXES`, also the band's key
+  up and down from the node pointed at; a finger on the structure row, whose names hang below it, gets the touched
+  name in a tag raised above); `perf.ts`, a canvas map of two properties (`AXES`, also the band's key
   values) with margin strips for missing values. Both canvases redraw only when something changes; 1000 samples
   redraw within a frame.
 - `stage.ts` is one transparent three.js canvas over the section, in CSS pixels: the current sample's mark in the
@@ -356,8 +357,8 @@ sequenceDiagram
   height (never scrolling the summary's head under the preview), and `#tx` turns Chrome's anchoring off to match.
   On phones the 3D canvas lives in the sticky preview (as tall as the largest window), so a frame at rest scrolls
   with its box: a canvas fixed to the window was moved by script after each scroll and, on iOS, where scrolling
-  runs apart from the page's script, trailed the page out of the box. A finger turns the frame side to side only;
-  up and down scroll the page.
+  runs apart from the page's script, trailed the page out of the box. A finger on the frame turns it every way and
+  never scrolls the page; scrolling starts outside its box.
 - On Android Chrome `main.ts` offers Web NFC (`NDEFReader`): a tag's URI record is routed like an address.
 
 ## Storage

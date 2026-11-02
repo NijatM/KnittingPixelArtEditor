@@ -3,8 +3,9 @@
 // between them so that lines cross as little as they can (layered barycentre sweeps, the ordering with the fewest
 // crossings kept), which puts samples sharing yarns side by side. The sample row is a fisheye: ~4 px ticks at
 // rest, widened under the pointer (or round the current sample) to ~16 px with their IDs while the rest squeeze.
-// Pointing at anything lights its whole chain by brightness, never by hue; the rest fades to 25 %. Drawn on a
-// canvas (view.ts), only when something changes.
+// Pointing at anything lights its whole chain by brightness, never by hue; the rest fades to 25 %. Structure names
+// hang below their boxes, where a finger on that row covers them: the touched one shows in a tag raised above it.
+// Drawn on a canvas (view.ts), only when something changes.
 import { fibreLine, type DB, type Rec } from './data';
 import { bands, hatch, palette, surface, type View, type ViewEvents } from './view';
 
@@ -13,6 +14,8 @@ const M = 24, GUT = 88, LENS = 16, R = 7;
 /** a phone: narrower margin and layer-name column */
 const NARROW = 560, M_N = 12, GUT_N = 64;
 const TICK_H = 26, ID_H = 56, NODE_H = 6, FADE = 0.25, TAU = 70;
+/** how far above the structure row a finger's tag sits (its centre): clear of a fingertip anywhere on the row */
+const RAISE = 64;
 const ORIGINS = ['natural', 'regenerated', 'synthetic', 'unknown'];
 const NAMES = ['FIBRES', 'YARNS', 'SAMPLES', 'STRUCTURES'];
 
@@ -52,7 +55,8 @@ export function mountLineage(box: HTMLElement, db: DB, on: ViewEvents): View {
   });
   const layer = (l: number) => [...nodes.values()].filter(n => n.layer === l);
   const F = layer(0), Y = layer(1), T = layer(3);
-  for (const t of T) t.more = `${t.downs.length} sample${t.downs.length === 1 ? '' : 's'}`;
+  // a structure's samples are the layer above it
+  for (const t of T) t.more = `${t.ups.length} sample${t.ups.length === 1 ? '' : 's'}`;
 
   // ---------------------------------------------------------------- order
   const number = (L: Node[]) => L.forEach((n, i) => (n.pos = i));
@@ -136,7 +140,7 @@ export function mountLineage(box: HTMLElement, db: DB, on: ViewEvents): View {
   const gapOf = (w: number) => (w > 3 ? 1 : 0);
 
   // ---------------------------------------------------------------- state
-  let visible = false, raf = 0, last = 0, mx: number | null = null, my = 0;
+  let visible = false, raf = 0, last = 0, mx: number | null = null, my = 0, finger = false;
   let hoverNode: Node | null = null, hoverRec: Rec | null = null, lifted = -1, cur = -1, pinned = -1;
   let matches: Set<string> | null = null, lit: Set<Node> | null = null, litDirty = true;
   const away = new Set<string>();
@@ -253,7 +257,9 @@ export function mountLineage(box: HTMLElement, db: DB, on: ViewEvents): View {
     row(F, [yF - 8, yF - 20], () => true);
     const litYarns = lit ? Y.filter(n => lit!.has(n)).length : 0;
     row(Y, [yY - 8, yY - 20], n => n === hoverNode || (!!lit && lit.has(n) && litYarns <= 24));
-    row(T, [yT + NODE_H + 11, yT + NODE_H + 23], () => true);
+    const raised = finger && hoverNode?.layer === 3 ? hoverNode : null;
+    row(T, [yT + NODE_H + 11, yT + NODE_H + 23], n => n !== raised);
+    if (raised) tag(raised);
     // the layer names in the gutter
     ctx.font = `9px ${pal.font}`;
     [F.length, Y.length, N, T.length].forEach((n, l) => {
@@ -261,6 +267,18 @@ export function mountLineage(box: HTMLElement, db: DB, on: ViewEvents): View {
       ctx.fillStyle = pal.text; ctx.fillText(NAMES[l], m, y - 5);
       ctx.fillStyle = pal.edge; ctx.fillText(String(n), m, y + 7);
     });
+  }
+
+  /** a structure's name and count over the finger on it, joined to its box by a hairline */
+  function tag(n: Node) {
+    ctx.font = `11px ${pal.font}`;
+    const text = `${n.label} · ${n.more}`, w = ctx.measureText(text).width + 12, cx = Math.round(n.x + n.w / 2) + 0.5;
+    const y = Math.round(Math.max(yS + TICK_H + 20, yT - RAISE)), x = Math.round(Math.max(m, Math.min(s.W - m - w, cx - w / 2)));
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = pal.hi; ctx.beginPath(); ctx.moveTo(cx, y + 9); ctx.lineTo(cx, yT); ctx.stroke();
+    ctx.fillStyle = pal.bg; ctx.fillRect(x, y - 9, w, 18);
+    ctx.strokeStyle = pal.edge; ctx.strokeRect(x + 0.5, y - 8.5, Math.round(w) - 1, 17);
+    ctx.fillStyle = pal.bright; ctx.fillText(text, x + 6, y + 0.5);
   }
 
   // ---------------------------------------------------------------- pointer
@@ -289,7 +307,7 @@ export function mountLineage(box: HTMLElement, db: DB, on: ViewEvents): View {
   }
   const move = (e: PointerEvent) => {
     const b = s.cv.getBoundingClientRect();
-    mx = e.clientX - b.left; my = e.clientY - b.top;
+    mx = e.clientX - b.left; my = e.clientY - b.top; finger = e.pointerType !== 'mouse';
     const inLens = my >= yS - ID_H - 40 && my <= yS + TICK_H + 40;
     px = inLens ? mx : null;
     ampT = inLens || cur >= 0 ? 1 : 0;

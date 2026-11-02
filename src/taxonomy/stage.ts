@@ -219,8 +219,7 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: 
   const move = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
     turn.y += (e.clientX - drag.x) * 0.012;
-    // on phones a finger turns it side to side only: up and down scroll the page (style.css)
-    if (!held.matches || e.pointerType === 'mouse') turn.x = Math.max(-1.3, Math.min(1.3, turn.x + (e.clientY - drag.y) * 0.012));
+    turn.x = Math.max(-1.3, Math.min(1.3, turn.x + (e.clientY - drag.y) * 0.012));
     drag.x = e.clientX; drag.y = e.clientY;
     kick();
   };

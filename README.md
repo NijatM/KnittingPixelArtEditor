@@ -98,8 +98,8 @@ Learn pages and editor steps share one numbering. Learn: 00 machine, 01 needle, 
 
 The third section (`#taxonomy`) shows framed knit samples as a shelf of spines: sample ID, a mark for the structure
 family and one band per yarn in its origin colours. Pointing at a spine shows the sample below (yarns, key values);
-a click pins it, "full record" opens every field. Each frame carries an NFC tag holding its address
-(`#taxonomy/SMP_0001`, format in [docs/TAG_FORMAT.md](docs/TAG_FORMAT.md)), so a phone opens it directly; the
+a click pins it, "full record" opens every field and "close sample" puts it back. Each frame carries an NFC tag
+holding its address (`#taxonomy/SMP_0001`, format in [docs/TAG_FORMAT.md](docs/TAG_FORMAT.md)), so a phone opens it directly; the
 first tag's old address (`#grammar/learn/taxonomy/frame-01`) still works. At the desk,
 `tools/nfc/taxonomy_reader.py` reads tags with a PN532 module on a USB-serial adapter and opens the same address
 on the laptop; laying the tag already shown on again flies its frame in again (no Python packages needed).

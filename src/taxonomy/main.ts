@@ -129,7 +129,9 @@ export async function init(el: HTMLElement) {
     if (s) { sort = s.dataset.sort as SortKey; root.querySelectorAll('[data-sort]').forEach(b => b.classList.toggle('on', b === s)); shelf.layout(sort, true); search(find.value); return; }
     const w = t.closest<HTMLElement>('[data-view]');
     if (w) { setView(w.dataset.view as ViewName); return; }
-    if (t.closest('[data-pin]')) { if (current) (pinned ? unpin() : pin(current)); return; }
+    if (t.closest('[data-pin]')) { if (current) pin(current); return; }
+    // the button goes with the sample: from the keyboard, focus goes back to the view
+    if (t.closest('[data-unpin]')) { closeSample(); if (!e.detail) $(BOX[view]).focus({ preventScroll: true }); return; }
     if (t.closest('[data-full]')) { openDrawer(!drawer); return; }
     if (t.closest('[data-close]')) { if (KIOSK) unpin(); else openDrawer(false); return; }
     if (t.closest('[data-nfc]')) { void scanTags(); return; }
@@ -324,6 +326,8 @@ function unpin() {
   if (KIOSK || (!lifted && !overBand)) show(null);
   render();
 }
+/** "close sample": out of the preview at once, even with the pointer still on the band (where unpinning keeps it). */
+function closeSample() { unpin(); show(null); }
 function reveal(r: Rec) { v().reveal(r.s.sample_id); }
 
 function search(q: string) {
@@ -397,7 +401,7 @@ function fill() {
   right.innerHTML = `
     <div class="kicker">KEY VALUES</div>
     <table class="kv"><tbody>${keyValues().map(id => `<tr><td>${esc(db.properties.find(p => p.id === id)!.label)}</td>${valueCell(r, id)}</tr>`).join('')}</tbody></table>
-    <div class="inline"><button class="btn${pinned ? ' on' : ''}" data-pin aria-pressed="${pinned}">${pinned ? 'pinned' : 'pin'}</button><button class="btn" data-full aria-expanded="${drawer}">${drawer ? 'close record' : 'full record ›'}</button></div>`;
+    <div class="inline">${pinned ? `<button class="btn" data-unpin aria-label="close sample ${s.sample_id}">close sample ×</button>` : '<button class="btn" data-pin>pin</button>'}<button class="btn" data-full aria-expanded="${drawer}">${drawer ? 'close record ×' : 'full record ›'}</button></div>`;
   preview(r);
   if (drawer) { $('.txdrawer').innerHTML = fullRecord(r); notes(r); }
 }
@@ -451,7 +455,7 @@ function fullRecord(r: Rec) {
   const m = s.machine;
   const machine = m ? `<table class="kv"><tbody>${MACHINE.filter(f => m[f.id] != null).map(f => `<tr><td>${esc(f.label)}</td><td class="num">${esc(String(m[f.id]))}${f.unit && f.type !== 'string' ? ` ${esc(String(f.unit))}` : ''}</td></tr>`).join('')}<tr><td></td><td>${statusBadge(m.status)}</td></tr></tbody></table>` : '<p class="faint">No machine settings.</p>';
   return `
-  <div class="drawhead"><div><div class="kicker">${s.sample_id} ${statusBadge(s.status)}</div><div class="txtitle">${esc(s.sample_name)}</div></div><button class="btn" data-close aria-label="close the full record">close ×</button></div>
+  <div class="drawhead"><div><div class="kicker">${s.sample_id} ${statusBadge(s.status)}</div><div class="txtitle">${esc(s.sample_name)}</div></div>${KIOSK ? `<button class="btn" data-close aria-label="close sample ${s.sample_id}">close sample ×</button>` : '<button class="btn" data-close aria-label="close the full record">close record ×</button>'}</div>
   <div class="drawcols">
     <div>
       <div class="subhead">SAMPLE<i></i></div>
