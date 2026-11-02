@@ -62,6 +62,9 @@ PREFIX = {0: '', 1: 'http://www.', 2: 'https://www.', 3: 'http://', 4: 'https://
 
 
 LOST = (OSError, termios.error)                                              # the adapter unplugged (or its port gone)
+# HSU wake-up. It goes out in the same write as the command behind it: a PN532 just powered (plugged in, or the Mac
+# woke) slept through it when 50 ms came between, and stayed silent as if not wired (rig, 2026-11-02)
+WAKE = bytes([0x55, 0x55] + [0] * 12)
 
 
 class PN532:
@@ -74,9 +77,7 @@ class PN532:
             a[4] = a[5] = termios.B115200
             termios.tcsetattr(self.fd, termios.TCSANOW, a)
             termios.tcflush(self.fd, termios.TCIOFLUSH)
-            os.write(self.fd, bytes([0x55, 0x55] + [0] * 14))               # wake from power-down (HSU)
-            time.sleep(0.05)
-            self.call(0x14, [0x01, 0x14, 0x01])                              # SAMConfiguration: normal mode
+            self.call(0x14, [0x01, 0x14, 0x01], wake=True)                   # SAMConfiguration: normal mode
             self.call(0x32, [0x05, 0xFF, 0x01, 0x05])                        # retries: answer "no tag" quickly
             self.call(0x32, [0x01, 0x00]); time.sleep(0.05); self.call(0x32, [0x01, 0x01])  # field off and on: tags start fresh
         except BaseException: self.close(); raise
@@ -96,15 +97,17 @@ class PN532:
             out += got
         return out
 
-    def call(self, cmd, data=(), timeout=1.0):
+    def call(self, cmd, data=(), timeout=1.0, wake=False):
         body = bytes([0xD4, cmd] + list(data))
         frame = bytes([0, 0, 0xFF, len(body), (-len(body)) & 0xFF]) + body + bytes([(-sum(body)) & 0xFF, 0])
         termios.tcflush(self.fd, termios.TCIFLUSH)
-        os.write(self.fd, frame)
-        buf = b''
+        os.write(self.fd, (WAKE if wake else b'') + frame)
+        buf, heard = b'', False
         end = time.time() + timeout
         while time.time() < end:                                             # skip the ACK, find the answer
-            buf += self.read(1, end - time.time())
+            got = self.read(1, end - time.time())
+            heard = heard or bool(got)
+            buf += got
             i = buf.find(b'\x00\xff', 0)
             while i >= 0 and i + 2 < len(buf) and buf[i + 2:i + 3] == b'\x00' and buf[i + 3:i + 4] == b'\xff':
                 buf = buf[i + 4:]; i = buf.find(b'\x00\xff')                 # 00 FF 00 FF: an ACK
@@ -116,7 +119,8 @@ class PN532:
                     if len(payload) == n and payload[0] == 0xD5 and payload[1] == cmd + 1:
                         return payload[2:]
                     return None
-        return None
+        # not a byte back: asleep again (powered anew, or a session ended mid-command): once more, woken first
+        return None if wake or heard else self.call(cmd, data, timeout, wake=True)
 
     def reset(self):
         """The field off and on: on the rig, a tag once listed was not found again while it lay there (it stays
@@ -318,8 +322,28 @@ def connect(want):
     while True:
         got = attempt(want)
         if got: return got[:2]
-        if not said: print(f'waiting for the reader on {want or "a USB-serial port"} (ctrl-c to stop)', flush=True); said = True
+        if not said:
+            port = find_port(want)
+            print(silent(port) if port else f'waiting for the reader on {want or "a USB-serial port"}', '(waiting; ctrl-c to stop)', flush=True); said = True
         time.sleep(1)
+
+
+def holder(port):
+    """Another program with the port open (a browser's serial tester, a reader left running), or None."""
+    try: out = subprocess.run(['lsof', '-F', 'pc', port], capture_output=True, text=True, timeout=5).stdout
+    except (OSError, subprocess.SubprocessError): return None
+    pid = None
+    for line in out.splitlines():
+        if line[:1] == 'p': pid = int(line[1:])
+        elif line[:1] == 'c' and pid != os.getpid(): return f'{line[1:]} (pid {pid})'
+    return None
+
+
+def silent(port):
+    """Why the reader on `port` does not answer, in the order worth checking."""
+    h = holder(port)
+    if h: return f'{port}: in use by {h}; close it (a browser tester: quit the browser)'
+    return f'{port}: no answer from the PN532; unplug it, wait 5 s, plug it in (power LED on?); then wiring, HSU switches'
 
 
 def load_table():
@@ -545,7 +569,7 @@ def kiosk(want, port, keys, browser, open_browser):
             if not reader: log('no reader connected')
             else:
                 v = reader[1].call(0x02)
-                log(f'{reader[0]}: PN532 firmware {v[1]}.{v[2]}' if v else f'{reader[0]}: no answer (wiring? HSU mode?)')
+                log(f'{reader[0]}: PN532 firmware {v[1]}.{v[2]}' if v else silent(reader[0]))
         elif cmd == 'reader':
             if keys: log('no reader with --keys')
             else:
@@ -598,6 +622,7 @@ def kiosk(want, port, keys, browser, open_browser):
 
 def main():
     args = sys.argv[1:]
+    if {'-h', '--help', 'help'} & set(args): return print(__doc__)
     def opt(name, default=None):
         if name not in args: return default
         i = args.index(name); v = args[i + 1]; del args[i:i + 2]; return v
@@ -606,14 +631,17 @@ def main():
         args.remove(name); return True
     port, browser, http_port = opt('--port'), opt('--browser', 'Google Chrome'), int(opt('--http', '8017'))
     tab, keys, no_browser = flag('--tab'), flag('--keys'), flag('--no-browser')
+    # an option it does not know stops it (an unknown one once started a whole kiosk, which then held the reader)
+    if bad := [a for a in args if a.startswith('-')]: sys.exit(f'unknown option {bad[0]} (see --help)')
     if args[:1] == ['kiosk']: return kiosk(port, http_port, keys, browser, not no_browser)
     if args[:1] not in (['check'], ['info'], ['write']): return watch(port, tab, browser)
     port = find_port(port)
     if not port: sys.exit('no USB-serial adapter found (use --port)')
-    nfc = PN532(port)
+    try: nfc = PN532(port)
+    except LOST: sys.exit(silent(port))
     if args[:1] == ['check']:
         v = nfc.call(0x02)
-        print(f'{port}: PN5{v[0]:x} firmware {v[1]}.{v[2]}' if v else f'{port}: no answer from a PN532 (HSU mode? wiring?)')
+        print(f'{port}: PN5{v[0]:x} firmware {v[1]}.{v[2]}' if v else silent(port))
         return
     if args[:1] == ['info']:
         print('lay the tag on the reader')

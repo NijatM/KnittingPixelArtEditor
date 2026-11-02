@@ -337,7 +337,10 @@ sequenceDiagram
 - `tools/nfc/taxonomy_reader.py` talks to a PN532 over a USB-serial adapter (HSU, 115200 baud) with `termios`, so
   it needs no packages. It waits for tags and opens each address in one reused browser window, survives the
   adapter being unplugged and plugged back in, and can `check` the reader, print a tag's `info`, or `write` an
-  address to an NTAG21x tag. `start_reader.command` launches it on macOS. Before each look it switches the field
+  address to an NTAG21x tag. `start_reader.command` launches it on macOS. The HSU wake-up bytes go out in the same
+  write as the first command (a PN532 just powered slept through them when a pause came between, and stayed silent
+  as if unwired), and a command met with silence is sent once more behind them; when it still gets no answer it
+  names the program holding the port, if any (a browser's serial tester). Before each look it switches the field
   off and on (on the rig, a tag once listed was not found again while it lay there); it lists up to two tags per
   look and reads a tag only until its address (5 pages instead of ~40); the same address again is set with `/again` after
   it, which the page takes as "fly the frame in again". `write SMP_####` gets the bytes from
