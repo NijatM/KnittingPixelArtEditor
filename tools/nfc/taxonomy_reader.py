@@ -356,6 +356,7 @@ class Desk:
     while it stays; one the reader misses for less than `keep` s still counts as there (not read again)."""
     def __init__(self, nfc, keep):
         self.nfc, self.keep, self.table, self.known, self.when = nfc, keep, load_table(), {}, {}
+        self.fresh = set()                                                   # the UIDs this look really saw
 
     def there(self, uid):
         if not self.nfc.there(uid): return False
@@ -371,6 +372,7 @@ class Desk:
                 self.known[uid] = got[0] or self.table.get(uid.hex())
                 new.append(uid)
             self.when[uid] = now
+        self.fresh = {u for u, t in self.when.items() if t == now}
         for uid, t in list(self.when.items()):
             if now - t > self.keep: del self.when[uid]; del self.known[uid]
             else: out[uid] = self.known[uid]
@@ -497,9 +499,19 @@ def open_full_screen(url, browser):
     else: webbrowser.open(url)
 
 
+# the kiosk browser's processes, by its profile; '--' first, or pgrep/pkill take the pattern for an option, fail, and
+# the page seemed not open (2026-11-02: close and quit left it open)
+KIOSK_PS = ['-f', '--', f'--user-data-dir={PROFILE}']
+
+
+def full_screen_open():
+    """Whether the kiosk browser runs (full screen, often on a desktop of its own)."""
+    return subprocess.run(['pgrep', *KIOSK_PS], capture_output=True).returncode == 0
+
+
 def close_full_screen():
-    """The kiosk browser (the one with the kiosk's profile) quits; other browser windows stay."""
-    return subprocess.run(['pkill', '-f', f'--user-data-dir={PROFILE}'], capture_output=True).returncode == 0
+    """The kiosk browser quits; other browser windows stay. True if it was open."""
+    return subprocess.run(['pkill', *KIOSK_PS], capture_output=True).returncode == 0
 
 
 class Console:
@@ -542,7 +554,8 @@ def kiosk(want, port, keys, browser, open_browser):
     url = f'http://127.0.0.1:{port}{BASE}?kiosk#taxonomy'
     log(f'Knitting Taxonomy kiosk\n  page    {url}\n  reader  {"none (--keys): test tags only" if keys else want or "the first USB-serial port"}\n'
         f'commands (Enter after each):\n{CONSOLE}', stamp=False)
-    if open_browser: open_full_screen(url, browser); log('page: opening full screen (cmd-Q there, or close here)')
+    if open_browser and full_screen_open(): log('page: already open from before; it connects to this kiosk by itself')
+    elif open_browser: open_full_screen(url, browser); log('page: opening full screen (cmd-Q there, or close here)')
     rig, test, seen = Rig(hub.say), {}, {}
     reader, retry, waiting = None, 0.0, False                                # reader: (port, PN532, firmware, Desk)
 
@@ -580,10 +593,14 @@ def kiosk(want, port, keys, browser, open_browser):
         elif cmd == 'build':
             log('npm run build …')
             r = subprocess.run(['npm', 'run', 'build'], cwd=ROOT, capture_output=True, text=True)
-            tail = (r.stdout + r.stderr).strip().splitlines()[-3:]
-            log(('built: ' if r.returncode == 0 else 'build failed:\n') + '\n'.join(tail))
+            out = (r.stdout + r.stderr).strip().splitlines()
+            done = [l for l in out if 'built in' in l]
+            log(f'built ({done[-1].strip("✓ ")})' if r.returncode == 0 and done else ('built' if r.returncode == 0 else 'build failed:\n' + '\n'.join(out[-6:])))
             if r.returncode == 0: hub.say('reload', keep=False)
-        elif cmd == 'open': open_full_screen(url, browser); log('page: opening full screen')
+        elif cmd == 'open':
+            # a second one would show the same page twice (and count twice)
+            if full_screen_open(): log('page: already open, full screen on its own desktop (ctrl-arrow or cmd-Tab to it)')
+            else: open_full_screen(url, browser); log('page: opening full screen')
         elif cmd == 'close': log('page: closed' if close_full_screen() else 'page: no full-screen page open')
         elif cmd in ('quit', 'q', 'exit'): return False
         elif cmd in ('help', '?', 'h'): log(CONSOLE, stamp=False)
@@ -606,7 +623,9 @@ def kiosk(want, port, keys, browser, open_browser):
                 for uid in new:
                     s = sample_of(found[uid])
                     log(f'tag {uid.hex()}: {s}' if s else f'tag {uid.hex()}: ignored, not a sample ({found[uid] or "no address"})')
-                seen = {**found, **test}
+                # only what this look saw: a tag the desk merely keeps (missed a moment) would restart the rig's wait,
+                # which then came on top of the desk's (lifted -> clear in ~6 s, not HOLD)
+                seen = {**{u: a for u, a in found.items() if u in reader[3].fresh}, **test} if reader else dict(test)
                 rig.look(now, {u: sample_of(a) for u, a in seen.items()})
             except LOST as e:
                 reader[1].close()
