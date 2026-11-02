@@ -5,6 +5,7 @@
 // in its origin colours (a blend split by share, unknown fibres hatched). Hit tests use the layout, not the DOM.
 import { HL } from '../hl';
 import { groups, type DB, type Rec, type SortKey } from './data';
+import type { View, ViewEvents } from './view';
 
 const { Cam, proj, facing, prism, rings, mk } = HL;
 
@@ -21,29 +22,16 @@ const MARKS: Record<string, string> = {
   unknown: 'M2 4H10',
 };
 
-export type Dir = 'left' | 'right' | 'up' | 'down' | 'home' | 'end';
-export interface Shelf {
+/** The Samples view (view.ts), plus the order switch and the spine elements. */
+export interface Shelf extends View {
   layout(by: SortKey, animate: boolean): void;
-  resize(): void;
-  setLifted(id: string | null): void;
-  setCurrent(id: string | null): void;
-  setPinned(id: string | null): void;
-  setMatches(ids: Set<string> | null): void;
-  neighbour(id: string | null, d: Dir): Rec | null;
-  /** Shelf order (the sort switch's), first to last. */
-  order(): Rec[];
-  /** The spine element, for scrolling it into view and screen-reader focus. */
+  /** The spine element, for screen-reader focus. */
   el(id: string): SVGGElement | null;
-  /** The spine's front face on screen: where its 3D frame (stage.ts) leaves from and lands. */
-  face(id: string): DOMRect | null;
-  /** Hides a spine while its frame is out (stage.ts). */
-  setAway(id: string, away: boolean): void;
-  destroy(): void;
 }
 
 interface Spine { rec: Rec; g: SVGGElement; sil: SVGPathElement; cr: SVGPathElement; mark: SVGPathElement; id: SVGTextElement; bands: SVGGElement; nb: number }
 
-export function mountShelf(box: HTMLElement, db: DB, on: { hover(r: Rec | null): void; click(r: Rec): void }): Shelf {
+export function mountShelf(box: HTMLElement, db: DB, on: ViewEvents): Shelf {
   HL.inject(document);
   box.setAttribute('data-hairline', 'tx');
   box.setAttribute('data-hairline-theme', 'dark');
@@ -173,6 +161,7 @@ export function mountShelf(box: HTMLElement, db: DB, on: { hover(r: Rec | null):
 
   return {
     layout,
+    show(v) { if (v) layout(by, false); else leave(); },
     resize: () => layout(by, false),
     setLifted: lifted,
     setCurrent: current,
@@ -198,6 +187,7 @@ export function mountShelf(box: HTMLElement, db: DB, on: { hover(r: Rec | null):
     },
     order: () => ord,
     el: id => spines.get(id)?.g ?? null,
+    reveal: id => spines.get(id)?.g.scrollIntoView({ block: 'nearest' }),
     face: id => {
       const b = spines.get(id)?.sil.getBoundingClientRect();
       return b?.width ? new DOMRect(b.x, b.y + DEPTH * K, b.width, b.height - DEPTH * K) : null;

@@ -1,11 +1,15 @@
 // The 3D layer over the Knitting Taxonomy section: one transparent three.js canvas over the whole window, in CSS
-// pixels. When a sample becomes current its spine hides and its frame appears in the spine's place, edge on, pulls
-// out of the row, turns face on and flies to the preview; the one before flies back and its spine shows again. In
-// the preview the frame can be turned by dragging (double-click: back to the resting turn).
+// pixels. When a sample becomes current its mark in the open view (a spine, a lineage tick, a map mark) hides and
+// its frame appears in the mark's place, edge on, pulls out, turns face on and flies to the preview; the one before
+// flies back and its mark shows again. In the preview the frame can be turned by dragging (double-click: back to
+// the resting turn).
 import * as THREE from 'three';
 import type { DB, Rec } from './data';
 import { backMesh, FRAME, FRAME_MID, frameMesh, loadModel, stripe } from './model';
-import type { Shelf } from './shelf';
+import type { View } from './view';
+
+/** Where frames leave from and land: the open view's marks. */
+export type Source = Pick<View, 'face' | 'setAway'>;
 
 const OUT_MS = 480, BACK_MS = 420, FOV = 20;
 /** the resting turn in the preview: a little to the side, so it reads as a solid */
@@ -21,6 +25,8 @@ export interface Stage {
   show(r: Rec | null, instant?: boolean): void;
   /** The photo or the model in the window, for a sample that has a photo. */
   face(f: Face): void;
+  /** Another view opened: frames now leave from and land on its marks. */
+  source(s: Source): void;
   destroy(): void;
 }
 
@@ -36,7 +42,7 @@ const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /** Mounts the layer into `root`; `view` is the preview's box (also where dragging turns the frame). Returns null
  *  without WebGL. */
-export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, shelf: Shelf): Stage | null {
+export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: Source): Stage | null {
   let renderer: THREE.WebGLRenderer;
   const canvas = document.createElement('canvas');
   canvas.className = 'txgl';
@@ -65,9 +71,9 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, shelf: 
   const pieces = new Set<Piece>();
   const kick = () => { if (!raf) raf = requestAnimationFrame(tick); };
 
-  /** where a piece sits on the shelf: edge on in its spine's front face, stretched to it */
+  /** where a piece sits in the view: edge on in its mark (a spine's front face), stretched to it */
   function spinePose(p: Piece): Pose | null {
-    const f = shelf.face(p.rec.s.sample_id);
+    const f = marks.face(p.rec.s.sample_id);
     if (!f) return null;
     const sy = f.height / FRAME.h;
     return { x: f.x + f.width / 2, y: f.y + f.height / 2, s: [sy, sy, f.width / p.depth], rx: 0, ry: Math.PI / 2 };
@@ -110,8 +116,8 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, shelf: 
   }
   function land(p: Piece) {
     if (p.dir === 'out') { p.dir = 'rest'; put(p, restPose()); return; }
-    // back on the shelf: the spine shows again
-    shelf.setAway(p.rec.s.sample_id, false);
+    // back in the view: its mark shows again
+    marks.setAway(p.rec.s.sample_id, false);
     pieces.delete(p);
     scene.remove(p.obj);
     p.dispose.forEach(f => f());
@@ -180,7 +186,7 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, shelf: 
     turn = { x: 0, y: 0 };
     // on its way back still: turn it round
     let p = [...pieces].find(q => q.rec === r);
-    if (!p) { p = make(r); pieces.add(p); shelf.setAway(r.s.sample_id, true); }
+    if (!p) { p = make(r); pieces.add(p); marks.setAway(r.s.sample_id, true); }
     current = p;
     fly(p, 'out', instant);
   }
@@ -211,6 +217,11 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, shelf: 
       if (!current?.photo) return;
       current.photo.visible = f === 'photo';
       current.yarn.visible = f === 'model';
+      kick();
+    },
+    source(s) {
+      for (const p of pieces) { marks.setAway(p.rec.s.sample_id, false); s.setAway(p.rec.s.sample_id, true); }
+      marks = s;
       kick();
     },
     destroy() {

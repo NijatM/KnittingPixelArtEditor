@@ -312,8 +312,15 @@ sequenceDiagram
   spines with the hairline kernel: a straight-on camera gives every spine the same shape, so one path is reused
   and a CSS transform places it; sorting slides them, hit tests use the layout. `main.ts` holds the state
   (pointed at → after 120 ms current → pinned; the address follows the pin), the band below and the full record.
-- `stage.ts` is one transparent three.js canvas over the section, in CSS pixels: the current sample's spine hides and
-  its frame (`model.ts`) leaves edge on from the spine's place, turns face on and flies to the preview; the one before
+- Three views share that state through one interface (`view.ts`: lift, current, pin, matches, neighbours for the
+  keys, a mark's screen rectangle): the shelf; `lineage.ts`, the four layers on a canvas (fibres and structures in
+  vocabulary order, yarns and samples ordered by layered barycentre sweeps, keeping the order with the fewest
+  crossings; the sample row is a fisheye solved so the lens centre stays under the pointer; a chain is everything
+  up and down from the node pointed at); `perf.ts`, a canvas map of two properties (`AXES`, also the band's key
+  values) with margin strips for missing values. Both canvases redraw only when something changes; 1000 samples
+  redraw within a frame.
+- `stage.ts` is one transparent three.js canvas over the section, in CSS pixels: the current sample's mark in the
+  open view hides and its frame (`model.ts`) leaves edge on from the mark's place, turns face on and flies to the preview; the one before
   flies back. Behind the window is the structure's yarn model from `data/models/` (loaded on first use), drawn as
   tubes in origin colours, blends as a twisted stripe. `scripts/taxonomy-models.ts` makes the models: each
   structure's program knitted larger than the window, relaxed with `relax.ts` (its outer two needles and passes

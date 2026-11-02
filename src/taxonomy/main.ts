@@ -1,26 +1,33 @@
 // Knitting Taxonomy: knitted samples in frames, each with an NFC tag that holds its address (#taxonomy/SMP_0001).
-// Loaded by app.ts the first time the section opens. The Samples view is a shelf of spines (shelf.ts); Lineage and
-// Performance come later. Pointing at a spine lifts it; resting on it for DWELL ms makes it the current sample,
-// shown in the band below; a click pins it there (the address follows); a second click or Esc unpins. The current
-// sample's frame flies from its spine to the preview in 3D (stage.ts).
+// Loaded by app.ts the first time the section opens. Three views of the same samples, toggled in the bar: Samples,
+// a shelf of spines (shelf.ts); Lineage, fibres → yarns → samples → structures (lineage.ts); Performance, a map of
+// two properties (perf.ts). In each, pointing at a sample lifts it; resting on it for DWELL ms makes it the current
+// sample, shown in the band below; a click pins it there (the address follows); a second click or Esc unpins. The
+// current sample's frame flies from its mark to the preview in 3D (stage.ts). Search and keys work in every view.
 import { EXPERIMENTS } from '../grammar/structures';
 import { sampleUrl, tagPayload, TAG_DATA_BYTES } from './core.js';
 import type { Term } from './core';
 import { fibreLine, fmtValue, load, vocab, type DB, type Rec, type SortKey, type YarnUse } from './data';
-import { mountShelf, type Dir, type Shelf } from './shelf';
+import { mountShelf, type Shelf } from './shelf';
+import { mountLineage } from './lineage';
+import { AXES, mountPerf, type Perf } from './perf';
+import type { Dir, View, ViewEvents } from './view';
 import { loadModel, type Model } from './model';
 import { mountStage, type Face, type Stage } from './stage';
 
 const DWELL = 120, LEAVE = 450;
-/** The band's key values: areal density and thickness, then the Performance view's two axes (its defaults until it
- *  exists), each once. */
-const KEY_VALUES = ['areal_density', 'thickness', 'areal_density', 'stretch_course'].filter((v, i, a) => a.indexOf(v) === i);
+/** The band's key values: areal density and thickness, then the Performance view's two axes, each once. */
+const keyValues = () => ['areal_density', 'thickness', AXES.x, AXES.y].filter((v, i, a) => a.indexOf(v) === i);
+type ViewName = 'samples' | 'lineage' | 'performance';
+const BOX: Record<ViewName, string> = { samples: '.txshelf', lineage: '.txlin', performance: '.txperf' };
 
 const esc = (s: string) => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
 const termOf = (n: string) => { const m = new Map(vocab(n).map(t => [t.id, t])); return (id: string) => m.get(id); };
 const ROLE = termOf('yarn_role'), METHOD = termOf('method'), STATUS = termOf('record_status'), GROUP = vocab('property_group'), MACHINE = vocab('machine');
 
-let root: HTMLElement, db: DB, shelf: Shelf, box: HTMLElement;
+let root: HTMLElement, db: DB, shelf: Shelf, box: HTMLElement, find: HTMLInputElement, view: ViewName = 'samples';
+const views: Partial<Record<ViewName, View>> = {};
+const v = () => views[view]!;
 let sort: SortKey = 'id', current: Rec | null = null, pinned = false, overBand = false, drawer = false, missing = '';
 let dwell = 0, leaveT = 0, matches: Rec[] | null = null;
 let stage: Stage | null = null, face: Face = 'model', first = true, instant = false;
@@ -30,14 +37,18 @@ const SHELL = `
 <header class="txbar">
   <div class="txname"><a href="#" class="homelink">Nijat Mahamaliyev</a><span class="dim small">Tailored Materiality Research</span></div>
   <div class="seg secseg" aria-label="section"><a href="#portrait">portrait</a><a href="#grammar">grammar</a><a href="#taxonomy" class="on" aria-current="page">taxonomy</a></div>
-  <div class="seg txviews" role="group" aria-label="view"><button class="on" aria-pressed="true">samples</button><button disabled title="comes in a later step">lineage</button><button disabled title="comes in a later step">performance</button></div>
+  <div class="seg txviews" role="group" aria-label="view"><button data-view="samples" class="on" aria-pressed="true">samples</button><button data-view="lineage" aria-pressed="false">lineage</button><button data-view="performance" aria-pressed="false">performance</button></div>
   <input class="txfind" type="search" placeholder="find: ID, fibre, yarn, structure…" aria-label="find samples" spellcheck="false" autocomplete="off">
   <span class="txcount small dim" aria-live="polite"></span>
   <div class="seg txsort" role="group" aria-label="order"><span class="small dim">order</span><button data-sort="id" class="on">ID</button><button data-sort="structure">structure</button><button data-sort="origin">origin</button></div>
+  <div class="txaxes" role="group" aria-label="axes" hidden><label class="small dim">x <select data-axis="x"></select></label><label class="small dim">y <select data-axis="y"></select></label></div>
+  <span class="txlive" aria-live="polite"></span>
 </header>
 <div class="txnotice small" hidden></div>
 <div class="txmain">
   <div class="txshelf" tabindex="0" role="listbox" aria-label="samples"></div>
+  <div class="txlin" tabindex="0" role="group" aria-label="lineage: fibres, yarns, samples and structures; arrow keys move along the samples" hidden></div>
+  <div class="txperf" tabindex="0" role="group" aria-label="performance map; arrow keys move between samples" hidden></div>
   <section class="txdrawer" aria-label="full record" hidden></section>
 </div>
 <footer class="txband">
@@ -49,20 +60,31 @@ const SHELL = `
 export async function init(el: HTMLElement) {
   root = el;
   root.innerHTML = SHELL;
+  find = $<HTMLInputElement>('.txfind');
   db = await load();
   box = $('.txshelf');
-  shelf = mountShelf(box, db, { hover, click });
+  shelf = mountShelf(box, db, events);
+  views.samples = shelf;
   stage = mountStage(root, $('.txview'), db, shelf);
+  const opts = GROUP.map(g => `<optgroup label="${esc(g.label)}">${db.properties.filter(p => p.group === g.id).map(p => `<option value="${p.id}">${esc(p.label)} (${esc(p.unit)})</option>`).join('')}</optgroup>`).join('');
+  root.querySelectorAll<HTMLSelectElement>('[data-axis]').forEach(sel => {
+    sel.innerHTML = opts;
+    const k = sel.dataset.axis as 'x' | 'y';
+    sel.value = AXES[k];
+    sel.addEventListener('change', () => { AXES[k] = sel.value; (views.performance as Perf | undefined)?.axes(); render(); });
+  });
   const n = db.recs.length;
   if (db.demo) { const t = $('.txnotice'); t.hidden = false; t.innerHTML = `<b>Demo data.</b> ${n} generated samples: every value is made up (status <i>generated</i>), none is a real sample. Real samples will replace them.`; }
   count();
   requestAnimationFrame(() => shelf.layout(sort, false));
-  new ResizeObserver(() => { if (box.clientWidth) shelf.resize(); }).observe(box);
+  new ResizeObserver(() => { if ($(BOX[view]).clientWidth) v().resize(); }).observe($('.txmain'));
 
   root.addEventListener('click', e => {
     const t = e.target as HTMLElement;
     const s = t.closest<HTMLElement>('[data-sort]');
-    if (s) { sort = s.dataset.sort as SortKey; root.querySelectorAll('[data-sort]').forEach(b => b.classList.toggle('on', b === s)); shelf.layout(sort, true); return; }
+    if (s) { sort = s.dataset.sort as SortKey; root.querySelectorAll('[data-sort]').forEach(b => b.classList.toggle('on', b === s)); shelf.layout(sort, true); search(find.value); return; }
+    const w = t.closest<HTMLElement>('[data-view]');
+    if (w) { setView(w.dataset.view as ViewName); return; }
     if (t.closest('[data-pin]')) { if (current) (pinned ? unpin() : pin(current)); return; }
     if (t.closest('[data-full]')) { openDrawer(!drawer); return; }
     if (t.closest('[data-close]')) { openDrawer(false); return; }
@@ -73,20 +95,12 @@ export async function init(el: HTMLElement) {
   band.addEventListener('pointerenter', () => { overBand = true; clearTimeout(leaveT); });
   band.addEventListener('pointerleave', () => { overBand = false; if (!pinned) leaveT = window.setTimeout(() => { if (!pinned && !overBand) show(null); }, LEAVE); });
 
-  const find = $<HTMLInputElement>('.txfind');
   find.addEventListener('input', () => search(find.value));
   find.addEventListener('keydown', e => {
     if (e.key === 'Enter' && matches?.length) { pin(matches[0]); reveal(matches[0]); }
     if (e.key === 'Escape') { find.value = ''; search(''); }
   });
-  box.addEventListener('keydown', e => {
-    const dir = ({ ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', Home: 'home', End: 'end' } as Record<string, Dir>)[e.key];
-    if (dir) {
-      e.preventDefault();
-      const r = shelf.neighbour(current?.s.sample_id ?? null, dir);
-      if (r) { shelf.setLifted(r.s.sample_id); if (pinned) pin(r); else show(r); reveal(r); }
-    } else if ((e.key === 'Enter' || e.key === ' ') && current) { e.preventDefault(); pinned ? unpin() : pin(current); }
-  });
+  for (const b of Object.values(BOX)) $(b).addEventListener('keydown', keys);
   document.addEventListener('keydown', e => {
     if (e.key !== 'Escape' || document.body.dataset.section !== 'taxonomy' || e.target === find) return;
     if (drawer) openDrawer(false); else if (pinned) unpin();
@@ -107,18 +121,48 @@ export function route(sub: string) {
     if (r) { reveal(r); pin(r); return; }
     missing = id; // keep the address as asked, show that there is no such sample
     pinned = false;
-    shelf.setPinned(null);
+    v().setPinned(null);
     show(null);
   }
   instant = false;
   render();
 }
 
+// ---------------------------------------------------------------- views
+const events: ViewEvents = { hover, click };
+function setView(name: ViewName) {
+  if (name === view) return;
+  clearTimeout(dwell);
+  v().setLifted(null);
+  v().show(false);
+  $(BOX[view]).hidden = true;
+  view = name;
+  const el = $(BOX[name]);
+  el.hidden = false;
+  views[name] ??= name === 'lineage' ? mountLineage(el, db, events) : mountPerf(el, db, events);
+  v().setCurrent(current?.s.sample_id ?? null);
+  v().setPinned(pinned && current ? current.s.sample_id : null);
+  v().show(true);
+  stage?.source(v());
+  search(find.value);
+  root.querySelectorAll<HTMLElement>('[data-view]').forEach(b => { const on = b.dataset.view === name; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+  $('.txsort').hidden = name !== 'samples';
+  $('.txaxes').hidden = name !== 'performance';
+}
+function keys(e: KeyboardEvent) {
+  const dir = ({ ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', Home: 'home', End: 'end' } as Record<string, Dir>)[e.key];
+  if (dir) {
+    e.preventDefault();
+    const r = v().neighbour(current?.s.sample_id ?? null, dir);
+    if (r) { v().setLifted(r.s.sample_id); if (pinned) pin(r); else show(r); reveal(r); }
+  } else if ((e.key === 'Enter' || e.key === ' ') && current) { e.preventDefault(); pinned ? unpin() : pin(current); }
+}
+
 // ---------------------------------------------------------------- state
 function hover(r: Rec | null) {
   clearTimeout(dwell);
   clearTimeout(leaveT);
-  shelf.setLifted(r?.s.sample_id ?? null);
+  v().setLifted(r?.s.sample_id ?? null);
   if (pinned) return;
   if (r) dwell = window.setTimeout(() => show(r), DWELL);
   else leaveT = window.setTimeout(() => { if (!pinned && !overBand) show(null); }, LEAVE);
@@ -133,8 +177,10 @@ function show(r: Rec | null) {
   face = r?.s.photo ? 'photo' : 'model';
   stage?.show(r, instant);
   instant = false;
-  shelf.setCurrent(r?.s.sample_id ?? null);
+  v().setCurrent(r?.s.sample_id ?? null);
   if (r) box.setAttribute('aria-activedescendant', `sp-${r.s.sample_id}`); else box.removeAttribute('aria-activedescendant');
+  // the canvas views have no element per sample: say which one is current
+  $('.txlive').textContent = r && view !== 'samples' ? `${r.s.sample_id}, ${r.s.sample_name}` : '';
   if (!r && drawer) openDrawer(false);
   render();
 }
@@ -143,22 +189,22 @@ function pin(r: Rec) {
   missing = '';
   pinned = true;
   show(r);
-  shelf.setPinned(r.s.sample_id);
+  v().setPinned(r.s.sample_id);
   history.replaceState(null, '', `#taxonomy/${r.s.sample_id}`);
   render();
 }
 function unpin() {
   pinned = false;
-  shelf.setPinned(null);
+  v().setPinned(null);
   if (location.hash !== '#taxonomy') history.replaceState(null, '', '#taxonomy');
   render();
 }
-function reveal(r: Rec) { shelf.el(r.s.sample_id)?.scrollIntoView({ block: 'nearest' }); }
+function reveal(r: Rec) { v().reveal(r.s.sample_id); }
 
 function search(q: string) {
   const words = q.toLowerCase().replace(/_/g, ' ').split(/\s+/).filter(Boolean);
-  matches = words.length ? shelf.order().filter(r => words.every(w => r.words.includes(w))) : null;
-  shelf.setMatches(matches ? new Set(matches.map(r => r.s.sample_id)) : null);
+  matches = words.length ? v().order().filter(r => words.every(w => r.words.includes(w))) : null;
+  v().setMatches(matches ? new Set(matches.map(r => r.s.sample_id)) : null);
   count();
 }
 function count() {
@@ -194,7 +240,7 @@ function render() {
   if (!r) {
     left.innerHTML = missing
       ? `<div class="kicker">${esc(missing)}</div><p class="warn">No sample with this ID here.</p>`
-      : `<div class="kicker">SAMPLE</div><p class="dim">Point at a spine to see its sample; click to keep it here. A tag opens its sample directly.</p>`;
+      : `<div class="kicker">SAMPLE</div><p class="dim">Point at a sample to see it here; click to keep it. A tag opens its sample directly.</p>`;
     right.innerHTML = '';
     preview(null);
     return;
@@ -208,7 +254,7 @@ function render() {
     <div class="yarns">${r.yarns.map(yarnLine).join('')}</div>`;
   right.innerHTML = `
     <div class="kicker">KEY VALUES</div>
-    <table class="kv"><tbody>${KEY_VALUES.map(id => `<tr><td>${esc(db.properties.find(p => p.id === id)!.label)}</td>${valueCell(r, id)}</tr>`).join('')}</tbody></table>
+    <table class="kv"><tbody>${keyValues().map(id => `<tr><td>${esc(db.properties.find(p => p.id === id)!.label)}</td>${valueCell(r, id)}</tr>`).join('')}</tbody></table>
     <div class="inline"><button class="btn${pinned ? ' on' : ''}" data-pin aria-pressed="${pinned}">${pinned ? 'pinned' : 'pin'}</button><button class="btn" data-full aria-expanded="${drawer}">${drawer ? 'close record' : 'full record ›'}</button></div>`;
   preview(r);
   if (drawer) { $('.txdrawer').innerHTML = fullRecord(r); notes(r); }
