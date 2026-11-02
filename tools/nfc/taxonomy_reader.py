@@ -29,7 +29,8 @@ an unknown tag's UID is printed so it can be added there.
 KIOSK. The rig has one slot. A sample laid on it flies in and its full record opens; lifted off, it flies back to
 its spine HOLD seconds after the reader last saw it (the wait also covers reads the reader misses). Only tags whose
 address ends in #taxonomy/SMP_#### count; any other tag is ignored and named in this terminal. While the shown tag
-lies there, other tags are ignored; once it is gone, a new sample takes over at once (a quick swap does not wait).
+lies there, other tags are ignored (the reader asks for that tag by its UID first, so it is found whatever else lies
+near); once it is gone, a new sample takes over at once (a quick swap does not wait).
 Tags carry the public address; the kiosk shows the same sample from the local copy. With --keys there is no reader:
 each line typed is what lies on it now (sample IDs or addresses, several at once allowed; an empty line: nothing).
 """
@@ -102,8 +103,15 @@ class PN532:
                     return None
         return None
 
+    def reset(self):
+        """The field off and on: on the rig, a tag once listed was not found again while it lay there (it stays
+        selected), so it seemed lifted. Off, every tag starts afresh."""
+        self.call(0x32, [0x01, 0x00]); time.sleep(0.01)                      # RFConfiguration: field off
+        self.call(0x32, [0x01, 0x01]); time.sleep(0.01)                      # field on, tags power up
+
     def tags(self):
         """The tags on the reader, up to two: [(target number, UID)]."""
+        self.reset()
         r = self.call(0x4A, [0x02, 0x00], timeout=1.5)                       # InListPassiveTarget, 106 kbps type A
         out, i = [], 1
         for _ in range(r[0] if r else 0):
@@ -113,6 +121,14 @@ class PN532:
             i += 5 + n
             if sel & 0x20 and i < len(r): i += r[i]                          # an ISO 14443-4 card's ATS (length first)
         return out
+
+    def there(self, uid):
+        """Whether the tag with this UID is on the reader, whatever else is: it alone is asked for (InListPassiveTarget
+        with its UID; a 7-byte UID after the cascade tag 0x88, as answered on the rig). Then it is target 1."""
+        if len(uid) not in (4, 7): return uid in [u for _, u in self.tags()]
+        self.reset()
+        r = self.call(0x4A, [0x01, 0x00] + list(uid if len(uid) == 4 else b'\x88' + uid), timeout=1.5)
+        return bool(r) and r[0] == 1
 
     def page4(self, page, tg=1):
         r = self.call(0x40, [tg, 0x30, page])                                # InDataExchange: NTAG READ (16 bytes)
@@ -294,6 +310,11 @@ class Desk:
     def __init__(self, nfc, keep):
         self.nfc, self.keep, self.table, self.known, self.when = nfc, keep, load_table(), {}, {}
 
+    def there(self, uid):
+        if not self.nfc.there(uid): return False
+        self.when[uid] = time.time()
+        return True
+
     def look(self):
         now, out, new = time.time(), {}, []
         for tg, uid in self.nfc.tags():
@@ -319,6 +340,8 @@ class Keys:
         for line in sys.stdin:
             items = line.split()
             self.now = {hashlib.sha1(i.encode()).digest()[:7]: (PUBLIC + '#taxonomy/' + i if re.fullmatch(r'SMP_\d{4}', i) else i) for i in items}
+
+    def there(self, uid): return uid in self.now
 
     def look(self):
         now = dict(self.now)
@@ -448,6 +471,8 @@ def kiosk(want, port, keys, browser, open_browser):
     else: port_, nfc = connect(want); source = Desk(nfc, HOLD); print(f'{port_}: waiting for tags (ctrl-c to stop)', flush=True)
     while True:
         try:
+            if rig.uid and source.there(rig.uid):                            # the shown tag still lies there: the
+                rig.look(time.time(), {rig.uid: rig.sample}); time.sleep(0.2); continue   # rest is not looked at
             tags, new = source.look()
             for uid in new:
                 s = sample_of(tags[uid])
