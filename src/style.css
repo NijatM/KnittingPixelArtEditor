@@ -528,7 +528,8 @@ svg.band { display: block; }
    page, a sideways one lifts the spines. */
 @media (max-width: 760px) {
   body[data-section="taxonomy"] { overflow: auto; }
-  #tx { display: flex; flex-direction: column; height: auto; min-height: 100dvh; }
+  /* overflow-anchor: none: main.ts keeps the open view in place itself (Safari has no scroll anchoring) */
+  #tx { display: flex; flex-direction: column; height: auto; min-height: 100dvh; overflow-anchor: none; }
   #tx > .txmain, #tx > .txband { display: contents; }
   .txbar { order: 1; padding: 10px 16px; }
   .txnotice { order: 2; padding: 6px 16px; }

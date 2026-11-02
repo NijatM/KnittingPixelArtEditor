@@ -339,7 +339,7 @@ function openDrawer(on: boolean) {
     d.innerHTML = fullRecord(current!); notes(current!); d.hidden = false; requestAnimationFrame(() => d.classList.add('open'));
     // on a phone the record opens in the page, under the summary: bring its head up under the preview (Chrome would
     // otherwise keep the shelf where it was and move the record out of sight above it)
-    if (PHONE.matches && !KIOSK) scrollTo({ top: d.getBoundingClientRect().top + scrollY - $('.txpreview').offsetHeight, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+    if (PHONE.matches && !KIOSK) scrollTo({ top: d.getBoundingClientRect().top + scrollY - $('.txpreview').offsetHeight, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }
   else { d.classList.remove('open'); window.setTimeout(() => { if (!drawer) d.hidden = true; }, 260); }
   render();
@@ -359,7 +359,17 @@ const valueCell = (r: Rec, id: string) => {
   return v ? `<td class="num">${esc(fmtValue(v.value, v.unit))}</td><td>${statusBadge(v.status)}</td>` : '<td class="num faint">—</td><td></td>';
 };
 
+/** Phones: the summary above the open view changes height with each sample; keep the view where it is on screen, so
+ * the sample under a finger stays under it, but never scroll the summary's head under the held preview (Safari has
+ * no scroll anchoring; Chrome's is off for #tx, see style.css). */
 function render() {
+  if (!PHONE.matches || KIOSK) return fill();
+  const b = $(BOX[view]), y = b.getBoundingClientRect().top;
+  fill();
+  const d = Math.min(b.getBoundingClientRect().top - y, Math.max(0, $('.txleft').getBoundingClientRect().top - $('.txpreview').offsetHeight));
+  if (d && y < innerHeight) scrollBy(0, d);
+}
+function fill() {
   const r = current, left = $('.txleft'), right = $('.txright');
   root.classList.toggle('pinned', pinned);
   root.classList.toggle('showing', !!r);

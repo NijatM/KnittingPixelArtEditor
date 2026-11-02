@@ -350,7 +350,9 @@ sequenceDiagram
   test tags pass through `Rig` like real ones; `reload` is a one-off event (not replayed to a page connecting).
 - Touch (`main.ts`): a finger only lifts (no dwell); letting go after a drag pins the one under it; a tap is left
   to the click. Phones (< 760 px, `style.css`): the band and the view area give way (`display: contents`), the
-  preview is sticky at the top, the record opens inline, the shelf is as tall as its rows (`shelf.ts`).
+  preview is sticky at the top, the record opens inline, the shelf is as tall as its rows (`shelf.ts`). Safari has
+  no scroll anchoring, so `render()` keeps the open view where it was on screen when the summary above it changes
+  height (never scrolling the summary's head under the preview), and `#tx` turns Chrome's anchoring off to match.
 - On Android Chrome `main.ts` offers Web NFC (`NDEFReader`): a tag's URI record is routed like an address.
 
 ## Storage
@@ -381,7 +383,9 @@ Warnings only; nothing is blocked. The limits are rules of thumb for your yarn a
 
 There is no test suite in the repo; `npm run build` typechecks. Releases were checked with scripts kept outside the
 repo: headless Chrome and WebKit through Playwright (wide, narrow and phone layouts), real Safari through
-`safaridriver`, and engine checks (the published-behaviour checks above, CPU against GPU).
+`safaridriver`, and engine checks (the published-behaviour checks above, CPU against GPU). The Knitting Taxonomy
+was checked with headless Chrome over the DevTools protocol (real GPU, touch emulation, 300 and 1000 samples) and
+with iOS and iPadOS Safari in the Xcode simulator through `safaridriver` (touch, layout, WebGL).
 
 ## Limits and open points
 
