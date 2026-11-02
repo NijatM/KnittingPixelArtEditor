@@ -1,0 +1,8 @@
+{"vocabulary_id": "property_group", "version": "0.1.0", "updated": "2026-11-02",
+ "note": "The four groups of performance values (property.group). Our wording.",
+ "terms": [
+  {"id": "optical", "label": "optical", "definition": "How much light passes through.", "status": "proposed"},
+  {"id": "mass_geometry", "label": "mass and geometry", "definition": "Weight, thickness and how densely the loops sit.", "status": "proposed"},
+  {"id": "mechanical", "label": "mechanical", "definition": "Stretch, recovery and strength.", "status": "proposed"},
+  {"id": "comfort", "label": "comfort and handling", "definition": "Air flow, stiffness and wear.", "status": "proposed"}
+ ]}

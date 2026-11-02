@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>KnittingPixelArtEditor</title>
-  <meta name="description" content="A portrait-to-knitting-chart editor and a V-bed knit program editor (BMP: one pixel per needle, one row per pass). Nijat Mahamaliyev, Tailored Materiality Research.">
+  <meta name="description" content="A portrait-to-knitting-chart editor, a V-bed knit program editor (BMP: one pixel per needle, one row per pass) and a catalogue of framed knitted samples with NFC tags. Nijat Mahamaliyev, Tailored Materiality Research.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%230b0b0b'/%3E%3Crect x='3' y='3' width='4' height='4' fill='%23f4f4f4'/%3E%3Crect x='9' y='3' width='4' height='4' fill='none' stroke='%23f4f4f4'/%3E%3Crect x='3' y='9' width='4' height='4' fill='none' stroke='%23f4f4f4'/%3E%3Crect x='9' y='9' width='4' height='4' fill='%23f4f4f4'/%3E%3C/svg%3E">
 </head>
 <body>
-<!-- Sections: the chooser (#home), the portrait editor (#app) and Knit Grammar (#kg, built by src/grammar). The hash picks one. -->
+<!-- Sections: the chooser (#home), the portrait editor (#app), Knit Grammar (#kg, built by src/grammar) and Knitting Taxonomy (#tx, built by src/taxonomy). The hash picks one. -->
 <div id="home"></div>
 <div id="app">
 
@@ -18,7 +18,7 @@
       <div class="name"><a href="#" class="homelink">Nijat Mahamaliyev</a></div>
       <div class="lab">Tailored Materiality Research</div>
     </div>
-    <div class="seg secseg" aria-label="section"><a href="#portrait" class="on" aria-current="page">portrait</a><a href="#grammar">grammar</a></div>
+    <div class="seg secseg" aria-label="section"><a href="#portrait" class="on" aria-current="page">portrait</a><a href="#grammar">grammar</a><a href="#taxonomy">taxonomy</a></div>
 
     <div class="spaced dim navsec">SOURCE</div>
     <div class="list">
@@ -300,6 +300,7 @@
   </aside>
 </div>
 <div id="kg"></div>
+<div id="tx"></div>
 <script type="module" src="/src/app.ts"></script>
 </body>
 </html>

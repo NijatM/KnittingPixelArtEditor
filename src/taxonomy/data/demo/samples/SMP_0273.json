@@ -1,0 +1,38 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0273",
+  "sample_name": "Full cardigan 17",
+  "sample_date": "2026-09-10",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0076",
+      "yarn_role": "main"
+    }
+  ],
+  "structure": "full_cardigan",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 5,
+    "loop_length": 9.77,
+    "carriage_speed": 0.5,
+    "needles": 200,
+    "courses": 210
+  },
+  "performance": {
+    "areal_density": {
+      "value": 421,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "course_density": {
+      "value": 6.8,
+      "unit": "courses/cm",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

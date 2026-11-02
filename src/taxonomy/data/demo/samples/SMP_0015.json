@@ -1,0 +1,38 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0015",
+  "sample_name": "1×1 rib 1",
+  "sample_date": "2025-09-20",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0001",
+      "yarn_role": "main"
+    }
+  ],
+  "structure": "rib_1x1",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 7,
+    "loop_length": 7.57,
+    "carriage_speed": 0.8,
+    "needles": 148,
+    "courses": 220
+  },
+  "performance": {
+    "areal_density": {
+      "value": 314,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "thickness": {
+      "value": 1.56,
+      "unit": "mm",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

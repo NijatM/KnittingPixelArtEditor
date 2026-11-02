@@ -1,0 +1,42 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0224",
+  "sample_name": "1×1 rib 24",
+  "sample_date": "2026-07-06",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0022",
+      "yarn_role": "main"
+    },
+    {
+      "yarn_id": "YRN_0021",
+      "yarn_role": "inlay"
+    }
+  ],
+  "structure": "rib_1x1",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 12,
+    "loop_length": 3.87,
+    "carriage_speed": 0.7,
+    "needles": 118,
+    "courses": 290
+  },
+  "performance": {
+    "areal_density": {
+      "value": 516,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "course_density": {
+      "value": 13.5,
+      "unit": "courses/cm",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

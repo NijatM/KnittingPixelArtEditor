@@ -1,0 +1,84 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0130",
+  "sample_name": "Half cardigan 10",
+  "sample_date": "2026-02-26",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0087",
+      "yarn_role": "main"
+    },
+    {
+      "yarn_id": "YRN_0056",
+      "yarn_role": "contrast"
+    }
+  ],
+  "structure": "half_cardigan",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 10,
+    "loop_length": 5.51,
+    "carriage_speed": 0.8,
+    "needles": 134,
+    "courses": 290
+  },
+  "performance": {
+    "areal_density": {
+      "value": 453,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "thickness": {
+      "value": 1.87,
+      "unit": "mm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "wale_density": {
+      "value": 10.1,
+      "unit": "wales/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "course_density": {
+      "value": 10.6,
+      "unit": "courses/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "stretch_course": {
+      "value": 100,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "stretch_wale": {
+      "value": 44,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "recovery_course": {
+      "value": 81,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "recovery_wale": {
+      "value": 84.9,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "tensile_wale": {
+      "value": 376,
+      "unit": "N",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

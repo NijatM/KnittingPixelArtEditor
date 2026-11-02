@@ -63,12 +63,11 @@ Steps in the sidebar: 00 photo, 01 frame, 02 grid, 03 style, 04 regions, 05 feat
 ## Knit Grammar
 
 Learn pages and editor steps share one numbering. Learn: 00 machine, 01 needle, 02 operations, 03 reading,
-04 two guides, 05 structures, 06 shaping, 07 knitting taxonomy, 08 sources. Editor: 09 experiments, 10 library,
-11 pattern, 12 key, 13 grammar, 14 draw, 15 view, 16 check, 17 export.
+04 two guides, 05 structures, 06 shaping, 07 sources. Editor: 08 experiments, 09 library, 10 pattern, 11 key,
+12 grammar, 13 draw, 14 view, 15 check, 16 export.
 
 - **Learn**: the V-bed machine, the latch needle's knitting cycle, the operations (knit, tuck, float, transfer,
-  racking), reading the grammar, two yarn guides, structures and shaping, and a knitting taxonomy of framed samples
-  (one placeholder so far). Interactive line figures and small 3D yarn swatches; every page lists its sources.
+  racking), reading the grammar, two yarn guides, structures and shaping. Interactive line figures and small 3D yarn swatches; every page lists its sources.
   Pages are drafts until reviewed.
 - **Editor**: paint operations, not colours. Tools: needle, run, flood, pass, wale, motif (select, move, flip,
   repeat with a shift), pick, mirror, undo. Views: colours, symbols, and a guides view that splits each
@@ -97,10 +96,19 @@ Learn pages and editor steps share one numbering. Learn: 00 machine, 01 needle, 
 
 ### Knitting Taxonomy and the desk reader
 
-Learn 07 lists framed knit samples. Each frame carries an NFC tag holding the address of its entry
-(`#grammar/learn/taxonomy/frame-NN`), so a phone opens it directly. At the desk, `tools/nfc/taxonomy_reader.py`
-reads tags with a PN532 module on a USB-serial adapter and opens the same address on the laptop (no Python
-packages needed; `check`, `info` and `write <url>` are there for setting up tags). One placeholder frame so far.
+The third section (`#taxonomy`) shows framed knit samples as a shelf of spines: sample ID, a mark for the structure
+family and one band per yarn in its origin colours. Pointing at a spine shows the sample below (yarns, key values);
+a click pins it, "full record" opens every field. Each frame carries an NFC tag holding its address
+(`#taxonomy/SMP_0001`, format in [docs/TAG_FORMAT.md](docs/TAG_FORMAT.md)), so a phone opens it directly; the
+first tag's old address (`#grammar/learn/taxonomy/frame-01`) still works. At the desk,
+`tools/nfc/taxonomy_reader.py` reads tags with a PN532 module on a USB-serial adapter and opens the same address
+on the laptop (no Python packages needed; `check`, `info` and `write <url>` are there for setting up tags).
+
+For now the shelf holds 300 **generated demo samples**: every value is made up and marked so
+(`node scripts/taxonomy-demo.mjs` writes them; `SHOW_DEMO` in `src/taxonomy/data.ts` removes them all).
+The records follow the material_bank v0.2 conventions (Tailored Materiality Group) in our own schema and
+vocabulary files (`src/taxonomy/schema`, `src/taxonomy/vocab`); `node scripts/taxonomy-check.mjs` checks them
+before every build.
 
 ## How it works
 
@@ -191,7 +199,8 @@ python3 tools/nfc/taxonomy_reader.py check    # print the PN532's firmware versi
 | Relaxation (CPU, GPU) and its worker | `src/grammar/relax.ts`, `relaxgpu.ts`, `knit.worker.ts` |
 | 3D view | `src/grammar/view3d.ts` |
 | Learn pages, figures, 3D swatches | `src/grammar/learn.ts`, `figures.ts`, `swatch3d.ts`, `src/hl.ts`, `src/vendor/hairline/` |
-| Knitting Taxonomy page and frame drawing | `src/grammar/taxonomy.ts`, `frame3d.ts` |
+| Knitting Taxonomy | `src/taxonomy/` (`main.ts`, `shelf.ts`, `data.ts`, `core.js`, `figure.ts`), `scripts/taxonomy-*.mjs` |
+| Frame drawing in 3D (placeholder, for the next step) | `src/grammar/frame3d.ts` |
 | Interface | `src/grammar/ui.ts`, `src/grammar/main.ts` |
 | **Other** | |
 | NFC desk reader | `tools/nfc/` |

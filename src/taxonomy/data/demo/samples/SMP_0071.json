@@ -1,0 +1,33 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0071",
+  "sample_name": "Plated jersey 8",
+  "sample_date": "2025-12-07",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0017",
+      "yarn_role": "main"
+    },
+    {
+      "yarn_id": "YRN_0070",
+      "yarn_role": "plating"
+    }
+  ],
+  "structure": "plated_jersey",
+  "performance": {
+    "thickness": {
+      "value": 0.83,
+      "unit": "mm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "wale_density": {
+      "value": 9.2,
+      "unit": "wales/cm",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

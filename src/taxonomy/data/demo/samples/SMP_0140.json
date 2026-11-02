@@ -1,0 +1,38 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0140",
+  "sample_name": "Milano rib 7",
+  "sample_date": "2026-03-11",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0021",
+      "yarn_role": "main"
+    }
+  ],
+  "structure": "milano_rib",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 12,
+    "loop_length": 4,
+    "carriage_speed": 0.9,
+    "needles": 114,
+    "courses": 240
+  },
+  "performance": {
+    "areal_density": {
+      "value": 569,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "wale_density": {
+      "value": 16.6,
+      "unit": "wales/cm",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

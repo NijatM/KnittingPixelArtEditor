@@ -1,0 +1,16 @@
+{"vocabulary_id": "method", "version": "0.1.0", "updated": "2026-11-02",
+ "note": "How a value was found (performance value.method). standard_candidate names a published test method the lab may adopt; none is adopted yet. Our wording. Proposals awaiting review.",
+ "terms": [
+  {"id": "light_transmission", "label": "light transmission", "definition": "A light meter reads a set source with and without the fabric in between.", "standard_candidate": null, "status": "proposed"},
+  {"id": "weigh_area", "label": "weigh a cut area", "definition": "Cut a known area from the conditioned fabric and weigh it.", "standard_candidate": "ASTM D3776", "status": "proposed"},
+  {"id": "thickness_gauge", "label": "thickness gauge", "definition": "Thickness between a flat foot and an anvil under a set pressure.", "standard_candidate": "ISO 5084", "status": "proposed"},
+  {"id": "count_glass", "label": "counting glass", "definition": "Count wales and courses over 1 cm of relaxed fabric with a counting glass.", "standard_candidate": null, "status": "proposed"},
+  {"id": "strip_extension", "label": "strip under fixed load", "definition": "Hang a fixed load on a strip; read the extension, then the recovery after the load comes off.", "standard_candidate": "ISO 20932-1", "status": "proposed"},
+  {"id": "burst_pneumatic", "label": "pneumatic bursting", "definition": "Inflate a diaphragm under a clamped circle of fabric until it bursts.", "standard_candidate": "ISO 13938-2", "status": "proposed"},
+  {"id": "strip_tensile", "label": "strip tensile test", "definition": "Pull a 50 mm wide strip at constant speed until it breaks.", "standard_candidate": "ISO 13934-1", "status": "proposed"},
+  {"id": "air_flow", "label": "air flow at set pressure", "definition": "Measure the air speed through a set area at a set pressure difference.", "standard_candidate": "ISO 9237", "status": "proposed"},
+  {"id": "cantilever", "label": "cantilever bending", "definition": "Slide a strip over a horizontal edge until its tip drops to a set angle.", "standard_candidate": "ASTM D1388", "status": "proposed"},
+  {"id": "martindale", "label": "Martindale abrasion", "definition": "Rub the fabric against an abradant in a Lissajous path and count cycles to breakdown.", "standard_candidate": "ISO 12947-2", "status": "proposed"},
+  {"id": "model_estimate", "label": "model estimate", "definition": "Worked out from the structure model and the machine settings, not measured.", "standard_candidate": null, "status": "proposed"},
+  {"id": "generator", "label": "demo generator", "definition": "Made up by scripts/taxonomy-demo.mjs. Not measured and not estimated.", "standard_candidate": null, "status": "proposed"}
+ ]}

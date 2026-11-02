@@ -1,0 +1,84 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0164",
+  "sample_name": "Full cardigan 9",
+  "sample_date": "2026-04-14",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0099",
+      "yarn_role": "main"
+    },
+    {
+      "yarn_id": "YRN_0082",
+      "yarn_role": "contrast"
+    }
+  ],
+  "structure": "full_cardigan",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 5,
+    "loop_length": 10.2,
+    "carriage_speed": 0.4,
+    "needles": 112,
+    "courses": 170
+  },
+  "performance": {
+    "opacity": {
+      "value": 84.6,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "areal_density": {
+      "value": 544,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "thickness": {
+      "value": 3.04,
+      "unit": "mm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "course_density": {
+      "value": 6.3,
+      "unit": "courses/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "stretch_course": {
+      "value": 134,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bursting_strength": {
+      "value": 743,
+      "unit": "kPa",
+      "method": "generator",
+      "status": "generated"
+    },
+    "tensile_course": {
+      "value": 212,
+      "unit": "N",
+      "method": "generator",
+      "status": "generated"
+    },
+    "tensile_wale": {
+      "value": 408,
+      "unit": "N",
+      "method": "generator",
+      "status": "generated"
+    },
+    "air_permeability": {
+      "value": 1340,
+      "unit": "mm/s",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

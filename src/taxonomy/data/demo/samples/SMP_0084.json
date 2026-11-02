@@ -1,0 +1,42 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0084",
+  "sample_name": "1×1 purl (garter) 4",
+  "sample_date": "2025-12-24",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0119",
+      "yarn_role": "main"
+    },
+    {
+      "yarn_id": "YRN_0005",
+      "yarn_role": "contrast"
+    }
+  ],
+  "structure": "purl_1x1",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 7,
+    "loop_length": 7.7,
+    "carriage_speed": 0.9,
+    "needles": 116,
+    "courses": 220
+  },
+  "performance": {
+    "areal_density": {
+      "value": 294,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "course_density": {
+      "value": 10.1,
+      "unit": "courses/cm",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

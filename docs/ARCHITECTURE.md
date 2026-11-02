@@ -37,7 +37,7 @@ flowchart TB
   gm --> eng["machine.ts → yarn.ts<br/>main thread"]
   eng --> kw["knit.worker.ts<br/>relaxation"]
   eng --> v3["view3d.ts<br/>three.js"]
-  gm --> learn["learn.ts, figures.ts,<br/>swatch3d.ts, taxonomy.ts"]
+  gm --> learn["learn.ts, figures.ts,<br/>swatch3d.ts"]
   learn --> pool["knit.worker.ts pool<br/>Learn swatches"]
 ```
 
@@ -299,15 +299,22 @@ sequenceDiagram
   participant T as NFC tag on a frame
   participant P as Phone
   participant R as Desk reader
-  participant S as Learn 07 entry
+  participant S as Sample on the shelf (#taxonomy/SMP_0001)
   T->>P: address of the entry
   P->>S: opens it
   T->>R: read by the PN532
   R->>S: opens the same address on the laptop
 ```
 
-- `taxonomy.ts` lists the frames (`FRAMES`); each entry's address is `#grammar/learn/taxonomy/<id>`. One
-  placeholder frame so far, drawn by `frame3d.ts` as a rotatable three.js frame (a drawing, not the yarn model).
+- `src/taxonomy/` is its own section (`#taxonomy/<sample_id>`), loaded the first time it opens. `data.ts` bundles
+  the records (fibres, yarns, samples: one JSON file each, material_bank ADR-0001) and the vocabularies, and
+  derives each yarn's type and origin shares (`core.js`, shared with the node scripts). `shelf.ts` draws the
+  spines with the hairline kernel: a straight-on camera gives every spine the same shape, so one path is reused
+  and a CSS transform places it; sorting slides them, hit tests use the layout. `main.ts` holds the state
+  (pointed at → after 120 ms current → pinned; the address follows the pin), the band below and the full record.
+- `scripts/taxonomy-demo.mjs` writes the generated demo set (seeded); `scripts/taxonomy-check.mjs` validates every
+  record against `src/taxonomy/schema` and the vocabularies and fits each tag (`docs/TAG_FORMAT.md`); it runs in
+  `prebuild`. The old Learn address `#grammar/learn/taxonomy/frame-NN` is rewritten to `#taxonomy/SMP_00NN`.
 - `tools/nfc/taxonomy_reader.py` talks to a PN532 over a USB-serial adapter (HSU, 115200 baud) with `termios`, so
   it needs no packages. It waits for tags and opens each address in one reused browser window, survives the
   adapter being unplugged and plugged back in, and can `check` the reader, print a tag's `info`, or `write` an
@@ -351,5 +358,6 @@ repo: headless Chrome and WebKit through Playwright (wide, narrow and phone layo
   (short rows) relaxes. The fabric view says where it jammed.
 - **To confirm with the lab's BMP → Steiger script**: when a row's transfers happen, how two guides travel, and
   the two provisional colours of the two-guide key. Each is a switch or a marked value, not hard-wired.
-- **Learn** pages are drafts until reviewed; the taxonomy has one placeholder frame.
+- **Learn** pages are drafts until reviewed. **Knitting Taxonomy** shows generated demo samples only; its
+  vocabularies and origin colours are proposals awaiting review.
 - **Portrait matching** was tuned on six photos; at 25 stitches the characters' art is coarse for mixing parts.

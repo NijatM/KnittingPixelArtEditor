@@ -1,0 +1,8 @@
+{"vocabulary_id": "record_status", "version": "0.1.0", "updated": "2026-11-02",
+ "note": "How far a sample record has got (sample.status). Our wording. Proposals awaiting review.",
+ "terms": [
+  {"id": "demo", "label": "demo", "definition": "Generated for the demo. Not a real sample; every value is made up.", "status": "proposed"},
+  {"id": "draft", "label": "draft", "definition": "A real sample, record still being filled in.", "status": "proposed"},
+  {"id": "reviewed", "label": "reviewed", "definition": "A real sample, record checked by a second person.", "status": "proposed"},
+  {"id": "final", "label": "final", "definition": "Complete and checked. Its tag may be locked.", "status": "proposed"}
+ ]}

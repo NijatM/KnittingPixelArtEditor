@@ -1,0 +1,42 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0006",
+  "sample_name": "Plated jersey 2",
+  "sample_date": "2025-09-08",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0069",
+      "yarn_role": "main"
+    },
+    {
+      "yarn_id": "YRN_0110",
+      "yarn_role": "plating"
+    }
+  ],
+  "structure": "plated_jersey",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 10,
+    "loop_length": 4.83,
+    "carriage_speed": 0.5,
+    "needles": 104,
+    "courses": 290
+  },
+  "performance": {
+    "areal_density": {
+      "value": 367,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "thickness": {
+      "value": 1.02,
+      "unit": "mm",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

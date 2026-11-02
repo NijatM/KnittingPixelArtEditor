@@ -1,0 +1,13 @@
+{"vocabulary_id": "fiber_type", "version": "0.1.0", "updated": "2026-11-02",
+ "note": "The polymer class of a fibre (fiber.fiber_type). Values follow the material_bank v0.2 enum (ADR-0004); our wording.",
+ "terms": [
+  {"id": "cellulose", "label": "cellulose", "definition": "Plant polymer: cotton, linen and hemp, and the fibres regenerated from wood pulp (viscose, lyocell, modal).", "status": "proposed"},
+  {"id": "protein", "label": "protein", "definition": "Animal fibres: wool and other hair fibres, and silk.", "status": "proposed"},
+  {"id": "polyamide", "label": "polyamide", "definition": "The nylon family, such as polyamide 6 and polyamide 66.", "status": "proposed"},
+  {"id": "polyester", "label": "polyester", "definition": "Polyesters, mostly polyethylene terephthalate (PET).", "status": "proposed"},
+  {"id": "polyacrylonitrile", "label": "polyacrylonitrile", "definition": "Acrylic and modacrylic fibres.", "status": "proposed"},
+  {"id": "polyolefin", "label": "polyolefin", "definition": "Polypropylene and polyethylene fibres.", "status": "proposed"},
+  {"id": "elastane", "label": "elastane", "definition": "Segmented polyurethane that stretches several times its length and springs back.", "status": "proposed"},
+  {"id": "other", "label": "other", "definition": "A known polymer class not listed here.", "status": "proposed"},
+  {"id": "unknown", "label": "unknown", "definition": "The polymer class is not known.", "status": "proposed"}
+ ]}

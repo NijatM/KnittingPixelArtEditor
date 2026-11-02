@@ -1,0 +1,54 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0157",
+  "sample_name": "2×2 rib 12",
+  "sample_date": "2026-04-04",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0072",
+      "yarn_role": "main"
+    },
+    {
+      "yarn_id": "YRN_0120",
+      "yarn_role": "inlay"
+    }
+  ],
+  "structure": "rib_2x2",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 7,
+    "loop_length": 7.33,
+    "carriage_speed": 0.9,
+    "needles": 104,
+    "courses": 290
+  },
+  "performance": {
+    "areal_density": {
+      "value": 364,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "thickness": {
+      "value": 1.69,
+      "unit": "mm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "wale_density": {
+      "value": 10.1,
+      "unit": "wales/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "course_density": {
+      "value": 7,
+      "unit": "courses/cm",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

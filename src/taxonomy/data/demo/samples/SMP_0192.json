@@ -1,0 +1,32 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0192",
+  "sample_name": "Half cardigan 12",
+  "sample_date": "2026-05-22",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0044",
+      "yarn_role": "main"
+    }
+  ],
+  "structure": "half_cardigan",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 7,
+    "loop_length": 7.3,
+    "carriage_speed": 0.5,
+    "needles": 80,
+    "courses": 90
+  },
+  "performance": {
+    "areal_density": {
+      "value": 364,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}
