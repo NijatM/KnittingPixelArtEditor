@@ -1,0 +1,86 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0197",
+  "sample_name": "Milano rib 10",
+  "sample_date": "2026-05-28",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0110",
+      "yarn_role": "main"
+    }
+  ],
+  "structure": "milano_rib",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 14,
+    "loop_length": 3.87,
+    "carriage_speed": 0.5,
+    "needles": 128,
+    "courses": 150
+  },
+  "performance": {
+    "opacity": {
+      "value": 94.6,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "areal_density": {
+      "value": 431,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "thickness": {
+      "value": 1.39,
+      "unit": "mm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "wale_density": {
+      "value": 14.7,
+      "unit": "wales/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "course_density": {
+      "value": 15.9,
+      "unit": "courses/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "stretch_course": {
+      "value": 43,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "tensile_course": {
+      "value": 261,
+      "unit": "N",
+      "method": "generator",
+      "status": "generated"
+    },
+    "tensile_wale": {
+      "value": 422,
+      "unit": "N",
+      "method": "generator",
+      "status": "generated"
+    },
+    "air_permeability": {
+      "value": 1720,
+      "unit": "mm/s",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bending_wale": {
+      "value": 1.98,
+      "unit": "cm",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

@@ -1,0 +1,122 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0191",
+  "sample_name": "Float jersey 12",
+  "sample_date": "2026-05-21",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0018",
+      "yarn_role": "main"
+    }
+  ],
+  "structure": "float_jersey",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 10,
+    "loop_length": 5.12,
+    "carriage_speed": 0.9,
+    "needles": 90,
+    "courses": 120
+  },
+  "performance": {
+    "opacity": {
+      "value": 89.8,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "areal_density": {
+      "value": 225,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "thickness": {
+      "value": 0.85,
+      "unit": "mm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "wale_density": {
+      "value": 8.6,
+      "unit": "wales/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "course_density": {
+      "value": 9.6,
+      "unit": "courses/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "stretch_course": {
+      "value": 34,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "stretch_wale": {
+      "value": 49,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "recovery_course": {
+      "value": 82,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "recovery_wale": {
+      "value": 82.8,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bursting_strength": {
+      "value": 417,
+      "unit": "kPa",
+      "method": "generator",
+      "status": "generated"
+    },
+    "tensile_course": {
+      "value": 210,
+      "unit": "N",
+      "method": "generator",
+      "status": "generated"
+    },
+    "tensile_wale": {
+      "value": 204,
+      "unit": "N",
+      "method": "generator",
+      "status": "generated"
+    },
+    "air_permeability": {
+      "value": 2860,
+      "unit": "mm/s",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bending_course": {
+      "value": 1.15,
+      "unit": "cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bending_wale": {
+      "value": 1.32,
+      "unit": "cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "abrasion": {
+      "value": 38500,
+      "unit": "cycles",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

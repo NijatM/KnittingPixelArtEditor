@@ -1,0 +1,98 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0211",
+  "sample_name": "Eyelet jersey 10",
+  "sample_date": "2026-06-17",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0082",
+      "yarn_role": "main"
+    }
+  ],
+  "structure": "eyelet_jersey",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 12,
+    "loop_length": 4.12,
+    "carriage_speed": 0.4,
+    "needles": 78,
+    "courses": 170
+  },
+  "performance": {
+    "areal_density": {
+      "value": 243,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "thickness": {
+      "value": 0.84,
+      "unit": "mm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "wale_density": {
+      "value": 9.5,
+      "unit": "wales/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "course_density": {
+      "value": 12.2,
+      "unit": "courses/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "stretch_course": {
+      "value": 43,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "stretch_wale": {
+      "value": 34,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "recovery_course": {
+      "value": 83.6,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bursting_strength": {
+      "value": 356,
+      "unit": "kPa",
+      "method": "generator",
+      "status": "generated"
+    },
+    "air_permeability": {
+      "value": 3540,
+      "unit": "mm/s",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bending_course": {
+      "value": 1.19,
+      "unit": "cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bending_wale": {
+      "value": 1.56,
+      "unit": "cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "abrasion": {
+      "value": 11000,
+      "unit": "cycles",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

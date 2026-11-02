@@ -1,0 +1,86 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0247",
+  "sample_name": "Eyelet jersey 12",
+  "sample_date": "2026-08-05",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0070",
+      "yarn_role": "main"
+    }
+  ],
+  "structure": "eyelet_jersey",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 10,
+    "loop_length": 4.78,
+    "carriage_speed": 0.9,
+    "needles": 166,
+    "courses": 90
+  },
+  "performance": {
+    "areal_density": {
+      "value": 228,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "thickness": {
+      "value": 0.94,
+      "unit": "mm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "wale_density": {
+      "value": 8,
+      "unit": "wales/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "course_density": {
+      "value": 10.4,
+      "unit": "courses/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "stretch_wale": {
+      "value": 42,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "recovery_course": {
+      "value": 84,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "recovery_wale": {
+      "value": 84.6,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "tensile_course": {
+      "value": 156,
+      "unit": "N",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bending_course": {
+      "value": 1.3,
+      "unit": "cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bending_wale": {
+      "value": 1.31,
+      "unit": "cm",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

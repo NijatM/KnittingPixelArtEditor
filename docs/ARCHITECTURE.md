@@ -37,7 +37,7 @@ flowchart TB
   gm --> eng["machine.ts → yarn.ts<br/>main thread"]
   eng --> kw["knit.worker.ts<br/>relaxation"]
   eng --> v3["view3d.ts<br/>three.js"]
-  gm --> learn["learn.ts, figures.ts,<br/>swatch3d.ts, taxonomy.ts"]
+  gm --> learn["learn.ts, figures.ts,<br/>swatch3d.ts"]
   learn --> pool["knit.worker.ts pool<br/>Learn swatches"]
 ```
 
@@ -299,19 +299,70 @@ sequenceDiagram
   participant T as NFC tag on a frame
   participant P as Phone
   participant R as Desk reader
-  participant S as Learn 07 entry
+  participant S as Sample on the shelf (#taxonomy/SMP_0001)
   T->>P: address of the entry
   P->>S: opens it
   T->>R: read by the PN532
   R->>S: opens the same address on the laptop
+  R->>S: kiosk: show / clear (server-sent events from the local copy)
 ```
 
-- `taxonomy.ts` lists the frames (`FRAMES`); each entry's address is `#grammar/learn/taxonomy/<id>`. One
-  placeholder frame so far, drawn by `frame3d.ts` as a rotatable three.js frame (a drawing, not the yarn model).
+- `src/taxonomy/` is its own section (`#taxonomy/<sample_id>`), loaded the first time it opens. `data.ts` bundles
+  the records (fibres, yarns, samples: one JSON file each, material_bank ADR-0001) and the vocabularies, and
+  derives each yarn's type and origin shares (`core.js`, shared with the node scripts). `shelf.ts` draws the
+  spines with the hairline kernel: a straight-on camera gives every spine the same shape, so one path is reused
+  and a CSS transform places it; sorting slides them, hit tests use the layout. Each spine is its own small svg in
+  a layer over the boards' svg, so the browser moves them as layers while they slide (one svg of 1000 spines was
+  repainted whole every frame); outside the phone layout each keeps its layer (`will-change`), and a re-sort only
+  moves them, since Safari would otherwise make and paint every layer as the slide starts. `stage.ts` builds every structure's model while the page is idle. `main.ts` holds the state
+  (pointed at → after 120 ms current → pinned; the address follows the pin), the band below and the full record.
+- Three views share that state through one interface (`view.ts`: lift, current, pin, matches, neighbours for the
+  keys, a mark's screen rectangle): the shelf; `lineage.ts`, the four layers on a canvas (fibres and structures in
+  vocabulary order, yarns and samples ordered by layered barycentre sweeps, keeping the order with the fewest
+  crossings; the sample row is a fisheye solved so the lens centre stays under the pointer; a chain is everything
+  up and down from the node pointed at; a finger on the structure row, whose names hang below it, gets the touched
+  name in a tag raised above); `perf.ts`, a canvas map of two properties (`AXES`, also the band's key
+  values) with margin strips for missing values. Both canvases redraw only when something changes; 1000 samples
+  redraw within a frame.
+- `stage.ts` is one transparent three.js canvas over the section, in CSS pixels: the current sample's mark in the
+  open view hides and its frame (`model.ts`) leaves edge on from the mark's place, turns face on and flies to the preview; the one before
+  flies back. Behind the window is the structure's yarn model from `data/models/` (loaded on first use), drawn as
+  tubes in origin colours, blends as a twisted stripe. `scripts/taxonomy-models.ts` makes the models: each
+  structure's program knitted larger than the window, relaxed with `relax.ts` (its outer two needles and passes
+  held flat, as by the frame: `relaxStart`'s fixed coordinates) and cropped to the window. Run it after changing
+  the structure vocabulary; `taxonomy-check.mjs` fails when a structure has no model.
+- `scripts/taxonomy-demo.mjs` writes the generated demo set (seeded); `scripts/taxonomy-check.mjs` validates every
+  record against `src/taxonomy/schema` and the vocabularies and fits each tag (`docs/TAG_FORMAT.md`); it runs in
+  `prebuild`. The old Learn address `#grammar/learn/taxonomy/frame-NN` is rewritten to `#taxonomy/SMP_00NN`.
 - `tools/nfc/taxonomy_reader.py` talks to a PN532 over a USB-serial adapter (HSU, 115200 baud) with `termios`, so
   it needs no packages. It waits for tags and opens each address in one reused browser window, survives the
   adapter being unplugged and plugged back in, and can `check` the reader, print a tag's `info`, or `write` an
-  address to an NTAG21x tag. `start_reader.command` launches it on macOS.
+  address to an NTAG21x tag. `start_reader.command` launches it on macOS. The HSU wake-up bytes go out in the same
+  write as the first command (a PN532 just powered slept through them when a pause came between, and stayed silent
+  as if unwired), and a command met with silence is sent once more behind them; when it still gets no answer it
+  names the program holding the port, if any (a browser's serial tester). Before each look it switches the field
+  off and on (on the rig, a tag once listed was not found again while it lay there); it lists up to two tags per
+  look and reads a tag only until its address (5 pages instead of ~40); the same address again is set with `/again` after
+  it, which the page takes as "fly the frame in again". `write SMP_####` gets the bytes from
+  `scripts/taxonomy-tag.mjs` (`core.js`'s `tagPayload`, `ndefMessage`, `tlv`: the site's own code), writes them
+  and reads them back.
+- `kiosk` serves `dist/` on 127.0.0.1 and `…/reader`, a server-sent event stream (`show SMP_####` / `clear`; the
+  latest state on connect). `Rig` holds the slot's rules: tags without a sample's address are ignored; while the
+  shown tag is seen (asked for by its UID first, so whatever else lies near cannot hide it), others are ignored; once it is gone, a new sample takes over at once, else `clear` after 3 s.
+  The page (`?kiosk`) hides the band and the ways out of the section, moves the preview into a large panel beside
+  the full record, shows a sample only by the reader or a click, and asks `stage.ts` to swing the frame. The
+  terminal is a console meanwhile (`Console`): commands go to the kiosk's loop, the only thread using the reader;
+  test tags pass through `Rig` like real ones; `reload` is a one-off event (not replayed to a page connecting).
+- Touch (`main.ts`): a finger only lifts (no dwell); letting go after a drag pins the one under it; a tap is left
+  to the click. Phones (< 760 px, `style.css`): the band and the view area give way (`display: contents`), the
+  preview is sticky at the top, the record opens inline, the shelf is as tall as its rows (`shelf.ts`). Safari has
+  no scroll anchoring, so `render()` keeps the open view where it was on screen when the summary above it changes
+  height (never scrolling the summary's head under the preview), and `#tx` turns Chrome's anchoring off to match.
+  On phones the 3D canvas lives in the sticky preview (as tall as the largest window), so a frame at rest scrolls
+  with its box: a canvas fixed to the window was moved by script after each scroll and, on iOS, where scrolling
+  runs apart from the page's script, trailed the page out of the box. A finger on the frame turns it every way and
+  never scrolls the page; scrolling starts outside its box.
+- On Android Chrome `main.ts` offers Web NFC (`NDEFReader`): a tag's URI record is routed like an address.
 
 ## Storage
 
@@ -341,7 +392,11 @@ Warnings only; nothing is blocked. The limits are rules of thumb for your yarn a
 
 There is no test suite in the repo; `npm run build` typechecks. Releases were checked with scripts kept outside the
 repo: headless Chrome and WebKit through Playwright (wide, narrow and phone layouts), real Safari through
-`safaridriver`, and engine checks (the published-behaviour checks above, CPU against GPU).
+`safaridriver`, and engine checks (the published-behaviour checks above, CPU against GPU). The Knitting Taxonomy
+was checked with headless Chrome over the DevTools protocol (real GPU, touch emulation, 300 and 1000 samples), with
+macOS Safari through `safaridriver` (the same checks and frame rates; Safari has to be quit first, it only takes
+automation when the driver starts it, and Low Power Mode holds its frame rate at 30), and with iOS and iPadOS Safari
+in the Xcode simulator through `safaridriver` (touch, layout, WebGL).
 
 ## Limits and open points
 
@@ -351,5 +406,6 @@ repo: headless Chrome and WebKit through Playwright (wide, narrow and phone layo
   (short rows) relaxes. The fabric view says where it jammed.
 - **To confirm with the lab's BMP → Steiger script**: when a row's transfers happen, how two guides travel, and
   the two provisional colours of the two-guide key. Each is a switch or a marked value, not hard-wired.
-- **Learn** pages are drafts until reviewed; the taxonomy has one placeholder frame.
+- **Learn** pages are drafts until reviewed. **Knitting Taxonomy** shows generated demo samples only; its
+  vocabularies and origin colours are proposals awaiting review.
 - **Portrait matching** was tuned on six photos; at 25 stitches the characters' art is coarse for mixing parts.

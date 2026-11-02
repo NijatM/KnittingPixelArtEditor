@@ -1,0 +1,11 @@
+{"vocabulary_id": "machine", "version": "0.1.0", "updated": "2026-11-02",
+ "note": "Machine settings a sample may carry (sample.machine). The block has one status (value_status: measured = recorded at the machine, or generated). tag_key is the short key on the NFC tag (docs/TAG_FORMAT.md). Our wording. Proposals awaiting review.",
+ "terms": [
+  {"id": "machine_type", "label": "machine", "unit": null, "type": "string", "tag_key": "mt", "definition": "The kind of machine, such as v-bed flat.", "status": "proposed"},
+  {"id": "gauge", "label": "gauge", "unit": "E", "type": "number", "tag_key": "g", "definition": "Needles per inch (25.4 mm) on one bed.", "status": "proposed"},
+  {"id": "loop_length", "label": "loop length", "unit": "mm", "type": "number", "tag_key": "ll", "definition": "Length of yarn in one loop of the main yarn.", "status": "proposed"},
+  {"id": "carriage_speed", "label": "carriage speed", "unit": "m/s", "type": "number", "tag_key": "cs", "definition": "Speed of the carriage while knitting.", "status": "proposed"},
+  {"id": "needles", "label": "needles in work", "unit": "needles", "type": "integer", "tag_key": "nw", "definition": "Needles knitting across the sample on one bed.", "status": "proposed"},
+  {"id": "courses", "label": "courses", "unit": "courses", "type": "integer", "tag_key": "nc", "definition": "Courses knitted for the sample.", "status": "proposed"},
+  {"id": "program", "label": "program", "unit": null, "type": "string", "tag_key": "pg", "definition": "File name of the knitting program.", "status": "proposed"}
+ ]}

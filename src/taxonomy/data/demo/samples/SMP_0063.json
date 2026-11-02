@@ -1,0 +1,50 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0063",
+  "sample_name": "2×2 rib 3",
+  "sample_date": "2025-11-25",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0089",
+      "yarn_role": "main"
+    }
+  ],
+  "structure": "rib_2x2",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 14,
+    "loop_length": 3.39,
+    "carriage_speed": 0.8,
+    "needles": 132,
+    "courses": 200
+  },
+  "performance": {
+    "areal_density": {
+      "value": 448,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "thickness": {
+      "value": 1.4,
+      "unit": "mm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "wale_density": {
+      "value": 22.4,
+      "unit": "wales/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "course_density": {
+      "value": 14.4,
+      "unit": "courses/cm",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

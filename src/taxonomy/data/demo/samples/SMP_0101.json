@@ -1,0 +1,78 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0101",
+  "sample_name": "Double jacquard 8",
+  "sample_date": "2026-01-17",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0054",
+      "yarn_role": "main"
+    },
+    {
+      "yarn_id": "YRN_0102",
+      "yarn_role": "contrast"
+    }
+  ],
+  "structure": "double_jacquard",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 7,
+    "loop_length": 6.56,
+    "carriage_speed": 0.9,
+    "needles": 180,
+    "courses": 180
+  },
+  "performance": {
+    "opacity": {
+      "value": 93.5,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "areal_density": {
+      "value": 681,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "thickness": {
+      "value": 1.97,
+      "unit": "mm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "wale_density": {
+      "value": 9,
+      "unit": "wales/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "stretch_course": {
+      "value": 42,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "stretch_wale": {
+      "value": 30,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bursting_strength": {
+      "value": 997,
+      "unit": "kPa",
+      "method": "generator",
+      "status": "generated"
+    },
+    "tensile_course": {
+      "value": 359,
+      "unit": "N",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

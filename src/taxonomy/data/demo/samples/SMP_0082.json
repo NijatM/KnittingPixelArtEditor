@@ -1,0 +1,38 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0082",
+  "sample_name": "Single jersey 13",
+  "sample_date": "2025-12-22",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0080",
+      "yarn_role": "main"
+    }
+  ],
+  "structure": "single_jersey",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 10,
+    "loop_length": 4.96,
+    "carriage_speed": 0.8,
+    "needles": 154,
+    "courses": 230
+  },
+  "performance": {
+    "areal_density": {
+      "value": 272,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "course_density": {
+      "value": 10.4,
+      "unit": "courses/cm",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

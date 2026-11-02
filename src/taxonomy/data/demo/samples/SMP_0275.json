@@ -1,0 +1,106 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0275",
+  "sample_name": "Double jacquard 23",
+  "sample_date": "2026-09-14",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0078",
+      "yarn_role": "main"
+    },
+    {
+      "yarn_id": "YRN_0058",
+      "yarn_role": "contrast"
+    },
+    {
+      "yarn_id": "YRN_0062",
+      "yarn_role": "contrast"
+    }
+  ],
+  "structure": "double_jacquard",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 10,
+    "loop_length": 5.28,
+    "carriage_speed": 0.9,
+    "needles": 188,
+    "courses": 210
+  },
+  "performance": {
+    "areal_density": {
+      "value": 618,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "thickness": {
+      "value": 1.66,
+      "unit": "mm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "wale_density": {
+      "value": 10.9,
+      "unit": "wales/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "course_density": {
+      "value": 12,
+      "unit": "courses/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "stretch_wale": {
+      "value": 27,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "recovery_course": {
+      "value": 79.7,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "recovery_wale": {
+      "value": 81.1,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "tensile_course": {
+      "value": 348,
+      "unit": "N",
+      "method": "generator",
+      "status": "generated"
+    },
+    "tensile_wale": {
+      "value": 523,
+      "unit": "N",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bending_course": {
+      "value": 1.75,
+      "unit": "cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bending_wale": {
+      "value": 2.35,
+      "unit": "cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "abrasion": {
+      "value": 22000,
+      "unit": "cycles",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

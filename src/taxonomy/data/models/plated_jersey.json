@@ -1,0 +1,5 @@
+{
+ "structure": "plated_jersey",
+ "same_as": "single_jersey",
+ "note": "plating (two yarns in one loop) is not in the yarn model: shown as its ground, single jersey, in the main yarn"
+}

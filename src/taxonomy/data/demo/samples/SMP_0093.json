@@ -1,0 +1,98 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0093",
+  "sample_name": "Float jersey 9",
+  "sample_date": "2026-01-06",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0049",
+      "yarn_role": "main"
+    }
+  ],
+  "structure": "float_jersey",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 7,
+    "loop_length": 7.53,
+    "carriage_speed": 0.8,
+    "needles": 190,
+    "courses": 140
+  },
+  "performance": {
+    "opacity": {
+      "value": 88.7,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "areal_density": {
+      "value": 319,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "thickness": {
+      "value": 1.12,
+      "unit": "mm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "wale_density": {
+      "value": 6,
+      "unit": "wales/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "course_density": {
+      "value": 6.7,
+      "unit": "courses/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "stretch_wale": {
+      "value": 56,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "recovery_course": {
+      "value": 80.7,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "recovery_wale": {
+      "value": 78.7,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bursting_strength": {
+      "value": 450,
+      "unit": "kPa",
+      "method": "generator",
+      "status": "generated"
+    },
+    "tensile_course": {
+      "value": 148,
+      "unit": "N",
+      "method": "generator",
+      "status": "generated"
+    },
+    "tensile_wale": {
+      "value": 223,
+      "unit": "N",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bending_course": {
+      "value": 1.42,
+      "unit": "cm",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

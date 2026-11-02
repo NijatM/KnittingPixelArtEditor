@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "yarn.schema.json",
+  "title": "YARN",
+  "description": "One yarn lot and its fibre composition. Our own file, written to the material_bank v0.2 conventions (Tailored Materiality Group). yarn_type is not stored: it is derived from the fibres' origins. Checked beyond the schema: percentages sum to 99–101, no fibre twice, every fiber_id exists.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "yarn_id", "yarn_name", "date_added", "composition"],
+  "properties": {
+    "schema_version": { "const": "0.2.0" },
+    "yarn_id": { "type": "string", "pattern": "^YRN_\\d{4}$" },
+    "yarn_name": { "type": "string", "minLength": 1 },
+    "date_added": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "composition": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["fiber_id", "percentage_value"],
+        "properties": {
+          "fiber_id": { "type": "string", "pattern": "^FBR_\\d{4}$" },
+          "percentage_value": { "type": "number", "minimum": 0.1, "maximum": 100 }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "demo": true,
+  "generated_by": "scripts/taxonomy-demo.mjs",
+  "seed": 20261102,
+  "data_as_of": "2026-11-02",
+  "counts": {
+    "fibers": 21,
+    "yarns": 120,
+    "samples": 300
+  },
+  "note": "Every sample here is generated (status demo) and every value is made up (status generated, method generator). Fibre names are real generic fibres; yarn names are neutral placeholders."
+}

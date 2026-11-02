@@ -1,0 +1,38 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0260",
+  "sample_name": "1×1 purl (garter) 16",
+  "sample_date": "2026-08-24",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0087",
+      "yarn_role": "main"
+    }
+  ],
+  "structure": "purl_1x1",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 7,
+    "loop_length": 6.49,
+    "carriage_speed": 0.7,
+    "needles": 146,
+    "courses": 180
+  },
+  "performance": {
+    "thickness": {
+      "value": 2.34,
+      "unit": "mm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "course_density": {
+      "value": 12.5,
+      "unit": "courses/cm",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

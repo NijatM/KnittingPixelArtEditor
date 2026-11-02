@@ -1,0 +1,102 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0214",
+  "sample_name": "Plated jersey 13",
+  "sample_date": "2026-06-22",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0004",
+      "yarn_role": "main"
+    },
+    {
+      "yarn_id": "YRN_0097",
+      "yarn_role": "plating"
+    }
+  ],
+  "structure": "plated_jersey",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 12,
+    "loop_length": 4.47,
+    "carriage_speed": 0.4,
+    "needles": 80,
+    "courses": 190
+  },
+  "performance": {
+    "opacity": {
+      "value": 94.6,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "areal_density": {
+      "value": 336,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "thickness": {
+      "value": 0.87,
+      "unit": "mm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "course_density": {
+      "value": 11.7,
+      "unit": "courses/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "stretch_course": {
+      "value": 49,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "stretch_wale": {
+      "value": 35,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "recovery_course": {
+      "value": 87.1,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "recovery_wale": {
+      "value": 90.5,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bursting_strength": {
+      "value": 545,
+      "unit": "kPa",
+      "method": "generator",
+      "status": "generated"
+    },
+    "tensile_wale": {
+      "value": 278,
+      "unit": "N",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bending_course": {
+      "value": 1.19,
+      "unit": "cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bending_wale": {
+      "value": 1.41,
+      "unit": "cm",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

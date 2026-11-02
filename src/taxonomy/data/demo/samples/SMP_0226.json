@@ -1,0 +1,86 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0226",
+  "sample_name": "2×2 rib 19",
+  "sample_date": "2026-07-08",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0098",
+      "yarn_role": "main"
+    }
+  ],
+  "structure": "rib_2x2",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 12,
+    "loop_length": 3.77,
+    "carriage_speed": 0.5,
+    "needles": 182,
+    "courses": 180
+  },
+  "performance": {
+    "opacity": {
+      "value": 95.8,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "areal_density": {
+      "value": 513,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "thickness": {
+      "value": 1.5,
+      "unit": "mm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "wale_density": {
+      "value": 19.1,
+      "unit": "wales/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "stretch_course": {
+      "value": 82,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "stretch_wale": {
+      "value": 29,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "recovery_course": {
+      "value": 73.4,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "recovery_wale": {
+      "value": 78,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "bursting_strength": {
+      "value": 794,
+      "unit": "kPa",
+      "method": "generator",
+      "status": "generated"
+    },
+    "air_permeability": {
+      "value": 1630,
+      "unit": "mm/s",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

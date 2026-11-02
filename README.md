@@ -63,12 +63,11 @@ Steps in the sidebar: 00 photo, 01 frame, 02 grid, 03 style, 04 regions, 05 feat
 ## Knit Grammar
 
 Learn pages and editor steps share one numbering. Learn: 00 machine, 01 needle, 02 operations, 03 reading,
-04 two guides, 05 structures, 06 shaping, 07 knitting taxonomy, 08 sources. Editor: 09 experiments, 10 library,
-11 pattern, 12 key, 13 grammar, 14 draw, 15 view, 16 check, 17 export.
+04 two guides, 05 structures, 06 shaping, 07 sources. Editor: 08 experiments, 09 library, 10 pattern, 11 key,
+12 grammar, 13 draw, 14 view, 15 check, 16 export.
 
 - **Learn**: the V-bed machine, the latch needle's knitting cycle, the operations (knit, tuck, float, transfer,
-  racking), reading the grammar, two yarn guides, structures and shaping, and a knitting taxonomy of framed samples
-  (one placeholder so far). Interactive line figures and small 3D yarn swatches; every page lists its sources.
+  racking), reading the grammar, two yarn guides, structures and shaping. Interactive line figures and small 3D yarn swatches; every page lists its sources.
   Pages are drafts until reviewed.
 - **Editor**: paint operations, not colours. Tools: needle, run, flood, pass, wale, motif (select, move, flip,
   repeat with a shift), pick, mirror, undo. Views: colours, symbols, and a guides view that splits each
@@ -97,10 +96,39 @@ Learn pages and editor steps share one numbering. Learn: 00 machine, 01 needle, 
 
 ### Knitting Taxonomy and the desk reader
 
-Learn 07 lists framed knit samples. Each frame carries an NFC tag holding the address of its entry
-(`#grammar/learn/taxonomy/frame-NN`), so a phone opens it directly. At the desk, `tools/nfc/taxonomy_reader.py`
-reads tags with a PN532 module on a USB-serial adapter and opens the same address on the laptop (no Python
-packages needed; `check`, `info` and `write <url>` are there for setting up tags). One placeholder frame so far.
+The third section (`#taxonomy`) shows framed knit samples as a shelf of spines: sample ID, a mark for the structure
+family and one band per yarn in its origin colours. Pointing at a spine shows the sample below (yarns, key values);
+a click pins it, "full record" opens every field and "close sample" puts it back. Each frame carries an NFC tag
+holding its address (`#taxonomy/SMP_0001`, format in [docs/TAG_FORMAT.md](docs/TAG_FORMAT.md)), so a phone opens it directly; the
+first tag's old address (`#grammar/learn/taxonomy/frame-01`) still works. At the desk,
+`tools/nfc/taxonomy_reader.py` reads tags with a PN532 module on a USB-serial adapter and opens the same address
+on the laptop; laying the tag already shown on again flies its frame in again (no Python packages needed).
+`write SMP_0001` writes a sample's whole tag (its address and its data, from the records), and `check` and `info`
+help set up the reader and tags. On Android Chrome, "scan tags here" in the bar reads tags into the open page (Web
+NFC), so tags do not open new tabs.
+
+For an exhibition, `kiosk` runs the same site offline from the built copy (`dist/`) on the laptop, full screen in
+Chrome, with the reader beside it: a sample laid on the reader flies in and its full record opens beside a large,
+slowly turning preview; lifted off, it goes back to its spine after 3 s. Only tags with a sample's address count,
+and while a sample lies there other tags are ignored. The terminal stays open for commands while it runs (`help`):
+test tags (type `SMP_0042`, then `lift`), `status`, `check` and `reader` (reconnect), `reload`, `build`, `open` /
+`close` the full-screen page, `quit`. `--keys` runs it without a reader (test tags only).
+
+On phones (under 760 px) the section is one page: the preview stays at the top, the summary and the full record
+below it, then the view. A finger dragged along the marks lifts them; letting go pins the one under it; a tap is a click.
+
+For now the shelf holds 300 **generated demo samples**: every value is made up and marked so
+(`node scripts/taxonomy-demo.mjs` writes them; `SHOW_DEMO` in `src/taxonomy/data.ts` removes them all).
+Two more views of the same samples sit beside the shelf: **lineage** (fibres → yarns → samples → structures joined
+by lines; pointing at anything lights its whole chain, and the sample row widens under the pointer) and
+**performance** (a map of two chosen properties; each mark's outline gives the status of its values, and samples
+missing a value sit in a strip in the margin). Search, pinning and the arrow keys work in all three.
+The current sample's frame flies from its mark (spine, tick or map mark) to the preview in 3D. Its window shows a yarn model of the sample's
+structure (not a photo of the sample): one per structure, relaxed once with the Knit Grammar yarn engine
+(`npm run taxonomy:models`), each yarn in its origin colour. A sample with a photo shows the photo first.
+The records follow the material_bank v0.2 conventions (Tailored Materiality Group) in our own schema and
+vocabulary files (`src/taxonomy/schema`, `src/taxonomy/vocab`); `node scripts/taxonomy-check.mjs` checks them
+before every build.
 
 ## How it works
 
@@ -151,8 +179,11 @@ python3 scripts/build-avatar-library.py <portrait-40-multi-resolution folder>
 The NFC desk reader (macOS or Linux, Python 3):
 
 ```sh
-python3 tools/nfc/taxonomy_reader.py          # wait for tags and open their addresses
-python3 tools/nfc/taxonomy_reader.py check    # print the PN532's firmware version
+python3 tools/nfc/taxonomy_reader.py                 # wait for tags and open their addresses
+python3 tools/nfc/taxonomy_reader.py check           # print the PN532's firmware version
+python3 tools/nfc/taxonomy_reader.py info            # print a tag's address and data
+python3 tools/nfc/taxonomy_reader.py write SMP_0001  # write a sample's tag from the records (needs node)
+npm run build && python3 tools/nfc/taxonomy_reader.py kiosk   # the exhibition kiosk (start_kiosk.command)
 ```
 
 ## Documentation
@@ -191,7 +222,8 @@ python3 tools/nfc/taxonomy_reader.py check    # print the PN532's firmware versi
 | Relaxation (CPU, GPU) and its worker | `src/grammar/relax.ts`, `relaxgpu.ts`, `knit.worker.ts` |
 | 3D view | `src/grammar/view3d.ts` |
 | Learn pages, figures, 3D swatches | `src/grammar/learn.ts`, `figures.ts`, `swatch3d.ts`, `src/hl.ts`, `src/vendor/hairline/` |
-| Knitting Taxonomy page and frame drawing | `src/grammar/taxonomy.ts`, `frame3d.ts` |
+| Knitting Taxonomy | `src/taxonomy/` (`main.ts`, `view.ts`, `shelf.ts`, `lineage.ts`, `perf.ts`, `data.ts`, `core.js`, `figure.ts`), `scripts/taxonomy-*.mjs` |
+| Taxonomy 3D frame and yarn models | `src/taxonomy/stage.ts`, `model.ts`, `data/models/`, `scripts/taxonomy-models.ts` |
 | Interface | `src/grammar/ui.ts`, `src/grammar/main.ts` |
 | **Other** | |
 | NFC desk reader | `tools/nfc/` |

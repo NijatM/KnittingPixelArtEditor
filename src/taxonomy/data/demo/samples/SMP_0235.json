@@ -1,0 +1,33 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0235",
+  "sample_name": "Milano rib 14",
+  "sample_date": "2026-07-21",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0092",
+      "yarn_role": "main"
+    },
+    {
+      "yarn_id": "YRN_0058",
+      "yarn_role": "contrast"
+    }
+  ],
+  "structure": "milano_rib",
+  "performance": {
+    "areal_density": {
+      "value": 472,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "thickness": {
+      "value": 1.79,
+      "unit": "mm",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

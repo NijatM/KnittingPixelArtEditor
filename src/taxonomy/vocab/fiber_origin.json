@@ -1,0 +1,8 @@
+{"vocabulary_id": "fiber_origin", "version": "0.1.0", "updated": "2026-11-02",
+ "note": "Where a fibre's polymer comes from (fiber.fiber_origin). Values follow the material_bank v0.2 enum (ADR-0004); our wording. A yarn's yarn_type is derived from its fibres' origins: unknown if any is unknown, the origin itself if there is one, blend otherwise.",
+ "terms": [
+  {"id": "natural", "label": "natural", "definition": "Grown: taken from plants or animals without dissolving the polymer.", "status": "proposed"},
+  {"id": "regenerated", "label": "regenerated", "definition": "A natural polymer, usually cellulose, dissolved and spun into a new fibre.", "status": "proposed"},
+  {"id": "synthetic", "label": "synthetic", "definition": "A polymer built from small molecules, usually from oil or recycled plastic, then spun.", "status": "proposed"},
+  {"id": "unknown", "label": "unknown", "definition": "The origin is not known.", "status": "proposed"}
+ ]}

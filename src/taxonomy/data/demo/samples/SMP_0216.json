@@ -1,0 +1,92 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0216",
+  "sample_name": "Full cardigan 11",
+  "sample_date": "2026-06-24",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0076",
+      "yarn_role": "main"
+    }
+  ],
+  "structure": "full_cardigan",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 7,
+    "loop_length": 7.43,
+    "carriage_speed": 0.9,
+    "needles": 86,
+    "courses": 250
+  },
+  "performance": {
+    "opacity": {
+      "value": 90.6,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "areal_density": {
+      "value": 545,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "wale_density": {
+      "value": 6.7,
+      "unit": "wales/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "course_density": {
+      "value": 9,
+      "unit": "courses/cm",
+      "method": "generator",
+      "status": "generated"
+    },
+    "stretch_wale": {
+      "value": 46,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "recovery_course": {
+      "value": 81.6,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "recovery_wale": {
+      "value": 83.4,
+      "unit": "%",
+      "method": "generator",
+      "status": "generated"
+    },
+    "tensile_course": {
+      "value": 193,
+      "unit": "N",
+      "method": "generator",
+      "status": "generated"
+    },
+    "tensile_wale": {
+      "value": 446,
+      "unit": "N",
+      "method": "generator",
+      "status": "generated"
+    },
+    "air_permeability": {
+      "value": 1200,
+      "unit": "mm/s",
+      "method": "generator",
+      "status": "generated"
+    },
+    "abrasion": {
+      "value": 17000,
+      "unit": "cycles",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

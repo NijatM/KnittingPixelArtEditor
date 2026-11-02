@@ -1,0 +1,16 @@
+{
+  "schema_version": "0.2.0",
+  "yarn_id": "YRN_0039",
+  "yarn_name": "demo yarn 039",
+  "date_added": "2025-07-11",
+  "composition": [
+    {
+      "fiber_id": "FBR_0003",
+      "percentage_value": 55
+    },
+    {
+      "fiber_id": "FBR_0001",
+      "percentage_value": 45
+    }
+  ]
+}

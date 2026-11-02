@@ -1,0 +1,7 @@
+{"vocabulary_id": "value_status", "version": "0.1.0", "updated": "2026-11-02",
+ "note": "Where one value comes from. Every performance value carries one; machine settings carry one for the block. tag_key is the letter used on the NFC tag (docs/TAG_FORMAT.md). Our wording.",
+ "terms": [
+  {"id": "measured", "tag_key": "m", "label": "measured", "definition": "Measured on this sample with the stated method. Machine settings: recorded at the machine.", "status": "proposed"},
+  {"id": "estimated", "tag_key": "e", "label": "estimated", "definition": "Worked out from other values or from a model, not measured on this sample.", "status": "proposed"},
+  {"id": "generated", "tag_key": "g", "label": "generated", "definition": "Made up for the demo by scripts/taxonomy-demo.mjs.", "status": "proposed"}
+ ]}

@@ -1,0 +1,42 @@
+{
+  "schema_version": "0.2.0",
+  "sample_id": "SMP_0139",
+  "sample_name": "Double jacquard 13",
+  "sample_date": "2026-03-11",
+  "data_as_of": "2026-11-02",
+  "status": "demo",
+  "sample_yarn": [
+    {
+      "yarn_id": "YRN_0040",
+      "yarn_role": "main"
+    },
+    {
+      "yarn_id": "YRN_0119",
+      "yarn_role": "contrast"
+    }
+  ],
+  "structure": "double_jacquard",
+  "machine": {
+    "status": "generated",
+    "machine_type": "v-bed flat",
+    "gauge": 12,
+    "loop_length": 4.21,
+    "carriage_speed": 0.6,
+    "needles": 124,
+    "courses": 290
+  },
+  "performance": {
+    "areal_density": {
+      "value": 570,
+      "unit": "g/m²",
+      "method": "generator",
+      "status": "generated"
+    },
+    "wale_density": {
+      "value": 13.8,
+      "unit": "wales/cm",
+      "method": "generator",
+      "status": "generated"
+    }
+  }
+}

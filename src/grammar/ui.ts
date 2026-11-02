@@ -15,7 +15,7 @@ export const SHELL = `
     <div class="name"><a href="#" class="homelink">Nijat Mahamaliyev</a></div>
     <div class="lab">Tailored Materiality Research</div>
   </div>
-  <div class="seg secseg" aria-label="section"><a href="#portrait">portrait</a><a href="#grammar" class="on" aria-current="page">grammar</a></div>
+  <div class="seg secseg" aria-label="section"><a href="#portrait">portrait</a><a href="#grammar" class="on" aria-current="page">grammar</a><a href="#taxonomy">taxonomy</a></div>
   <div class="spaced dim navsec">LEARN</div>
   <div class="list">${PAGES.map((p, i) => `<div class="lrow" data-learn="${p.id}" tabindex="0"><span class="lnum">${String(i).padStart(2, '0')}</span><span class="left">${p.nav}</span><span class="right">${p.draft ? 'draft' : ''}</span></div>`).join('')}</div>
   <div class="spaced dim navsec">EDITOR</div>

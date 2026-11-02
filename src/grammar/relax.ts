@@ -48,7 +48,11 @@ export interface Relax {
   x: Float64Array; g: Float64Array; xn: Float64Array; gNew: Float64Array; dir: Float64Array;
   S: Float32Array[]; Y: Float32Array[]; rho: Float64Array; k: number;
   w: Work;
+  /** coordinates that stay where they started (node * 3 + axis): their force is set to 0, so no step moves them */
+  fixed?: Int32Array;
 }
+
+const pin = (st: Relax, g: Float64Array) => { if (st.fixed) for (const j of st.fixed) g[j] = 0; };
 
 function work(s: YarnSys): Work {
   const seg: number[] = [];
@@ -276,14 +280,15 @@ function energy(s: YarnSys, x: Float64Array, g: Float64Array, w: Work): number {
   return E;
 }
 
-export function relaxStart(s: YarnSys, warm?: Float32Array): Relax {
+export function relaxStart(s: YarnSys, warm?: Float32Array, fixed?: Int32Array): Relax {
   const n = s.nn * 3, x = Float64Array.from(warm && warm.length === n ? warm : s.init), g = new Float64Array(n), w = work(s);
   const st: Relax = {
     pos: Float32Array.from(x), nrm: new Float32Array(s.t.n * 3), iter: 0, moved: Infinity, energy: 0, force: Infinity,
     x, g, xn: new Float64Array(n), gNew: new Float64Array(n), dir: new Float64Array(n),
-    S: [...Array(HIST)].map(() => new Float32Array(n)), Y: [...Array(HIST)].map(() => new Float32Array(n)), rho: new Float64Array(HIST), k: 0, w,
+    S: [...Array(HIST)].map(() => new Float32Array(n)), Y: [...Array(HIST)].map(() => new Float32Array(n)), rho: new Float64Array(HIST), k: 0, w, fixed,
   };
   st.energy = energy(s, x, g, w);
+  pin(st, g);
   st.nrm.set(w.nrm);
   return st;
 }
@@ -329,10 +334,12 @@ export function relaxSteps(s: YarnSys, st: Relax, n: number) {
     for (let tries = 0; tries < 30 && !ok; tries++) {
       for (let j = 0; j < len; j++) st.xn[j] = st.x[j] + a * q[j];
       En = energy(s, st.xn, st.gNew, st.w);
+      pin(st, st.gNew);
       if (En <= st.energy + 1e-4 * a * dg) ok = true; else a *= 0.5;
     }
     if (!ok) { // no step lowers the energy along this direction: forget the history; stuck even from the gradient: done
       energy(s, st.x, st.g, st.w);
+      pin(st, st.g);
       if (st.k === 0) { st.moved = 0; st.iter++; break; }
       st.k = 0; st.iter++; continue;
     }
