@@ -227,7 +227,17 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: 
   view.addEventListener('pointercancel', up);
   view.addEventListener('dblclick', reset);
   addEventListener('resize', size);
+  // a frame at rest follows the preview when the page scrolls (phones), and one in flight its mark in a scrolled view
+  const scrolled = () => { if (pieces.size) kick(); };
+  addEventListener('scroll', scrolled, { capture: true, passive: true });
   size();
+  // every structure's model built while the page is idle, one at a time, so a first flight does not stop for it
+  // (on the M2 Pro the first one stalled a frame 150–300 ms: fetch, tubes, upload together)
+  let gone = false;
+  const idle = (f: () => void) => ('requestIdleCallback' in window ? requestIdleCallback(f, { timeout: 3000 }) : setTimeout(f, 300));
+  const queue = [...new Set(db.recs.map(r => r.structure.id))];
+  const next = () => { const id = queue.shift(); if (id && !gone) loadModel(id).catch(() => null).then(() => idle(next)); };
+  idle(next);
 
   return {
     show,
@@ -249,8 +259,10 @@ export function mountStage(root: HTMLElement, view: HTMLElement, db: DB, marks: 
     },
     swing(on) { swinging = on; kick(); },
     destroy() {
+      gone = true;
       cancelAnimationFrame(raf);
       removeEventListener('resize', size);
+      removeEventListener('scroll', scrolled, { capture: true });
       for (const p of pieces) p.dispose.forEach(f => f());
       renderer.dispose(); canvas.remove();
     },

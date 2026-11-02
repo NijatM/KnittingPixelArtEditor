@@ -2,8 +2,11 @@
 // Loaded by app.ts the first time the section opens. Three views of the same samples, toggled in the bar: Samples,
 // a shelf of spines (shelf.ts); Lineage, fibres → yarns → samples → structures (lineage.ts); Performance, a map of
 // two properties (perf.ts). In each, pointing at a sample lifts it; resting on it for DWELL ms makes it the current
-// sample, shown in the band below; a click pins it there (the address follows); a second click or Esc unpins. The
+// sample, shown in the band below; a click pins it there (the address follows); a second click or Esc unpins. A
+// finger dragging over the marks only lifts them; letting go pins the one under it, and a tap is a click. The
 // current sample's frame flies from its mark to the preview in 3D (stage.ts). Search and keys work in every view.
+// Phones (style.css, under 760 px): the preview stays at the top, the summary and the full record below it, then the
+// view.
 // A sample's address arriving while it is already pinned (its tag laid on again) flies its frame in once more.
 // Tags reach the page three ways: an address opened (a phone, the desk reader setting this tab's address); on
 // Android Chrome, Web NFC behind the "scan tags here" button; in the kiosk (?kiosk, served by
@@ -22,6 +25,12 @@ import { mountStage, type Face, type Stage } from './stage';
 
 const DWELL = 120, LEAVE = 450;
 const KIOSK = new URLSearchParams(location.search).has('kiosk');
+/** no mouse to point with (phones, tablets): the hint in the empty band says tap */
+const TOUCH = matchMedia('(hover: none)').matches;
+/** a finger moved further than this (px) between down and up dragged; less is a tap, left to the click */
+const TAP = 4;
+/** the phone layout (style.css): one page scroll, the preview held at the top */
+const PHONE = matchMedia('(max-width: 760px)');
 /** The band's key values: areal density and thickness, then the Performance view's two axes, each once. */
 const keyValues = () => ['areal_density', 'thickness', AXES.x, AXES.y].filter((v, i, a) => a.indexOf(v) === i);
 type ViewName = 'samples' | 'lineage' | 'performance';
@@ -36,6 +45,8 @@ const views: Partial<Record<ViewName, View>> = {};
 const v = () => views[view]!;
 let sort: SortKey = 'id', current: Rec | null = null, pinned = false, overBand = false, drawer = false, missing = '';
 let dwell = 0, leaveT = 0, matches: Rec[] | null = null;
+/** the sample the pointer is on; a finger on the screen (where it went down); clicks ignored until then (ms) */
+let lifted: Rec | null = null, finger: { x: number; y: number } | null = null, quiet = 0;
 /** kiosk: the sample the reader showed ('' none), and whether the reader is connected */
 let tagged = '', reader = false;
 let stage: Stage | null = null, face: Face = 'model', first = true, instant = false;
@@ -46,6 +57,7 @@ const SHELL = `
   <div class="txname"><a href="#" class="homelink">Nijat Mahamaliyev</a><span class="dim small">Tailored Materiality Research</span></div>
   <div class="seg secseg" aria-label="section"><a href="#portrait">portrait</a><a href="#grammar">grammar</a><a href="#taxonomy" class="on" aria-current="page">taxonomy</a></div>
   <div class="seg txviews" role="group" aria-label="view"><button data-view="samples" class="on" aria-pressed="true">samples</button><button data-view="lineage" aria-pressed="false">lineage</button><button data-view="performance" aria-pressed="false">performance</button></div>
+  <i class="txbreak" hidden></i>
   <input class="txfind" type="search" placeholder="find: ID, fibre, yarn, structure…" aria-label="find samples" spellcheck="false" autocomplete="off">
   <span class="txcount small dim" aria-live="polite"></span>
   <div class="seg txsort" role="group" aria-label="order"><span class="small dim">order</span><button data-sort="id" class="on">ID</button><button data-sort="structure">structure</button><button data-sort="origin">origin</button></div>
@@ -94,7 +106,29 @@ export async function init(el: HTMLElement) {
   if (db.demo) { const t = $('.txnotice'); t.hidden = false; t.innerHTML = `<b>Demo data.</b> ${n} generated samples: every value is made up (status <i>generated</i>), none is a real sample. Real samples will replace them.`; }
   count();
   requestAnimationFrame(() => shelf.layout(sort, false));
-  new ResizeObserver(() => { if ($(BOX[view]).clientWidth) v().resize(); }).observe($('.txmain'));
+  const ro = new ResizeObserver(() => { if ($(BOX[view]).clientWidth) v().resize(); });
+  for (const b of Object.values(BOX)) ro.observe($(b));
+  // a bar too long for one line folds into two even ones (sections and views; finding and order) rather than
+  // leaving one group on a line of its own
+  const bar = $('.txbar'), brk = $('.txbreak');
+  new ResizeObserver(() => {
+    brk.hidden = true;
+    const items = [...bar.children].filter(e => !(e as HTMLElement).hidden && !e.matches('.txlive, .txbreak')) as HTMLElement[];
+    const mid = (e: HTMLElement) => e.offsetTop + e.offsetHeight / 2; // the bar centres each line's items
+    brk.hidden = Math.abs(mid(items[items.length - 1]) - mid(items[0])) < 4;
+  }).observe(bar);
+
+  // a finger lifts what it passes over (hover() does not dwell then); letting go after a drag pins the one under it,
+  // and the click the browser may send after that is ignored. A tap is left to the click (a second tap unpins).
+  root.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse') finger = { x: e.clientX, y: e.clientY }; }, true);
+  root.addEventListener('pointerup', e => {
+    const f = finger;
+    finger = null;
+    if (!f || Math.hypot(e.clientX - f.x, e.clientY - f.y) <= TAP || !lifted || !(e.target as Element).closest(BOX[view])) return;
+    pin(lifted);
+    quiet = performance.now() + 700;
+  }, true);
+  root.addEventListener('pointercancel', () => { finger = null; }, true); // the browser took the drag for a scroll
 
   root.addEventListener('click', e => {
     const t = e.target as HTMLElement;
@@ -192,6 +226,7 @@ function listen() {
     arrive(id);
     render();
   });
+  es.addEventListener('reload', () => location.reload()); // typed in the kiosk's terminal (reload, build)
   es.addEventListener('clear', () => {
     if (tagged && current?.s.sample_id === tagged) unpin();
     tagged = missing = '';
@@ -241,12 +276,15 @@ function keys(e: KeyboardEvent) {
 function hover(r: Rec | null) {
   clearTimeout(dwell);
   clearTimeout(leaveT);
+  lifted = r;
   v().setLifted(r?.s.sample_id ?? null);
-  if (pinned || KIOSK) return; // the kiosk shows a sample on the reader or a click, never on hover
+  // a finger only lifts; the kiosk shows a sample on the reader or a click, never on hover
+  if (pinned || KIOSK || finger) return;
   if (r) dwell = window.setTimeout(() => show(r), DWELL);
   else leaveT = window.setTimeout(() => { if (!pinned && !overBand) show(null); }, LEAVE);
 }
 function click(r: Rec) {
+  if (performance.now() < quiet) return;
   if (pinned && current === r) unpin();
   else pin(r);
 }
@@ -277,7 +315,8 @@ function unpin() {
   pinned = false;
   v().setPinned(null);
   if (location.hash !== '#taxonomy') history.replaceState(null, '', '#taxonomy');
-  if (KIOSK) show(null); // nothing to hover back to: the frame goes back to its mark
+  // nothing pointing at it any more (the kiosk, a finger lifted, the pointer elsewhere): the frame goes back to its mark
+  if (KIOSK || (!lifted && !overBand)) show(null);
   render();
 }
 function reveal(r: Rec) { v().reveal(r.s.sample_id); }
@@ -296,7 +335,12 @@ function count() {
 function openDrawer(on: boolean) {
   drawer = on && !!current;
   const d = $('.txdrawer');
-  if (drawer) { d.innerHTML = fullRecord(current!); notes(current!); d.hidden = false; requestAnimationFrame(() => d.classList.add('open')); }
+  if (drawer) {
+    d.innerHTML = fullRecord(current!); notes(current!); d.hidden = false; requestAnimationFrame(() => d.classList.add('open'));
+    // on a phone the record opens in the page, under the summary: bring its head up under the preview (Chrome would
+    // otherwise keep the shelf where it was and move the record out of sight above it)
+    if (PHONE.matches && !KIOSK) scrollTo({ top: d.getBoundingClientRect().top + scrollY - $('.txpreview').offsetHeight, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+  }
   else { d.classList.remove('open'); window.setTimeout(() => { if (!drawer) d.hidden = true; }, 260); }
   render();
 }
@@ -323,7 +367,7 @@ function render() {
   if (!r) {
     left.innerHTML = missing
       ? `<div class="kicker">${esc(missing)}</div><p class="warn">No sample with this ID here.</p>`
-      : `<div class="kicker">SAMPLE</div><p class="dim">Point at a sample to see it here; click to keep it. A tag opens its sample directly.</p>`;
+      : `<div class="kicker">SAMPLE</div><p class="dim">${TOUCH ? 'Tap a sample to see it here, or drag along them and let go on one.' : 'Point at a sample to see it here; click to keep it.'} A tag opens its sample directly.</p>`;
     right.innerHTML = '';
     preview(null);
     return;

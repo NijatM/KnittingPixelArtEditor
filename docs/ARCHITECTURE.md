@@ -311,7 +311,9 @@ sequenceDiagram
   the records (fibres, yarns, samples: one JSON file each, material_bank ADR-0001) and the vocabularies, and
   derives each yarn's type and origin shares (`core.js`, shared with the node scripts). `shelf.ts` draws the
   spines with the hairline kernel: a straight-on camera gives every spine the same shape, so one path is reused
-  and a CSS transform places it; sorting slides them, hit tests use the layout. `main.ts` holds the state
+  and a CSS transform places it; sorting slides them, hit tests use the layout. Each spine is its own small svg in
+  a layer over the boards' svg, so the browser moves them as layers while they slide (one svg of 1000 spines was
+  repainted whole every frame). `stage.ts` builds every structure's model while the page is idle. `main.ts` holds the state
   (pointed at → after 120 ms current → pinned; the address follows the pin), the band below and the full record.
 - Three views share that state through one interface (`view.ts`: lift, current, pin, matches, neighbours for the
   keys, a mark's screen rectangle): the shelf; `lineage.ts`, the four layers on a canvas (fibres and structures in
@@ -343,7 +345,12 @@ sequenceDiagram
   latest state on connect). `Rig` holds the slot's rules: tags without a sample's address are ignored; while the
   shown tag is seen (asked for by its UID first, so whatever else lies near cannot hide it), others are ignored; once it is gone, a new sample takes over at once, else `clear` after 3 s.
   The page (`?kiosk`) hides the band and the ways out of the section, moves the preview into a large panel beside
-  the full record, shows a sample only by the reader or a click, and asks `stage.ts` to swing the frame.
+  the full record, shows a sample only by the reader or a click, and asks `stage.ts` to swing the frame. The
+  terminal is a console meanwhile (`Console`): commands go to the kiosk's loop, the only thread using the reader;
+  test tags pass through `Rig` like real ones; `reload` is a one-off event (not replayed to a page connecting).
+- Touch (`main.ts`): a finger only lifts (no dwell); letting go after a drag pins the one under it; a tap is left
+  to the click. Phones (< 760 px, `style.css`): the band and the view area give way (`display: contents`), the
+  preview is sticky at the top, the record opens inline, the shelf is as tall as its rows (`shelf.ts`).
 - On Android Chrome `main.ts` offers Web NFC (`NDEFReader`): a tag's URI record is routed like an address.
 
 ## Storage

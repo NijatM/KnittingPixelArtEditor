@@ -14,6 +14,8 @@ export interface Perf extends View { /** AXES changed */ axes(): void }
 const MW = 5, MH = 14, SLIDE = 520, FADE = 0.25;
 /** room round the plot: the y labels and the left strip; the x labels, the x name and the bottom strip */
 const PAD = { l: 96, r: 28, t: 34, b: 70 };
+/** a phone: the legend in two lines above the plot, the x name above the count of samples without a y value */
+const NARROW = 560, PAD_N = { l: 72, r: 16, t: 66, b: 84 };
 const RANK: Record<string, number> = { generated: 0, estimated: 1, measured: 2 };
 const STATUS = ['generated', 'estimated', 'measured'];
 
@@ -37,10 +39,12 @@ export function mountPerf(box: HTMLElement, db: DB, on: ViewEvents): Perf {
   // ---------------------------------------------------------------- places
   const from = new Float64Array(N * 2), to = new Float64Array(N * 2), xy = new Float64Array(N * 2), rank = new Int8Array(N);
   let ord: Rec[] = [], t0 = 0, sx = (v: number) => v, sy = (v: number) => v, ticksX: number[] = [], ticksY: number[] = [];
-  let px0 = 0, px1 = 0, py0 = 0, py1 = 0, stripY = 0, stripX = 0, missing = { x: 0, y: 0, both: 0 };
+  let px0 = 0, px1 = 0, py0 = 0, py1 = 0, stripY = 0, stripX = 0, missing = { x: 0, y: 0, both: 0 }, narrow = false;
   function place(slide: boolean) {
-    px0 = PAD.l; px1 = Math.max(px0 + 100, s.W - PAD.r); py0 = PAD.t; py1 = Math.max(py0 + 80, s.H - PAD.b);
-    stripY = py1 + 52; stripX = 30;
+    narrow = s.W < NARROW;
+    const pad = narrow ? PAD_N : PAD;
+    px0 = pad.l; px1 = Math.max(px0 + 100, s.W - pad.r); py0 = pad.t; py1 = Math.max(py0 + 80, s.H - pad.b);
+    stripY = py1 + (narrow ? 66 : 52); stripX = 30;
     const vx = recs.map(r => r.s.performance?.[AXES.x]), vy = recs.map(r => r.s.performance?.[AXES.y]);
     const scale = (vals: (number | undefined)[], a: number, b: number): [(v: number) => number, number[]] => {
       const v = vals.filter((x): x is number => x != null);
@@ -100,28 +104,41 @@ export function mountPerf(box: HTMLElement, db: DB, on: ViewEvents): Perf {
     for (const v of ticksY) { const y = sy(v); if (y >= py0 && y <= py1) ctx.fillText(num(v), px0 - 8, y); }
     const X = prop(AXES.x), Y = prop(AXES.y);
     ctx.fillStyle = pal.bright;
-    ctx.fillText(`${X.label} (${X.unit}) →`, px1, py1 + 30);
+    ctx.fillText(`${X.label} (${X.unit}) →`, px1, py1 + (narrow ? 26 : 30));
     ctx.textAlign = 'left';
     ctx.fillText(`↑ ${Y.label} (${Y.unit})`, px0, py0 - 16);
     // the strips
     ctx.fillStyle = pal.text;
     ctx.textAlign = 'left';
-    if (missing.y) ctx.fillText(`no ${Y.label}: ${missing.y}`, px0, py1 + 30);
+    if (missing.y) ctx.fillText(`no ${Y.label}: ${missing.y}`, px0, py1 + (narrow ? 46 : 30));
     if (missing.x) ctx.fillText(`no ${X.label}: ${missing.x}`, 6, py0 - 3);
     if (missing.both) ctx.fillText(`neither: ${missing.both}`, 6, stripY + 13);
     ctx.strokeStyle = pal.lo; ctx.setLineDash([1, 3]); ctx.beginPath();
     ctx.moveTo(px0, stripY + 0.5); ctx.lineTo(px1, stripY + 0.5); ctx.moveTo(stripX + 0.5, py0); ctx.lineTo(stripX + 0.5, py1);
     ctx.stroke(); ctx.setLineDash([]);
-    // the legend
-    ctx.textAlign = 'right';
-    let lx = px1;
-    for (const st of STATUS.slice().reverse()) {
-      ctx.fillStyle = pal.text; ctx.fillText(st, lx, py0 - 16);
-      lx -= ctx.measureText(st).width + 6 + MW;
-      outline(lx, py0 - 16 - MH / 2, RANK[st], pal.edge);
-      lx -= 14;
+    // the legend: right of the y name; on a phone two lines above it
+    const say = 'status of the less certain value:';
+    if (narrow) {
+      ctx.textAlign = 'left';
+      ctx.fillText(say, 6, 12);
+      let lx = 6;
+      for (const st of STATUS) {
+        outline(lx, 30 - MH / 2, RANK[st], pal.edge);
+        lx += MW + 6;
+        ctx.fillStyle = pal.text; ctx.fillText(st, lx, 30);
+        lx += ctx.measureText(st).width + 14;
+      }
+    } else {
+      ctx.textAlign = 'right';
+      let lx = px1;
+      for (const st of STATUS.slice().reverse()) {
+        ctx.fillStyle = pal.text; ctx.fillText(st, lx, py0 - 16);
+        lx -= ctx.measureText(st).width + 6 + MW;
+        outline(lx, py0 - 16 - MH / 2, RANK[st], pal.edge);
+        lx -= 14;
+      }
+      ctx.fillText(say, lx, py0 - 16);
     }
-    ctx.fillText('status of the less certain value:', lx, py0 - 16);
     // the marks: faded ones first, the lifted and current ones last
     const top = new Set([lifted, cur]);
     for (const faded of [true, false]) for (let i = 0; i < N; i++) {
@@ -174,7 +191,10 @@ export function mountPerf(box: HTMLElement, db: DB, on: ViewEvents): Perf {
   }
   const move = (e: PointerEvent) => { const b = s.cv.getBoundingClientRect(); mx = e.clientX - b.left; my = e.clientY - b.top; hovered(hit(mx, my)); };
   const leave = () => { mx = null; hovered(null); };
-  const click = () => { if (hoverRec) on.click(hoverRec); };
+  // a finger lifts as it goes down; a tap sends no move before its click, so the click finds its own mark
+  const down = (e: PointerEvent) => { if (e.pointerType !== 'mouse') move(e); };
+  const click = (e: MouseEvent) => { move(e as PointerEvent); if (hoverRec) on.click(hoverRec); };
+  s.cv.addEventListener('pointerdown', down);
   s.cv.addEventListener('pointermove', move);
   s.cv.addEventListener('pointerleave', leave);
   s.cv.addEventListener('click', click);
@@ -215,6 +235,6 @@ export function mountPerf(box: HTMLElement, db: DB, on: ViewEvents): Perf {
       return visible && i >= 0 ? s.screen(xy[i * 2] - MW / 2, xy[i * 2 + 1] - MH / 2, MW, MH) : null;
     },
     setAway(id, a) { if (a) away.add(id); else away.delete(id); kick(); },
-    destroy() { cancelAnimationFrame(raf); s.cv.removeEventListener('pointermove', move); s.cv.removeEventListener('pointerleave', leave); s.cv.removeEventListener('click', click); s.cv.remove(); },
+    destroy() { cancelAnimationFrame(raf); s.cv.removeEventListener('pointerdown', down); s.cv.removeEventListener('pointermove', move); s.cv.removeEventListener('pointerleave', leave); s.cv.removeEventListener('click', click); s.cv.remove(); },
   };
 }

@@ -10,7 +10,8 @@ No packages needed: the serial port is opened with termios (macOS / Linux).
                                              The tag already shown, laid on again: the page flies its frame in again
   python3 taxonomy_reader.py kiosk           the exhibition kiosk, offline: serves the built site (dist/, made by
                                              "npm run build") on this computer, opens it full screen in Chrome and
-                                             tells the page which sample lies on the reader (see KIOSK below)
+                                             tells the page which sample lies on the reader (see KIOSK below). The
+                                             terminal stays open for commands while it runs (type help)
   python3 taxonomy_reader.py check           print the PN532's firmware version and exit
   python3 taxonomy_reader.py info            print the next tag's UID, chip version, first pages, address and data
   python3 taxonomy_reader.py write SMP_0001  write that sample's tag from the records (address + data, as in
@@ -18,7 +19,7 @@ No packages needed: the serial port is opened with termios (macOS / Linux).
   python3 taxonomy_reader.py write <url>     write only <url> to the next NTAG21x tag laid on the reader
   options: --port /dev/cu.usbserial-10 (default: the first /dev/cu.usbserial* or /dev/ttyUSB*), --tab,
            --browser "Brave Browser" (any Chromium browser on macOS; default Google Chrome);
-           kiosk only: --http 8017 (the local port), --no-browser, --keys (no reader: type what lies on it, see KIOSK)
+           kiosk only: --http 8017 (the local port), --no-browser, --keys (no reader: test tags only, see KIOSK)
   start_reader.command and start_kiosk.command (next to this file) start them from Finder with a double-click.
   While waiting for tags, the reader may be unplugged and plugged back in (or plugged in only after starting): it
   waits for it and goes on.
@@ -31,10 +32,24 @@ its spine HOLD seconds after the reader last saw it (the wait also covers reads 
 address ends in #taxonomy/SMP_#### count; any other tag is ignored and named in this terminal. While the shown tag
 lies there, other tags are ignored (the reader asks for that tag by its UID first, so it is found whatever else lies
 near); once it is gone, a new sample takes over at once (a quick swap does not wait).
-Tags carry the public address; the kiosk shows the same sample from the local copy. With --keys there is no reader:
-each line typed is what lies on it now (sample IDs or addresses, several at once allowed; an empty line: nothing).
+Tags carry the public address; the kiosk shows the same sample from the local copy. While it runs, the terminal
+takes commands (CONSOLE below): test tags, the reader's state, reconnecting it, reloading or rebuilding the page,
+opening and closing the full-screen window. With --keys there is no reader, only test tags; there a line of sample IDs
+or addresses is what lies on the reader now, and an empty line lifts them.
 """
-import errno, functools, glob, hashlib, http.server, json, os, re, select, subprocess, sys, tempfile, termios, threading, time
+CONSOLE = """\
+  SMP_0042            a test tag on the reader, as if that sample were laid on it (several: SMP_0001 SMP_0002;
+                      an address works too); it follows the same rules as a real tag
+  lift                the test tags off again (the sample goes back after 3 s, as on the rig)
+  status              the page, the reader, the sample shown, what lies on the reader
+  check               ask the reader for its firmware version
+  reader              connect the reader again (after replugging it)
+  reload              reload the full-screen page
+  build               rebuild the site (npm run build), then reload the page
+  open / close        open the full-screen page again / close it
+  quit                close the page and stop (also ctrl-c)
+  help                this list"""
+import errno, functools, glob, hashlib, http.server, json, os, queue, re, select, subprocess, sys, tempfile, termios, threading, time
 import urllib.parse, webbrowser
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -284,17 +299,25 @@ def find_port(want):
     return next(iter(sorted(glob.glob('/dev/cu.usbserial*') + glob.glob('/dev/ttyUSB*'))), None)
 
 
+def attempt(want):
+    """The reader if its adapter is plugged in and the PN532 on it answers: (port, PN532, firmware "1.6"), else None."""
+    port = find_port(want)
+    if not port: return None
+    try:
+        nfc = PN532(port)
+        v = nfc.call(0x02)                                                   # firmware version: it is a PN532, awake
+        if v: return port, nfc, f'{v[1]}.{v[2]}'
+        nfc.close()
+    except LOST: pass
+    return None
+
+
 def connect(want):
     """The reader, once its adapter is plugged in and the PN532 on it answers."""
     said = False
     while True:
-        port = find_port(want)
-        if port:
-            try:
-                nfc = PN532(port)
-                if nfc.call(0x02): return port, nfc                          # firmware version: it is a PN532, awake
-                nfc.close()
-            except LOST: pass
+        got = attempt(want)
+        if got: return got[:2]
         if not said: print(f'waiting for the reader on {want or "a USB-serial port"} (ctrl-c to stop)', flush=True); said = True
         time.sleep(1)
 
@@ -330,24 +353,9 @@ class Desk:
         return out, new
 
 
-class Keys:
-    """Instead of a reader (kiosk --keys): each line typed is what lies on it now."""
-    def __init__(self):
-        self.now, self.seen = {}, set()
-        threading.Thread(target=self.read, daemon=True).start()
-
-    def read(self):
-        for line in sys.stdin:
-            items = line.split()
-            self.now = {hashlib.sha1(i.encode()).digest()[:7]: (PUBLIC + '#taxonomy/' + i if re.fullmatch(r'SMP_\d{4}', i) else i) for i in items}
-
-    def there(self, uid): return uid in self.now
-
-    def look(self):
-        now = dict(self.now)
-        new = [u for u in now if u not in self.seen]
-        self.seen = set(now)
-        return now, new
+def test_tags(items):
+    """Test tags (the kiosk's console): {made-up UID: address} for sample IDs or addresses."""
+    return {hashlib.sha1(i.encode()).digest()[:7]: (PUBLIC + '#taxonomy/' + i if re.fullmatch(r'SMP_\d{4}', i) else i) for i in items}
 
 
 def watch(want, tab, browser):
@@ -389,19 +397,26 @@ class Rig:
 
 
 class Hub:
-    """What the reader last told the page; each kiosk page listening (server-sent events) gets every change."""
-    def __init__(self):
-        self.cv, self.n, self.state, self.boot = threading.Condition(), 0, ('clear', ''), f'{int(time.time())}'
+    """What the reader last told the page; each kiosk page listening (server-sent events) gets every change. A page
+    that connects gets the state (show or clear); `keep=False` events (reload) go only to the pages listening then."""
+    def __init__(self, log):
+        self.cv, self.n, self.state, self.last, self.boot = threading.Condition(), 0, ('clear', ''), ('clear', ''), f'{int(time.time())}'
+        self.log, self.pages = log, 0
 
-    def say(self, event, data):
+    def say(self, event, data='', keep=True):
         with self.cv:
-            self.n += 1; self.state = (event, data); self.cv.notify_all()
-        print(f'  page: {event} {data}'.rstrip(), flush=True)
+            self.n += 1; self.last = (event, data); self.cv.notify_all()
+            if keep: self.state = (event, data)
+        self.log(f'page: {event} {data}'.rstrip())
 
     def wait(self, n, timeout):
         with self.cv:
             self.cv.wait_for(lambda: self.n != n, timeout)
-            return self.n, self.state
+            return self.n, (self.state if n < 0 else self.last)
+
+    def page(self, d):
+        with self.cv: self.pages += d
+        self.log(f'page {"connected" if d > 0 else "gone"} ({self.pages} open)')
 
 
 class Site(http.server.SimpleHTTPRequestHandler):
@@ -428,6 +443,7 @@ class Site(http.server.SimpleHTTPRequestHandler):
         self.send_header('Content-Type', 'text/event-stream'); self.end_headers()
         hub, last = self.hub, self.headers.get('Last-Event-ID')
         n, state = hub.wait(-1, 0)
+        hub.page(1)
         try:
             self.wfile.write(b'retry: 2000\n\n')
             if last != f'{hub.boot}-{n}': self.send(hub.boot, n, state)        # a page that reconnects has it already
@@ -437,6 +453,7 @@ class Site(http.server.SimpleHTTPRequestHandler):
                 else: n = m; self.send(hub.boot, n, state)
                 self.wfile.flush()
         except (BrokenPipeError, ConnectionResetError): pass
+        finally: hub.page(-1)
 
     def send(self, boot, n, state):
         self.wfile.write(f'id: {boot}-{n}\nevent: {state[0]}\ndata: {state[1]}\n\n'.encode()); self.wfile.flush()
@@ -444,47 +461,139 @@ class Site(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a): pass
 
 
+PROFILE = os.path.join(tempfile.gettempdir(), 'knitting-taxonomy-kiosk')    # the kiosk browser's own profile
+
+
 def open_full_screen(url, browser):
     """Chrome (or another Chromium browser) in kiosk mode, its own profile so it starts as a new instance (cmd-Q
     leaves); elsewhere the default browser."""
     if sys.platform == 'darwin' and os.path.isdir(f'/Applications/{browser}.app'):
-        profile = os.path.join(tempfile.gettempdir(), 'knitting-taxonomy-kiosk')
-        subprocess.run(['open', '-na', browser, '--args', '--kiosk', f'--user-data-dir={profile}', '--no-first-run',
+        subprocess.run(['open', '-na', browser, '--args', '--kiosk', f'--user-data-dir={PROFILE}', '--no-first-run',
                         '--no-default-browser-check', '--disable-pinch', '--overscroll-history-navigation=0', url])
     else: webbrowser.open(url)
+
+
+def close_full_screen():
+    """The kiosk browser (the one with the kiosk's profile) quits; other browser windows stay."""
+    return subprocess.run(['pkill', '-f', f'--user-data-dir={PROFILE}'], capture_output=True).returncode == 0
+
+
+class Console:
+    """The terminal while the kiosk runs: each line typed goes to the kiosk's loop (the only one using the reader).
+    Messages print above the prompt."""
+    def __init__(self):
+        self.tty, self.lines, self.lock = sys.stdin.isatty(), queue.Queue(), threading.Lock()
+        threading.Thread(target=self.read, daemon=True).start()
+
+    def read(self):
+        while True:
+            try: line = input()
+            except EOFError: self.lines.put(None if self.tty else ''); return  # ctrl-d quits; a pipe ending lifts
+            self.lines.put(line.strip())
+            self.prompt()
+
+    def prompt(self):
+        if self.tty:
+            with self.lock: sys.stdout.write('kiosk> '); sys.stdout.flush()
+
+    def log(self, text, stamp=True):
+        with self.lock:
+            head = time.strftime('%H:%M:%S  ') if stamp else ''
+            body = '\n'.join(head + t if i == 0 else ' ' * len(head) + t for i, t in enumerate(text.split('\n')))
+            sys.stdout.write(('\r\033[K' if self.tty else '') + body + '\n' + ('kiosk> ' if self.tty else ''))
+            sys.stdout.flush()
 
 
 def kiosk(want, port, keys, browser, open_browser):
     site = os.path.join(ROOT, 'dist')
     if not os.path.isfile(os.path.join(site, 'index.html')): sys.exit('no built site in dist/: run "npm run build" here first')
-    hub = Hub()
+    con = Console()
+    log = con.log
+    hub = Hub(log)
     handler = type('KioskSite', (Site,), {'hub': hub})
     try: server = http.server.ThreadingHTTPServer(('127.0.0.1', port), functools.partial(handler, directory=site))
     except OSError as e: sys.exit(f'port {port}: {e.strerror} (another kiosk running? use --http <port>)')
     server.daemon_threads = True
     threading.Thread(target=server.serve_forever, daemon=True).start()
     url = f'http://127.0.0.1:{port}{BASE}?kiosk#taxonomy'
-    print(f'kiosk page: {url}', flush=True)
-    if open_browser: open_full_screen(url, browser)
-    rig = Rig(hub.say)
-    if keys: source, nfc = Keys(), None; print('no reader: type what lies on it (sample IDs or addresses), Enter; an empty line: nothing', flush=True)
-    else: port_, nfc = connect(want); source = Desk(nfc, HOLD); print(f'{port_}: waiting for tags (ctrl-c to stop)', flush=True)
-    while True:
-        try:
-            if rig.uid and source.there(rig.uid):                            # the shown tag still lies there: the
-                rig.look(time.time(), {rig.uid: rig.sample}); time.sleep(0.2); continue   # rest is not looked at
-            tags, new = source.look()
-            for uid in new:
-                s = sample_of(tags[uid])
-                print(f'tag {uid.hex()}: {s}' if s else f'tag {uid.hex()}: ignored, not a sample ({tags[uid] or "no address"})', flush=True)
-            rig.look(time.time(), {u: sample_of(a) for u, a in tags.items()})
-        except LOST as e:
-            nfc.close()
-            print(f'{port_}: the reader went away ({e})', flush=True)
-            rig.look(time.time(), {})
-            port_, nfc = connect(want); source = Desk(nfc, HOLD)
-            print(f'{port_}: back, waiting for tags', flush=True)
-        time.sleep(0.2)
+    log(f'Knitting Taxonomy kiosk\n  page    {url}\n  reader  {"none (--keys): test tags only" if keys else want or "the first USB-serial port"}\n'
+        f'commands (Enter after each):\n{CONSOLE}', stamp=False)
+    if open_browser: open_full_screen(url, browser); log('page: opening full screen (cmd-Q there, or close here)')
+    rig, test, seen = Rig(hub.say), {}, {}
+    reader, retry, waiting = None, 0.0, False                                # reader: (port, PN532, firmware, Desk)
+
+    def status():
+        r = 'none (--keys)' if keys else f'{reader[0]}, PN532 firmware {reader[2]}' if reader else 'not connected, waiting for it'
+        on = [f'{u.hex()} {sample_of(a) or "not a sample"}' for u, a in seen.items() if u not in test] + [f'test {sample_of(a) or a}' for a in test.values()]
+        return (f'page    {url}, {hub.pages} open\nreader  {r}\nshown   {rig.sample or "nothing"}' +
+                (' (lifted, goes back in a moment)' if rig.sample and rig.uid not in seen else '') + f'\non it   {", ".join(on) or "nothing"}')
+
+    def command(line):
+        """One line typed; False to stop."""
+        nonlocal test, reader, retry, waiting
+        if line is None: return False
+        words = line.split()
+        cmd = words[0].lower() if words else ''
+        if not words or re.fullmatch(r'SMP_\d{4}', words[0]) or words[0].startswith('http') or cmd == 'put':
+            items = words[1:] if cmd == 'put' else words
+            if not items and not keys: return True                           # Enter alone: nothing
+            test = test_tags(items)
+            log(f'test tags on the reader: {" ".join(items)}' if items else 'test tags lifted')
+        elif cmd == 'lift': test = {}; log('test tags lifted')
+        elif cmd in ('status', 's'): log(status())
+        elif cmd == 'check':
+            if not reader: log('no reader connected')
+            else:
+                v = reader[1].call(0x02)
+                log(f'{reader[0]}: PN532 firmware {v[1]}.{v[2]}' if v else f'{reader[0]}: no answer (wiring? HSU mode?)')
+        elif cmd == 'reader':
+            if keys: log('no reader with --keys')
+            else:
+                if reader: reader[1].close()
+                reader, retry, waiting = None, 0.0, False
+                log('reader: connecting again')
+        elif cmd == 'reload': hub.say('reload', keep=False)
+        elif cmd == 'build':
+            log('npm run build …')
+            r = subprocess.run(['npm', 'run', 'build'], cwd=ROOT, capture_output=True, text=True)
+            tail = (r.stdout + r.stderr).strip().splitlines()[-3:]
+            log(('built: ' if r.returncode == 0 else 'build failed:\n') + '\n'.join(tail))
+            if r.returncode == 0: hub.say('reload', keep=False)
+        elif cmd == 'open': open_full_screen(url, browser); log('page: opening full screen')
+        elif cmd == 'close': log('page: closed' if close_full_screen() else 'page: no full-screen page open')
+        elif cmd in ('quit', 'q', 'exit'): return False
+        elif cmd in ('help', '?', 'h'): log(CONSOLE, stamp=False)
+        else: log(f'{words[0]}: not a command (help lists them)')
+        return True
+
+    try:
+        while True:
+            while not con.lines.empty():
+                if not command(con.lines.get()): return
+            now = time.time()
+            if not keys and not reader and now >= retry:
+                got, retry = attempt(want), now + 1.0
+                if got: reader = (*got, Desk(got[1], HOLD)); waiting = False; log(f'reader: {got[0]}, PN532 firmware {got[2]}; waiting for tags')
+                elif not waiting: waiting = True; log(f'reader: waiting for it on {want or "a USB-serial port"} (test tags work meanwhile)')
+            try:
+                if rig.uid and (rig.uid in test or reader and reader[3].there(rig.uid)):   # the shown tag still lies
+                    rig.look(now, {rig.uid: rig.sample}); time.sleep(0.2); continue       # there: the rest waits
+                found, new = reader[3].look() if reader else ({}, [])
+                for uid in new:
+                    s = sample_of(found[uid])
+                    log(f'tag {uid.hex()}: {s}' if s else f'tag {uid.hex()}: ignored, not a sample ({found[uid] or "no address"})')
+                seen = {**found, **test}
+                rig.look(now, {u: sample_of(a) for u, a in seen.items()})
+            except LOST as e:
+                reader[1].close()
+                log(f'reader: {reader[0]} went away ({e}); waiting for it')
+                reader, waiting, seen = None, True, dict(test)
+                rig.look(time.time(), {u: sample_of(a) for u, a in test.items()})
+            time.sleep(0.2)
+    except KeyboardInterrupt: pass
+    finally:
+        if open_browser: close_full_screen()
+        log('kiosk stopped', stamp=False)
 
 
 def main():

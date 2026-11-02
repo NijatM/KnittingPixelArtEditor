@@ -110,7 +110,12 @@ NFC), so tags do not open new tabs.
 For an exhibition, `kiosk` runs the same site offline from the built copy (`dist/`) on the laptop, full screen in
 Chrome, with the reader beside it: a sample laid on the reader flies in and its full record opens beside a large,
 slowly turning preview; lifted off, it goes back to its spine after 3 s. Only tags with a sample's address count,
-and while a sample lies there other tags are ignored. `--keys` stands in for the reader (type sample IDs).
+and while a sample lies there other tags are ignored. The terminal stays open for commands while it runs (`help`):
+test tags (type `SMP_0042`, then `lift`), `status`, `check` and `reader` (reconnect), `reload`, `build`, `open` /
+`close` the full-screen page, `quit`. `--keys` runs it without a reader (test tags only).
+
+On phones (under 760 px) the section is one page: the preview stays at the top, the summary and the full record
+below it, then the view. A finger dragged along the marks lifts them; letting go pins the one under it; a tap is a click.
 
 For now the shelf holds 300 **generated demo samples**: every value is made up and marked so
 (`node scripts/taxonomy-demo.mjs` writes them; `SHOW_DEMO` in `src/taxonomy/data.ts` removes them all).

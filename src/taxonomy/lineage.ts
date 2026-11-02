@@ -10,6 +10,8 @@ import { bands, hatch, palette, surface, type View, type ViewEvents } from './vi
 
 /** side margin, the gutter with the layer names, the lens's widest tick and its half-width (in ticks) */
 const M = 24, GUT = 88, LENS = 16, R = 7;
+/** a phone: narrower margin and layer-name column */
+const NARROW = 560, M_N = 12, GUT_N = 64;
 const TICK_H = 26, ID_H = 56, NODE_H = 6, FADE = 0.25, TAU = 70;
 const ORIGINS = ['natural', 'regenerated', 'synthetic', 'unknown'];
 const NAMES = ['FIBRES', 'YARNS', 'SAMPLES', 'STRUCTURES'];
@@ -90,9 +92,10 @@ export function mountLineage(box: HTMLElement, db: DB, on: ViewEvents): View {
 
   // ---------------------------------------------------------------- geometry
   const N = S.length, xs = new Float64Array(N), ws = new Float64Array(N);
-  let x0 = 0, wr = 0, yF = 0, yY = 0, yS = 0, yT = 0;
+  let x0 = 0, wr = 0, yF = 0, yY = 0, yS = 0, yT = 0, m = M;
   function place() {
-    x0 = M + GUT; wr = Math.max(100, s.W - x0 - M);
+    const narrow = s.W < NARROW;
+    m = narrow ? M_N : M; x0 = m + (narrow ? GUT_N : GUT); wr = Math.max(100, s.W - x0 - m);
     yF = 34; yT = s.H - 34 - NODE_H;
     const room = Math.max(60, yT - yF - 2 * NODE_H - TICK_H);
     yY = yF + NODE_H + room * 0.26; yS = yY + NODE_H + room * 0.42;
@@ -236,7 +239,7 @@ export function mountLineage(box: HTMLElement, db: DB, on: ViewEvents): View {
       const list = L.filter(show).sort((a, b) => +(b === hoverNode) - +(a === hoverNode) || +(lit?.has(b) ?? 0) - +(lit?.has(a) ?? 0) || a.pos - b.pos);
       for (const n of list) {
         const text = n === hoverNode && n.more ? `${n.label} · ${n.more}` : n.label, tw = ctx.measureText(text).width;
-        const x = Math.max(x0, Math.min(s.W - M - tw, n.x + n.w / 2 - tw / 2));
+        const x = Math.max(x0, Math.min(s.W - m - tw, n.x + n.w / 2 - tw / 2));
         const pref = n.pos % ys.length, r = [pref, ...ys.keys()].find(k => taken[k].every(([a, b]) => x + tw + 6 < a || x > b + 6));
         if (r == null) continue;
         taken[r].push([x, x + tw]);
@@ -255,8 +258,8 @@ export function mountLineage(box: HTMLElement, db: DB, on: ViewEvents): View {
     ctx.font = `9px ${pal.font}`;
     [F.length, Y.length, N, T.length].forEach((n, l) => {
       const y = [yF + NODE_H / 2, yY + NODE_H / 2, yS + TICK_H / 2, yT + NODE_H / 2][l];
-      ctx.fillStyle = pal.text; ctx.fillText(NAMES[l], M, y - 5);
-      ctx.fillStyle = pal.edge; ctx.fillText(String(n), M, y + 7);
+      ctx.fillStyle = pal.text; ctx.fillText(NAMES[l], m, y - 5);
+      ctx.fillStyle = pal.edge; ctx.fillText(String(n), m, y + 7);
     });
   }
 
@@ -293,7 +296,13 @@ export function mountLineage(box: HTMLElement, db: DB, on: ViewEvents): View {
     kick();
   };
   const leave = () => { mx = null; px = null; ampT = cur >= 0 ? 1 : 0; hovered(null); kick(); };
-  const click = () => { if (hoverNode?.rec) on.click(hoverNode.rec); };
+  // a finger lights its chain as it goes down; a tap sends no move before its click, so the click finds its own mark
+  const down = (e: PointerEvent) => { if (e.pointerType !== 'mouse') move(e); };
+  const click = (e: MouseEvent) => {
+    const b = s.cv.getBoundingClientRect(), n = hoverNode ?? hit(e.clientX - b.left, e.clientY - b.top);
+    if (n?.rec) on.click(n.rec);
+  };
+  s.cv.addEventListener('pointerdown', down);
   s.cv.addEventListener('pointermove', move);
   s.cv.addEventListener('pointerleave', leave);
   s.cv.addEventListener('click', click);
@@ -332,6 +341,6 @@ export function mountLineage(box: HTMLElement, db: DB, on: ViewEvents): View {
       return s.screen(xs[i] + g / 2, yS, Math.max(1, ws[i] - g), TICK_H);
     },
     setAway(id, a) { if (a) away.add(id); else away.delete(id); kick(); },
-    destroy() { cancelAnimationFrame(raf); s.cv.removeEventListener('pointermove', move); s.cv.removeEventListener('pointerleave', leave); s.cv.removeEventListener('click', click); s.cv.remove(); },
+    destroy() { cancelAnimationFrame(raf); s.cv.removeEventListener('pointerdown', down); s.cv.removeEventListener('pointermove', move); s.cv.removeEventListener('pointerleave', leave); s.cv.removeEventListener('click', click); s.cv.remove(); },
   };
 }

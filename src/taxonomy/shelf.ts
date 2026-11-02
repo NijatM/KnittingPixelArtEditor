@@ -1,7 +1,8 @@
 // The Samples view's shelf: every sample as a spine standing on a board, drawn with the hairline kernel. The camera
 // looks straight at the shelf (azimuth 0), so every spine has the same shape: one path for all of them, moved into
 // place with a CSS transform. That keeps the vertical IDs sharp and the rows level, and lets a re-sort slide the
-// spines to their new places. A spine shows its sample ID, a mark for the structure family and one band per yarn
+// spines to their new places. Each spine is its own small svg over the boards' svg, so the browser moves them as
+// layers while they slide (one svg of 1000 spines was repainted whole every frame: ~30 ms, 20–30 fps on an M2 Pro). A spine shows its sample ID, a mark for the structure family and one band per yarn
 // in its origin colours (a blend split by share, unknown fibres hatched). Hit tests use the layout, not the DOM.
 import { HL } from '../hl';
 import { groups, type DB, type Rec, type SortKey } from './data';
@@ -26,10 +27,10 @@ const MARKS: Record<string, string> = {
 export interface Shelf extends View {
   layout(by: SortKey, animate: boolean): void;
   /** The spine element, for screen-reader focus. */
-  el(id: string): SVGGElement | null;
+  el(id: string): SVGSVGElement | null;
 }
 
-interface Spine { rec: Rec; g: SVGGElement; sil: SVGPathElement; cr: SVGPathElement; mark: SVGPathElement; id: SVGTextElement; bands: SVGGElement; nb: number }
+interface Spine { rec: Rec; g: SVGSVGElement; sil: SVGPathElement; cr: SVGPathElement; mark: SVGPathElement; id: SVGTextElement; bands: SVGGElement; nb: number }
 
 export function mountShelf(box: HTMLElement, db: DB, on: ViewEvents): Shelf {
   HL.inject(document);
@@ -41,7 +42,13 @@ export function mountShelf(box: HTMLElement, db: DB, on: ViewEvents): Shelf {
   const hatch = mk('pattern', { id: 'tx-hatch', patternUnits: 'userSpaceOnUse', width: 3, height: 3, patternTransform: 'rotate(45)' }, defs);
   mk('rect', { width: 3, height: 3, style: `fill:${unknown};opacity:.35` }, hatch);
   mk('rect', { width: 1.3, height: 3, style: `fill:${unknown}` }, hatch);
-  const boards = mk('g', {}, svg), labels = mk('g', { class: 'glabels' }, svg), spinesG = mk('g', {}, svg);
+  const boards = mk('g', {}, svg), labels = mk('g', { class: 'glabels' }, svg);
+  // the spines' layer: a hairline box of its own, so the kernel's styles reach each spine's svg
+  const layer = document.createElement('div');
+  layer.className = 'txspines';
+  layer.setAttribute('data-hairline', 'tx');
+  layer.setAttribute('data-hairline-theme', 'dark');
+  box.appendChild(layer);
   const pin = mk('ellipse', { class: 'dot pinmark', rx: 2.2, ry: 2.2 }, null) as SVGEllipseElement;
 
   const C = Cam(0, K, 1);
@@ -50,7 +57,7 @@ export function mountShelf(box: HTMLElement, db: DB, on: ViewEvents): Shelf {
 
   const spines = new Map<string, Spine>();
   for (const rec of db.recs) {
-    const g = mk('g', { class: 'sp', id: `sp-${rec.s.sample_id}` }, spinesG) as SVGGElement;
+    const g = mk('svg', { class: 'sp', id: `sp-${rec.s.sample_id}`, 'aria-label': `${rec.s.sample_id}, ${rec.s.sample_name}` }, layer) as SVGSVGElement;
     const lift = mk('g', { class: 'lift' }, g);
     const sil = mk('path', { class: 'sil' }, lift), cr = mk('path', { class: 'nf lo' }, lift);
     const bands = mk('g', {}, lift) as SVGGElement;
@@ -97,8 +104,10 @@ export function mountShelf(box: HTMLElement, db: DB, on: ViewEvents): Shelf {
 
   function layout(next: SortKey, animate: boolean) {
     by = next;
-    svg.classList.toggle('still', !animate);
-    const W = box.clientWidth, H = box.clientHeight, f = flow(Math.max(SW, W - 2 * MARGIN));
+    layer.classList.toggle('still', !animate);
+    // on phones the shelf is not a box of its own but part of the page (style.css): as tall as its rows, short spines
+    const flowing = getComputedStyle(box).position !== 'absolute';
+    const W = box.clientWidth, H = flowing ? 0 : box.clientHeight, f = flow(Math.max(SW, W - 2 * MARGIN));
     ord = f.order;
     const fixed = LIFT_ROOM + DEPTH * K + UNDER + ROW_GAP;
     const FH = Math.max(96, Math.min(150, Math.floor((H - 2 * top) / Math.max(1, f.nrows) - fixed)));
@@ -107,7 +116,7 @@ export function mountShelf(box: HTMLElement, db: DB, on: ViewEvents): Shelf {
     pin.setAttribute('cy', String(pinY));
     xoff = Math.round((W - f.widest) / 2);
     svg.setAttribute('viewBox', `0 0 ${W} ${Math.max(H, f.nrows * rowH + 2 * top)}`);
-    svg.style.height = `${Math.max(H, f.nrows * rowH + 2 * top)}px`;
+    svg.style.height = layer.style.height = `${Math.max(H, f.nrows * rowH + 2 * top)}px`;
     // one spine shape for all of them
     const [ring, inner] = rings(0, 0, SW, DEPTH, 1.6, 0.8), sh = prism(P, front, ring, inner, 0, FH / ZF);
     rows = Array.from({ length: f.nrows }, (_, i) => { const y = top + i * rowH; return { y, foot: y + LIFT_ROOM + DEPTH * K + FH, items: [] }; });
@@ -135,7 +144,7 @@ export function mountShelf(box: HTMLElement, db: DB, on: ViewEvents): Shelf {
       const t = mk('text', { class: 'glabel', x: xoff + l.x, y: rows[l.row].foot + UNDER - 3.5 }, labels);
       t.textContent = l.text;
     }
-    if (!animate) requestAnimationFrame(() => svg.classList.remove('still'));
+    if (!animate) requestAnimationFrame(() => layer.classList.remove('still'));
   }
 
   // ---------------------------------------------------------------- pointer
@@ -150,7 +159,9 @@ export function mountShelf(box: HTMLElement, db: DB, on: ViewEvents): Shelf {
   let under: Rec | null = null;
   const move = (e: PointerEvent) => { const r = hit(e); if (r !== under) { under = r; on.hover(r); } };
   const leave = () => { if (under) { under = null; on.hover(null); } };
+  const down = (e: PointerEvent) => { if (e.pointerType !== 'mouse') move(e); }; // a finger lifts as it goes down
   const click = (e: MouseEvent) => { const r = hit(e); if (r) on.click(r); };
+  svg.addEventListener('pointerdown', down);
   svg.addEventListener('pointermove', move);
   svg.addEventListener('pointerleave', leave);
   svg.addEventListener('click', click);
@@ -187,12 +198,18 @@ export function mountShelf(box: HTMLElement, db: DB, on: ViewEvents): Shelf {
     },
     order: () => ord,
     el: id => spines.get(id)?.g ?? null,
-    reveal: id => spines.get(id)?.g.scrollIntoView({ block: 'nearest' }),
+    // the shelf's own scroll only: on a phone the page stays where it is (the sample is in the preview at the top)
+    reveal(id) {
+      const sp = spines.get(id), row = sp && rows.find(r => r.items.some(it => it.rec === sp.rec));
+      if (!row || box.scrollHeight <= box.clientHeight) return;
+      if (row.y < box.scrollTop) box.scrollTop = row.y;
+      else if (row.foot + UNDER > box.scrollTop + box.clientHeight) box.scrollTop = row.foot + UNDER + top - box.clientHeight;
+    },
     face: id => {
       const b = spines.get(id)?.sil.getBoundingClientRect();
       return b?.width ? new DOMRect(b.x, b.y + DEPTH * K, b.width, b.height - DEPTH * K) : null;
     },
     setAway: (id, away) => spines.get(id)?.g.classList.toggle('away', away),
-    destroy() { svg.removeEventListener('pointermove', move); svg.removeEventListener('pointerleave', leave); svg.removeEventListener('click', click); svg.remove(); },
+    destroy() { svg.removeEventListener('pointerdown', down); svg.removeEventListener('pointermove', move); svg.removeEventListener('pointerleave', leave); svg.removeEventListener('click', click); svg.remove(); layer.remove(); },
   };
 }

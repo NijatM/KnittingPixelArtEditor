@@ -429,6 +429,7 @@ ol.sources a { word-break: break-all; }
 .txfind { flex: 1 1 200px; max-width: 360px; background: var(--bg2); border: 1px solid var(--line2); padding: 3px 8px; outline: none; border-radius: 0; }
 .txfind:focus { border-color: var(--hi); }
 .txcount { font-variant-numeric: tabular-nums; min-width: 9ch; }
+.txbreak { flex-basis: 100%; height: 0; }
 .txsort { align-items: center; margin-left: auto; }
 .txsort .small { margin-right: 8px; }
 .txnotice { padding: 6px 20px; border-bottom: 1px dashed var(--line2); color: var(--dim); }
@@ -450,17 +451,22 @@ ol.sources a { word-break: break-all; }
 .txaxes select:focus { outline: none; border-color: var(--hi); }
 .txlive { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .txshelf > svg.txsvg { position: static; display: block; width: 100%; }
-.txsvg .sp { transition: transform 620ms cubic-bezier(.5, 0, .1, 1), opacity 200ms; }
-.txsvg.still .sp { transition: opacity 200ms; }
-.txsvg .lift { transition: transform 120ms cubic-bezier(.3, 0, .2, 1); }
-.txsvg .sp.up .lift { transform: translateY(-8px); }
-.txsvg .sp.cur .lift { transform: translateY(-12px); }
-.txsvg .sp.up .sil, .txsvg .sp.cur .sil { stroke: var(--hl-hi); }
-.txsvg .sp.dim { opacity: .25; }
-.txsvg .sid { fill: var(--dim); font-size: 9.5px; font-weight: 500; dominant-baseline: central; }
-.txsvg .sp.up .sid, .txsvg .sp.cur .sid { fill: var(--hi); }
+/* the spines: one svg each, in a layer over the boards (shelf.ts); the pointer goes through to the boards' svg */
+.txspines { position: absolute; left: 0; top: 0; width: 100%; aspect-ratio: auto; pointer-events: none; touch-action: auto; }
+.txspines > svg.sp { position: absolute; inset: 0 auto auto 0; width: 16px; height: 1px; overflow: visible; transition: transform 620ms cubic-bezier(.5, 0, .1, 1), opacity 200ms; }
+.txspines.still > svg.sp { transition: opacity 200ms; }
+.txspines .lift { transition: transform 120ms cubic-bezier(.3, 0, .2, 1); }
+.txspines .sp.up .lift { transform: translateY(-8px); }
+.txspines .sp.cur .lift { transform: translateY(-12px); }
+.txspines .sp.up .sil, .txspines .sp.cur .sil { stroke: var(--hl-hi); }
+.txspines .sp.dim { opacity: .25; }
+.txspines .sid { fill: var(--dim); font-size: 9.5px; font-weight: 500; dominant-baseline: central; }
+.txspines .sp.up .sid, .txspines .sp.cur .sid { fill: var(--hi); }
+.txspines text { pointer-events: none; user-select: none; -webkit-user-select: none; }
 .txsvg .glabel { fill: var(--dim); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
 .txsvg text { pointer-events: none; user-select: none; -webkit-user-select: none; }
+/* a vertical drag scrolls; a sideways one is the view's (lifts the spines); no long-press menu on a spine */
+.txsvg { touch-action: pan-y pinch-zoom; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }
 
 .txband { display: grid; grid-template-columns: minmax(0, 1fr) 240px minmax(0, 1fr); gap: 24px; height: 232px; padding: 12px 20px; border-top: 1px solid var(--line); background: var(--bg); position: relative; z-index: 4; }
 .txleft, .txright { min-width: 0; overflow: hidden; }
@@ -477,8 +483,8 @@ svg.band { display: block; }
 #tx .kv td.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--hi); white-space: nowrap; }
 #tx .warn { color: var(--warn); }
 .txpreview { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 0; text-align: center; }
-.txview { width: 100%; height: 158px; display: flex; align-items: center; justify-content: center; touch-action: none; }
-.txview:empty { cursor: grab; }
+.txview { width: 100%; height: 158px; display: flex; align-items: center; justify-content: center; touch-action: pan-y pinch-zoom; }
+.txview:empty { cursor: grab; touch-action: none; } /* the 3D frame is there: a drag turns it */
 .txview.turning { cursor: grabbing; }
 .txview .txframe { width: auto; height: 100%; }
 .txcap { line-height: 1.35; max-width: 100%; }
@@ -515,14 +521,28 @@ svg.band { display: block; }
 #tx.kiosk .txdrawer { left: 44%; }
 .txkline { padding: 14px 20px 16px; border-top: 1px solid var(--line); color: var(--hi); font-size: 18px; text-align: center; }
 
-/* phones: the band above the shelf, everything in one scroll (the full phone layout comes later) */
+/* phones (decision 20): sample first, in one page scroll. The band's and the view area's boxes give way
+   (display: contents), so their parts line up in the page: the preview at the top, held there while the page
+   scrolls (the sample flies up into it from wherever it was tapped), the summary, the full record inline when
+   opened, then the view. The shelf is as tall as its rows (shelf.ts: short spines); a vertical drag on it scrolls the
+   page, a sideways one lifts the spines. */
 @media (max-width: 760px) {
   body[data-section="taxonomy"] { overflow: auto; }
   #tx { display: flex; flex-direction: column; height: auto; min-height: 100dvh; }
-  .txbar { padding: 10px 16px; }
+  #tx > .txmain, #tx > .txband { display: contents; }
+  .txbar { order: 1; padding: 10px 16px; }
+  .txnotice { order: 2; padding: 6px 16px; }
   .txsort, .txaxes { margin-left: 0; }
-  .txband { order: 3; height: auto; grid-template-columns: 1fr; gap: 12px; padding: 12px 16px; }
-  .txright { align-items: flex-start; text-align: left; }
-  .txmain { order: 4; height: 70vh; flex: none; }
+  .txpreview { order: 3; position: sticky; top: 0; z-index: 4; background: var(--bg); padding: 10px 16px 6px; border-bottom: 1px solid var(--line); }
+  .txview { height: min(28vh, 210px); }
+  .txleft { order: 4; padding: 12px 16px 0; overflow: visible; }
+  .txright { order: 5; align-items: flex-start; text-align: left; padding: 12px 16px 14px; overflow: visible; }
+  .txright:empty { display: none; }
+  #tx .txdrawer { order: 6; position: static; transform: none; transition: none; overflow: visible; padding: 4px 16px 20px; }
+  .txshelf, .txlin, .txperf { order: 7; border-top: 1px solid var(--line); }
+  .txshelf[data-hairline] { position: relative; inset: auto; overflow: visible; }
+  .txlin, .txperf { position: relative; inset: auto; height: min(72vh, 620px); touch-action: pan-y pinch-zoom; }
+  .drawhead { flex-wrap: wrap; }
   .drawcols { grid-template-columns: 1fr; }
 }
+
