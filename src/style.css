@@ -451,9 +451,11 @@ ol.sources a { word-break: break-all; }
 .txaxes select:focus { outline: none; border-color: var(--hi); }
 .txlive { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .txshelf > svg.txsvg { position: static; display: block; width: 100%; }
-/* the spines: one svg each, in a layer over the boards (shelf.ts); the pointer goes through to the boards' svg */
+/* the spines: one svg each, in a layer over the boards (shelf.ts); the pointer goes through to the boards' svg.
+   will-change keeps each its own layer: Safari otherwise makes 300 layers when a re-sort starts (one 100-150 ms frame);
+   not on phones (style below), where that much layer memory is the greater risk */
 .txspines { position: absolute; left: 0; top: 0; width: 100%; aspect-ratio: auto; pointer-events: none; touch-action: auto; }
-.txspines > svg.sp { position: absolute; inset: 0 auto auto 0; width: 16px; height: 1px; overflow: visible; transition: transform 620ms cubic-bezier(.5, 0, .1, 1), opacity 200ms; }
+.txspines > svg.sp { position: absolute; inset: 0 auto auto 0; width: 16px; height: 1px; overflow: visible; will-change: transform; transition: transform 620ms cubic-bezier(.5, 0, .1, 1), opacity 200ms; }
 .txspines.still > svg.sp { transition: opacity 200ms; }
 .txspines .lift { transition: transform 120ms cubic-bezier(.3, 0, .2, 1); }
 .txspines .sp.up .lift { transform: translateY(-8px); }
@@ -542,6 +544,7 @@ svg.band { display: block; }
   #tx .txdrawer { order: 6; position: static; transform: none; transition: none; overflow: visible; padding: 4px 16px 20px; }
   .txshelf, .txlin, .txperf { order: 7; border-top: 1px solid var(--line); }
   .txshelf[data-hairline] { position: relative; inset: auto; overflow: visible; }
+  .txspines > svg.sp { will-change: auto; }
   .txlin, .txperf { position: relative; inset: auto; height: min(72vh, 620px); touch-action: pan-y pinch-zoom; }
   .drawhead { flex-wrap: wrap; }
   .drawcols { grid-template-columns: 1fr; }

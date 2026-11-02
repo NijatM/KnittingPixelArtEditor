@@ -313,7 +313,8 @@ sequenceDiagram
   spines with the hairline kernel: a straight-on camera gives every spine the same shape, so one path is reused
   and a CSS transform places it; sorting slides them, hit tests use the layout. Each spine is its own small svg in
   a layer over the boards' svg, so the browser moves them as layers while they slide (one svg of 1000 spines was
-  repainted whole every frame). `stage.ts` builds every structure's model while the page is idle. `main.ts` holds the state
+  repainted whole every frame); outside the phone layout each keeps its layer (`will-change`), and a re-sort only
+  moves them, since Safari would otherwise make and paint every layer as the slide starts. `stage.ts` builds every structure's model while the page is idle. `main.ts` holds the state
   (pointed at → after 120 ms current → pinned; the address follows the pin), the band below and the full record.
 - Three views share that state through one interface (`view.ts`: lift, current, pin, matches, neighbours for the
   keys, a mark's screen rectangle): the shelf; `lineage.ts`, the four layers on a canvas (fibres and structures in
@@ -384,8 +385,10 @@ Warnings only; nothing is blocked. The limits are rules of thumb for your yarn a
 There is no test suite in the repo; `npm run build` typechecks. Releases were checked with scripts kept outside the
 repo: headless Chrome and WebKit through Playwright (wide, narrow and phone layouts), real Safari through
 `safaridriver`, and engine checks (the published-behaviour checks above, CPU against GPU). The Knitting Taxonomy
-was checked with headless Chrome over the DevTools protocol (real GPU, touch emulation, 300 and 1000 samples) and
-with iOS and iPadOS Safari in the Xcode simulator through `safaridriver` (touch, layout, WebGL).
+was checked with headless Chrome over the DevTools protocol (real GPU, touch emulation, 300 and 1000 samples), with
+macOS Safari through `safaridriver` (the same checks and frame rates; Safari has to be quit first, it only takes
+automation when the driver starts it, and Low Power Mode holds its frame rate at 30), and with iOS and iPadOS Safari
+in the Xcode simulator through `safaridriver` (touch, layout, WebGL).
 
 ## Limits and open points
 

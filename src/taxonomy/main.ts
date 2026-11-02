@@ -108,15 +108,8 @@ export async function init(el: HTMLElement) {
   requestAnimationFrame(() => shelf.layout(sort, false));
   const ro = new ResizeObserver(() => { if ($(BOX[view]).clientWidth) v().resize(); });
   for (const b of Object.values(BOX)) ro.observe($(b));
-  // a bar too long for one line folds into two even ones (sections and views; finding and order) rather than
-  // leaving one group on a line of its own
-  const bar = $('.txbar'), brk = $('.txbreak');
-  new ResizeObserver(() => {
-    brk.hidden = true;
-    const items = [...bar.children].filter(e => !(e as HTMLElement).hidden && !e.matches('.txlive, .txbreak')) as HTMLElement[];
-    const mid = (e: HTMLElement) => e.offsetTop + e.offsetHeight / 2; // the bar centres each line's items
-    brk.hidden = Math.abs(mid(items[items.length - 1]) - mid(items[0])) < 4;
-  }).observe(bar);
+  // a frame later: folding inside the observer would change the size it just reported (a resize-observer loop)
+  new ResizeObserver(() => requestAnimationFrame(fold)).observe($('.txbar'));
 
   // a finger lifts what it passes over (hover() does not dwell then); letting go after a drag pins the one under it,
   // and the click the browser may send after that is ignored. A tap is left to the click (a second tap unpins).
@@ -251,6 +244,11 @@ function setView(name: ViewName) {
   v().show(false);
   $(BOX[view]).hidden = true;
   view = name;
+  // the bar first: the view below lays itself out once, at the height the bar leaves it
+  root.querySelectorAll<HTMLElement>('[data-view]').forEach(b => { const on = b.dataset.view === name; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
+  $('.txsort').hidden = name !== 'samples';
+  $('.txaxes').hidden = name !== 'performance';
+  fold();
   const el = $(BOX[name]);
   el.hidden = false;
   views[name] ??= name === 'lineage' ? mountLineage(el, db, events) : mountPerf(el, db, events);
@@ -259,9 +257,16 @@ function setView(name: ViewName) {
   v().show(true);
   stage?.source(v());
   search(find.value);
-  root.querySelectorAll<HTMLElement>('[data-view]').forEach(b => { const on = b.dataset.view === name; b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on)); });
-  $('.txsort').hidden = name !== 'samples';
-  $('.txaxes').hidden = name !== 'performance';
+}
+/** A bar too long for one line folds into two even ones (sections and views; finding and order) rather than leaving
+ * one group on a line of its own. Again with each view, whose items differ: a folded bar keeps its size when they
+ * shrink, so the observer alone would leave it folded. */
+function fold() {
+  const bar = $('.txbar'), brk = $('.txbreak');
+  brk.hidden = true;
+  const items = [...bar.children].filter(e => !(e as HTMLElement).hidden && !e.matches('.txlive, .txbreak')) as HTMLElement[];
+  const mid = (e: HTMLElement) => e.offsetTop + e.offsetHeight / 2; // the bar centres each line's items
+  brk.hidden = Math.abs(mid(items[items.length - 1]) - mid(items[0])) < 4;
 }
 function keys(e: KeyboardEvent) {
   const dir = ({ ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down', Home: 'home', End: 'end' } as Record<string, Dir>)[e.key];

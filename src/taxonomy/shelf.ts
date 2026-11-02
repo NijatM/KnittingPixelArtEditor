@@ -57,7 +57,7 @@ export function mountShelf(box: HTMLElement, db: DB, on: ViewEvents): Shelf {
 
   const spines = new Map<string, Spine>();
   for (const rec of db.recs) {
-    const g = mk('svg', { class: 'sp', id: `sp-${rec.s.sample_id}`, 'aria-label': `${rec.s.sample_id}, ${rec.s.sample_name}` }, layer) as SVGSVGElement;
+    const g = mk('svg', { class: 'sp', id: `sp-${rec.s.sample_id}`, role: 'option', 'aria-label': `${rec.s.sample_id}, ${rec.s.sample_name}` }, layer) as SVGSVGElement;
     const lift = mk('g', { class: 'lift' }, g);
     const sil = mk('path', { class: 'sil' }, lift), cr = mk('path', { class: 'nf lo' }, lift);
     const bands = mk('g', {}, lift) as SVGGElement;
@@ -79,6 +79,8 @@ export function mountShelf(box: HTMLElement, db: DB, on: ViewEvents): Shelf {
 
   // ---------------------------------------------------------------- layout
   let by: SortKey = 'id', ord: Rec[] = db.recs.slice(), rowH = 0, xoff = 0, top = 6, pinY = 0;
+  /** the spine height the shapes were last drawn for: a re-sort only moves them (redrawing makes Safari repaint all) */
+  let drawnFH = 0;
   let rows: { y: number; foot: number; items: { x: number; rec: Rec }[] }[] = [];
 
   function flow(avail: number) {
@@ -124,13 +126,14 @@ export function mountShelf(box: HTMLElement, db: DB, on: ViewEvents): Shelf {
       const p = f.pos.get(sp.rec.s.sample_id)!, row = rows[p.row];
       row.items.push({ x: p.x, rec: sp.rec });
       sp.g.style.transform = `translate(${xoff + p.x}px, ${row.foot}px)`;
+      if (FH === drawnFH) continue;
       sp.sil.setAttribute('d', sh.sil);
       sp.cr.setAttribute('d', sh.crease);
       sp.mark.setAttribute('transform', `translate(2 ${-FH + 7})`);
       const above = BAND_FOOT + sp.nb * (BAND + BAND_GAP) + 4;
       sp.id.setAttribute('transform', `translate(${SW / 2} ${-above}) rotate(-90)`);
-      sp.g.setAttribute('role', 'option');
     }
+    drawnFH = FH;
     rows.forEach(r => r.items.sort((a, b) => a.x - b.x));
     boards.replaceChildren();
     for (const r of rows) {
