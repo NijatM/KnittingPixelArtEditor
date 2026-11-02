@@ -1,0 +1,22 @@
+{
+  "vocabulary_id": "structure",
+  "version": "0.1.0",
+  "updated": "2026-11-02",
+  "note": "Weft-knit structures, grouped by the four base families. Our wording. All terms are proposals awaiting review.",
+  "terms": [
+    { "id": "single_jersey",  "family": "plain",     "label": "Single jersey",  "definition": "Every needle knits on one bed; all loops are drawn to the same side.", "pattern": null, "status": "proposed" },
+    { "id": "plated_jersey",  "family": "plain",     "label": "Plated jersey",  "definition": "Single jersey knitted with two yarns in the same loops, one kept on the face and one on the back.", "pattern": null, "status": "proposed" },
+    { "id": "tuck_jersey",    "family": "plain",     "label": "Tuck jersey",    "definition": "Single jersey with tuck stitches: a needle takes yarn without casting off its loop.", "pattern": "bubble", "status": "proposed" },
+    { "id": "float_jersey",   "family": "plain",     "label": "Float jersey",   "definition": "Single jersey with missed needles, so the yarn floats past them on the back.", "pattern": null, "status": "proposed" },
+    { "id": "eyelet_jersey",  "family": "plain",     "label": "Eyelet jersey",  "definition": "Single jersey with loops transferred to a neighbouring needle, leaving holes.", "pattern": "window", "status": "proposed" },
+    { "id": "rib_1x1",        "family": "rib",       "label": "1×1 rib",        "definition": "Both beds knit, alternating one wale on each.", "pattern": null, "status": "proposed" },
+    { "id": "rib_2x2",        "family": "rib",       "label": "2×2 rib",        "definition": "Both beds knit, alternating two wales on each.", "pattern": null, "status": "proposed" },
+    { "id": "half_cardigan",  "family": "rib",       "label": "Half cardigan",  "definition": "Rib in which one bed tucks on alternate courses.", "pattern": null, "status": "proposed" },
+    { "id": "full_cardigan",  "family": "rib",       "label": "Full cardigan",  "definition": "Rib in which the beds tuck in turn on alternate courses.", "pattern": null, "status": "proposed" },
+    { "id": "milano_rib",     "family": "rib",       "label": "Milano rib",     "definition": "A course of rib followed by one course on each bed alone.", "pattern": null, "status": "proposed" },
+    { "id": "purl_1x1",       "family": "purl",      "label": "1×1 purl (garter)", "definition": "Courses alternate between the beds, so face and back loops alternate course by course.", "pattern": "ridges", "status": "proposed" },
+    { "id": "interlock",      "family": "interlock", "label": "Interlock",      "definition": "Two 1×1 ribs knitted into each other on alternate needles, smooth on both sides.", "pattern": null, "status": "proposed" },
+    { "id": "punto_di_roma",  "family": "interlock", "label": "Punto di Roma",  "definition": "A course of interlock followed by one course on each bed alone.", "pattern": null, "status": "proposed" },
+    { "id": "double_jacquard","family": "interlock", "label": "Double jacquard","definition": "Two or more yarns: the face shows a picture, the back bed knits a backing.", "pattern": "picture", "status": "proposed" }
+  ]
+}

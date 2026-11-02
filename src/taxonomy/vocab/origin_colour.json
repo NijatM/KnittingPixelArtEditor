@@ -1,0 +1,12 @@
+{
+  "vocabulary_id": "origin_colour",
+  "version": "0.1.0",
+  "updated": "2026-11-02",
+  "note": "PROVISIONAL, to confirm with material_bank (ADR-0005 names no colours). Colour codes for fiber_origin on spines, lineage nodes and model yarn. Blend yarns are split by share; no blend colour. Picked from the Okabe-Ito colour-blind-safe set.",
+  "terms": [
+    { "id": "natural",     "srgb": "#009E73", "status": "provisional" },
+    { "id": "regenerated", "srgb": "#56B4E9", "status": "provisional" },
+    { "id": "synthetic",   "srgb": "#CC79A7", "status": "provisional" },
+    { "id": "unknown",     "srgb": "#6e6e6e", "pattern": "hatched", "status": "provisional" }
+  ]
+}

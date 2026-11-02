@@ -1,0 +1,12 @@
+{
+  "vocabulary_id": "yarn_role",
+  "version": "0.1.0",
+  "updated": "2026-11-02",
+  "note": "The role a yarn plays in a sample (sample_yarn.yarn_role). Our wording. Proposals awaiting review.",
+  "terms": [
+    { "id": "main",    "label": "Main",    "definition": "The ground yarn that forms the structure.", "status": "proposed" },
+    { "id": "plating", "label": "Plating", "definition": "Knitted in the same loops as the main yarn, kept on one side of the fabric.", "status": "proposed" },
+    { "id": "inlay",   "label": "Inlay",   "definition": "Laid into the fabric without forming loops, for example an elastic yarn.", "status": "proposed" },
+    { "id": "contrast","label": "Contrast","definition": "A second yarn for a picture or stripes, knitting where the pattern asks for it.", "status": "proposed" }
+  ]
+}
